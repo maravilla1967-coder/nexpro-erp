@@ -1,0 +1,165 @@
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { api } from '../api.js';
+import Modal from '../components/Modal.jsx';
+import Pill from '../components/Pill.jsx';
+
+export default function WorkOrdersList() {
+  const [list, setList] = useState([]);
+  const [status, setStatus] = useState('');
+  const [mechanics, setMechanics] = useState([]);
+  const [services, setServices] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [woMechanicId, setWoMechanicId] = useState('');
+  const [woStatus, setWoStatus] = useState('pendiente');
+  const [woServices, setWoServices] = useState([]);
+  const [error, setError] = useState('');
+
+  function load() { api.get('/work-orders', { status }).then(setList).catch(console.error); }
+  useEffect(() => { load(); }, [status]);
+  useEffect(() => {
+    api.get('/mechanics', { active: 'true' }).then(setMechanics);
+    api.get('/services', { active: 'true' }).then(setServices);
+  }, []);
+
+  function openEdit(wo) {
+    setEditing(wo);
+    setWoMechanicId(wo.mechanic_id || '');
+    setWoStatus(wo.status);
+    setWoServices(wo.services.map((s) => ({ ...s, hours: s.hours ?? 0, hourlyRate: s.hourly_rate ?? 0, flatPrice: s.flat_price ?? 0, pricingType: s.pricing_type })));
+    setError('');
+  }
+
+  function updateWoService(idx, field, value) {
+    const copy = [...woServices];
+    copy[idx] = { ...copy[idx], [field]: value };
+    setWoServices(copy);
+  }
+  function pickService(idx, serviceId) {
+    const svc = services.find((s) => String(s.id) === String(serviceId));
+    const copy = [...woServices];
+    copy[idx] = {
+      ...copy[idx], service_id: serviceId, description: svc ? svc.name : copy[idx].description,
+      pricingType: svc ? svc.pricing_type : copy[idx].pricingType,
+      hourlyRate: svc ? svc.hourly_rate : copy[idx].hourlyRate,
+      flatPrice: svc ? svc.flat_price : copy[idx].flatPrice,
+    };
+    setWoServices(copy);
+  }
+  function addRow() { setWoServices([...woServices, { description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 }]); }
+  function removeRow(idx) { setWoServices(woServices.filter((_, i) => i !== idx)); }
+
+  async function saveEdit(e) {
+    e.preventDefault();
+    const payload = {
+      mechanicId: woMechanicId || null, status: woStatus,
+      services: woServices.filter((s) => s.description).map((s) => ({
+        serviceId: s.service_id || s.serviceId || null, description: s.description, pricingType: s.pricingType,
+        hours: parseFloat(s.hours) || 0, hourlyRate: parseFloat(s.hourlyRate) || 0, flatPrice: parseFloat(s.flatPrice) || 0,
+      })),
+    };
+    try { await api.put(`/work-orders/${editing.id}`, payload); setEditing(null); load(); }
+    catch (err) { setError(err.message); }
+  }
+
+  const total = woServices.reduce((sum, s) => sum + (s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0)), 0);
+
+  return (
+    <>
+      <div className="topbar">
+        <div><h1>Órdenes de Trabajo</h1><div className="sub">Servicios asignados a mecánicos por vehículo</div></div>
+      </div>
+      <div className="content">
+        <div className="toolbar">
+          <select style={{ width: 200 }} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">Todos los estados</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="en_proceso">En proceso</option>
+            <option value="completado">Completado</option>
+            <option value="facturado">Facturado</option>
+          </select>
+        </div>
+        <div className="card">
+          {list.length === 0 ? <div className="empty-state">No hay órdenes de trabajo todavía. Se crean desde la ficha del vehículo.</div> : (
+            <table>
+              <thead><tr><th>Número</th><th>Vehículo</th><th>Mecánico</th><th>Total</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+              <tbody>
+                {list.map((wo) => (
+                  <tr key={wo.id}>
+                    <td className="mono">{wo.number}</td>
+                    <td><Link to={`/vehiculos/${wo.vehicle_id}`}>{wo.vin}</Link> <span className="muted">{wo.make} {wo.model}</span></td>
+                    <td>{wo.mechanic_name || '—'}</td>
+                    <td><strong>${Number(wo.total).toLocaleString()}</strong></td>
+                    <td><Pill value={wo.status} /></td>
+                    <td className="muted">{wo.created_at}</td>
+                    <td><button className="link-btn" onClick={() => openEdit(wo)}>Editar</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {editing && (
+        <Modal title={`Orden de trabajo ${editing.number}`} onClose={() => setEditing(null)} wide>
+          <form onSubmit={saveEdit}>
+            {error && <div className="error-banner">{error}</div>}
+            <div className="grid grid-2">
+              <div className="field"><label>Mecánico</label>
+                <select value={woMechanicId} onChange={(e) => setWoMechanicId(e.target.value)}>
+                  <option value="">— Sin asignar —</option>
+                  {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>Estado</label>
+                <select value={woStatus} onChange={(e) => setWoStatus(e.target.value)}>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="en_proceso">En proceso</option>
+                  <option value="completado">Completado</option>
+                  <option value="facturado">Facturado</option>
+                </select>
+              </div>
+            </div>
+            <table className="line-items-table">
+              <thead><tr><th>Servicio</th><th>Descripción</th><th style={{ width: 120 }}>Tipo</th><th style={{ width: 80 }}>Horas</th><th style={{ width: 100 }}>$/hora</th><th style={{ width: 110 }}>$ fijo</th><th style={{ width: 90 }}>Total</th><th></th></tr></thead>
+              <tbody>
+                {woServices.map((s, idx) => {
+                  const rowTotal = s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0);
+                  return (
+                    <tr key={idx}>
+                      <td>
+                        <select value={s.service_id || s.serviceId || ''} onChange={(e) => pickService(idx, e.target.value)}>
+                          <option value="">— manual —</option>
+                          {services.map((sv) => <option key={sv.id} value={sv.id}>{sv.name}</option>)}
+                        </select>
+                      </td>
+                      <td><input value={s.description} onChange={(e) => updateWoService(idx, 'description', e.target.value)} /></td>
+                      <td>
+                        <select value={s.pricingType} onChange={(e) => updateWoService(idx, 'pricingType', e.target.value)}>
+                          <option value="hora">Por hora</option>
+                          <option value="servicio_completo">Servicio completo</option>
+                        </select>
+                      </td>
+                      <td><input type="number" step="0.25" disabled={s.pricingType !== 'hora'} value={s.hours} onChange={(e) => updateWoService(idx, 'hours', e.target.value)} /></td>
+                      <td><input type="number" step="0.01" disabled={s.pricingType !== 'hora'} value={s.hourlyRate} onChange={(e) => updateWoService(idx, 'hourlyRate', e.target.value)} /></td>
+                      <td><input type="number" step="0.01" disabled={s.pricingType !== 'servicio_completo'} value={s.flatPrice} onChange={(e) => updateWoService(idx, 'flatPrice', e.target.value)} /></td>
+                      <td className="text-right">${rowTotal.toLocaleString()}</td>
+                      <td><button type="button" className="link-btn" onClick={() => removeRow(idx)}>✕</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addRow}>+ Agregar servicio</button>
+            <div className="text-right" style={{ marginTop: 10, fontWeight: 700 }}>Total: ${total.toLocaleString()}</div>
+            <div className="modal-footer">
+              <button type="button" className="btn" onClick={() => setEditing(null)}>Cancelar</button>
+              <button type="submit" className="btn btn-primary">Guardar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
