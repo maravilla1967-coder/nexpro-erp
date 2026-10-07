@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../i18n.jsx';
 
 const COLORS = {
   lead: 'gray', prospecto: 'blue', cliente: 'green', inactivo: 'gray',
@@ -10,8 +11,9 @@ const COLORS = {
 };
 
 export default function Pill({ value }) {
+  const { t } = useI18n();
   if (!value) return null;
   const color = COLORS[value] || 'gray';
-  const label = value.replace(/_/g, ' ');
+  const label = t(value.replace(/_/g, ' '));
   return <span className={`pill ${color}`}>{label}</span>;
 }

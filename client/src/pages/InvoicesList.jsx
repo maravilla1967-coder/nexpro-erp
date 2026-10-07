@@ -4,8 +4,10 @@ import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import LineItemsEditor from '../components/LineItemsEditor.jsx';
+import { useI18n } from '../i18n.jsx';
 
 export default function InvoicesList() {
+  const { t } = useI18n();
   const [list, setList] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -41,14 +43,14 @@ export default function InvoicesList() {
   return (
     <>
       <div className="topbar">
-        <div><h1>Facturación</h1><div className="sub">Facturas a clientes</div></div>
-        <button className="btn btn-primary" onClick={openNew}>+ Nueva factura</button>
+        <div><h1>{t('Facturación')}</h1><div className="sub">{t('Facturas a clientes')}</div></div>
+        <button className="btn btn-primary" onClick={openNew}>{t('+ Nueva factura')}</button>
       </div>
       <div className="content">
         <div className="card">
-          {list.length === 0 ? <div className="empty-state">No hay facturas todavía.</div> : (
+          {list.length === 0 ? <div className="empty-state">{t('No hay facturas todavía.')}</div> : (
             <table>
-              <thead><tr><th>Número</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+              <thead><tr><th>{t('Número')}</th><th>{t('Cliente')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th></tr></thead>
               <tbody>
                 {list.map((inv) => (
                   <tr key={inv.id}>
@@ -58,8 +60,8 @@ export default function InvoicesList() {
                     <td><Pill value={inv.status} /></td>
                     <td className="muted">{inv.issue_date}</td>
                     <td>
-                      <Link to={`/facturas/${inv.id}`} className="link-btn">Ver / Imprimir</Link>{' '}
-                      {inv.status === 'pendiente' && <button className="link-btn" onClick={() => markPaid(inv.id)}>Marcar pagada</button>}
+                      <Link to={`/facturas/${inv.id}`} className="link-btn">{t('Ver / Imprimir')}</Link>{' '}
+                      {inv.status === 'pendiente' && <button className="link-btn" onClick={() => markPaid(inv.id)}>{t('Marcar pagada')}</button>}
                     </td>
                   </tr>
                 ))}
@@ -70,22 +72,22 @@ export default function InvoicesList() {
       </div>
 
       {modalOpen && (
-        <Modal title="Nueva factura" onClose={() => setModalOpen(false)} wide>
+        <Modal title={t('Nueva factura')} onClose={() => setModalOpen(false)} wide>
           <form onSubmit={save}>
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
-              <div className="field"><label>Cliente *</label>
+              <div className="field"><label>{t('Cliente *')}</label>
                 <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                  <option value="">— Seleccionar —</option>
+                  <option value="">{t('— Seleccionar —')}</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div className="field"><label>Impuesto (%)</label><input type="number" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} /></div>
+              <div className="field"><label>{t('Impuesto (%)')}</label><input type="number" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} /></div>
             </div>
             <LineItemsEditor items={items} setItems={setItems} products={products} priceLabel="Precio unit." priceSourceField="selling_price" />
             <div className="modal-footer">
-              <button type="button" className="btn" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Guardar</button>
+              <button type="button" className="btn" onClick={() => setModalOpen(false)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Guardar')}</button>
             </div>
           </form>
         </Modal>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
+import { useI18n } from './i18n.jsx';
 
 import Dashboard from './pages/Dashboard.jsx';
 import CustomersList from './pages/CustomersList.jsx';
@@ -48,7 +49,24 @@ const NAV = [
   },
 ];
 
+function LanguageToggle() {
+  const { lang, toggle } = useI18n();
+  return (
+    <button
+      type="button"
+      className="btn btn-sm"
+      onClick={toggle}
+      title={lang === 'es' ? 'Switch to English' : 'Cambiar a Español'}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'center' }}
+    >
+      <span>🌐</span>
+      <span>{lang === 'es' ? 'ES' : 'EN'} / {lang === 'es' ? 'EN' : 'ES'}</span>
+    </button>
+  );
+}
+
 export default function App() {
+  const { t } = useI18n();
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -59,9 +77,12 @@ export default function App() {
             <span>Trucks &amp; Equipment Corp.</span>
           </div>
         </div>
+        <div style={{ padding: '0 14px 10px' }}>
+          <LanguageToggle />
+        </div>
         {NAV.map((group) => (
           <div className="nav-group" key={group.label}>
-            <div className="nav-label">{group.label}</div>
+            <div className="nav-label">{t(group.label)}</div>
             {group.links.map((link) => (
               <NavLink
                 key={link.to}
@@ -70,7 +91,7 @@ export default function App() {
                 className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               >
                 <span>{link.icon}</span>
-                <span>{link.text}</span>
+                <span>{t(link.text)}</span>
               </NavLink>
             ))}
           </div>

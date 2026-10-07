@@ -2,15 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
+import { useI18n } from '../i18n.jsx';
 
 export default function Dashboard() {
+  const { t } = useI18n();
   const [data, setData] = useState(null);
 
   useEffect(() => {
     api.get('/dashboard').then(setData).catch(console.error);
   }, []);
 
-  if (!data) return <div className="content">Cargando…</div>;
+  if (!data) return <div className="content">{t('Cargando…')}</div>;
   const { totals, recentActivities, recentVehicles } = data;
 
   return (
@@ -18,40 +20,40 @@ export default function Dashboard() {
       <div className="topbar">
         <div>
           <h1>Dashboard</h1>
-          <div className="sub">Resumen general de Nexpro</div>
+          <div className="sub">{t('Resumen general de Nexpro')}</div>
         </div>
       </div>
       <div className="content">
         <div className="grid grid-4" style={{ marginBottom: 8 }}>
           <div className="kpi">
-            <div className="label">Clientes / Leads</div>
+            <div className="label">{t('Clientes / Leads')}</div>
             <div className="value">{totals.customers}</div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{totals.leads} leads activos</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{totals.leads} {t('leads activos')}</div>
           </div>
           <div className="kpi">
-            <div className="label">Vehículos en taller</div>
+            <div className="label">{t('Vehículos en taller')}</div>
             <div className="value">{totals.vehiclesInShop}</div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{totals.openWorkOrders} órdenes de trabajo abiertas</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{totals.openWorkOrders} {t('órdenes de trabajo abiertas')}</div>
           </div>
           <div className="kpi">
-            <div className="label">Pedidos abiertos</div>
+            <div className="label">{t('Pedidos abiertos')}</div>
             <div className="value">{totals.openSalesOrders}</div>
           </div>
           <div className="kpi">
-            <div className="label">Facturas pendientes</div>
+            <div className="label">{t('Facturas pendientes')}</div>
             <div className={`value ${totals.pendingInvoices > 0 ? 'alert' : ''}`}>${Number(totals.pendingInvoicesTotal).toLocaleString()}</div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{totals.pendingInvoices} facturas</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{totals.pendingInvoices} {t('facturas')}</div>
           </div>
         </div>
 
         <div className="grid grid-2">
           <div className="card">
-            <div className="card-title">Vehículos recibidos recientemente</div>
+            <div className="card-title">{t('Vehículos recibidos recientemente')}</div>
             {recentVehicles.length === 0 ? (
-              <div className="empty-state">Aún no se han recibido vehículos.</div>
+              <div className="empty-state">{t('Aún no se han recibido vehículos.')}</div>
             ) : (
               <table>
-                <thead><tr><th>VIN</th><th>Vehículo</th><th>Cliente</th><th>Estado</th></tr></thead>
+                <thead><tr><th>VIN</th><th>{t('Vehículo')}</th><th>{t('Cliente')}</th><th>{t('Estado')}</th></tr></thead>
                 <tbody>
                   {recentVehicles.map((v) => (
                     <tr key={v.id} className="clickable">
@@ -67,12 +69,12 @@ export default function Dashboard() {
           </div>
 
           <div className="card">
-            <div className="card-title">Tareas y seguimientos pendientes (CRM)</div>
+            <div className="card-title">{t('Tareas y seguimientos pendientes (CRM)')}</div>
             {recentActivities.length === 0 ? (
-              <div className="empty-state">No hay tareas pendientes.</div>
+              <div className="empty-state">{t('No hay tareas pendientes.')}</div>
             ) : (
               <table>
-                <thead><tr><th>Cliente</th><th>Asunto</th><th>Fecha</th></tr></thead>
+                <thead><tr><th>{t('Cliente')}</th><th>{t('Asunto')}</th><th>{t('Fecha')}</th></tr></thead>
                 <tbody>
                   {recentActivities.map((a) => (
                     <tr key={a.id}>

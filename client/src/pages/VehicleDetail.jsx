@@ -3,10 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
+import { useI18n } from '../i18n.jsx';
 
 const EQUIP_EMPTY = { equipmentTypeId: '', customTypeName: '', serialNumber: '', manufacturer: '', model: '', notes: '' };
 
 export default function VehicleDetail() {
+  const { t } = useI18n();
   const { id } = useParams();
   const navigate = useNavigate();
   const [vehicle, setVehicle] = useState(null);
@@ -32,7 +34,7 @@ export default function VehicleDetail() {
   }, []);
 
   async function remove() {
-    if (!window.confirm('¿Eliminar este vehículo y todo su historial?')) return;
+    if (!window.confirm(t('¿Eliminar este vehículo y todo su historial?'))) return;
     await api.del(`/vehicles/${id}`);
     navigate('/vehiculos');
   }
@@ -50,7 +52,7 @@ export default function VehicleDetail() {
   }
 
   async function deleteEquip(eid) {
-    if (!window.confirm('¿Eliminar este equipo del vehículo?')) return;
+    if (!window.confirm(t('¿Eliminar este equipo del vehículo?'))) return;
     await api.del(`/vehicles/equipment/${eid}`);
     load();
   }
@@ -92,7 +94,7 @@ export default function VehicleDetail() {
     catch (err) { setError(err.message); }
   }
 
-  if (!vehicle) return <div className="content">Cargando…</div>;
+  if (!vehicle) return <div className="content">{t('Cargando…')}</div>;
 
   const woTotalPreview = woServices.reduce((sum, s) => {
     if (s.pricingType === 'servicio_completo') return sum + (parseFloat(s.flatPrice) || 0);
@@ -104,40 +106,40 @@ export default function VehicleDetail() {
       <div className="topbar">
         <div>
           <h1 className="mono">{vehicle.vin}</h1>
-          <div className="sub">{vehicle.make} {vehicle.model} {vehicle.year} {vehicle.chassis_type ? `· Chasis ${vehicle.chassis_type}` : ''} · <Pill value={vehicle.status} /></div>
+          <div className="sub">{vehicle.make} {vehicle.model} {vehicle.year} {vehicle.chassis_type ? `· ${t('Chasis')} ${vehicle.chassis_type}` : ''} · <Pill value={vehicle.status} /></div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link to="/vehiculos" className="btn">← Volver</Link>
-          <button className="btn btn-danger" onClick={remove}>Eliminar</button>
+          <Link to="/vehiculos" className="btn">{t('← Volver')}</Link>
+          <button className="btn btn-danger" onClick={remove}>{t('Eliminar')}</button>
         </div>
       </div>
       <div className="content">
         <div className="grid grid-2">
           <div className="card">
-            <div className="card-title">Datos del vehículo</div>
+            <div className="card-title">{t('Datos del vehículo')}</div>
             {vehicle.photo_url && <img src={vehicle.photo_url} className="thumb-lg" style={{ marginBottom: 12 }} />}
-            <div><strong>Cliente:</strong> {vehicle.customer_name ? <Link to={`/clientes/${vehicle.customer_id}`}>{vehicle.customer_name}</Link> : '—'}</div>
-            <div><strong>Placa:</strong> {vehicle.plate || '—'}</div>
-            <div><strong>Recibido:</strong> {vehicle.received_at}</div>
-            <div><strong>Notas:</strong> {vehicle.notes || '—'}</div>
+            <div><strong>{t('Cliente:')}</strong> {vehicle.customer_name ? <Link to={`/clientes/${vehicle.customer_id}`}>{vehicle.customer_name}</Link> : '—'}</div>
+            <div><strong>{t('Placa:')}</strong> {vehicle.plate || '—'}</div>
+            <div><strong>{t('Recibido:')}</strong> {vehicle.received_at}</div>
+            <div><strong>{t('Notas:')}</strong> {vehicle.notes || '—'}</div>
           </div>
 
           <div className="card">
             <div className="card-title">
-              Equipos instalados en el chasis
-              <button className="btn btn-sm btn-primary" onClick={openEquipModal}>+ Agregar equipo</button>
+              {t('Equipos instalados en el chasis')}
+              <button className="btn btn-sm btn-primary" onClick={openEquipModal}>{t('+ Agregar equipo')}</button>
             </div>
-            {vehicle.equipment.length === 0 ? <div className="empty-state">Sin equipos registrados aún.</div> : (
+            {vehicle.equipment.length === 0 ? <div className="empty-state">{t('Sin equipos registrados aún.')}</div> : (
               <table>
-                <thead><tr><th>Tipo</th><th>Serie</th><th>Fabricante</th><th>Modelo</th><th></th></tr></thead>
+                <thead><tr><th>{t('Tipo')}</th><th>{t('Serie')}</th><th>{t('Fabricante')}</th><th>{t('Modelo')}</th><th></th></tr></thead>
                 <tbody>
                   {vehicle.equipment.map((e) => (
                     <tr key={e.id}>
-                      <td>{e.equipment_type_name || e.custom_type_name} {!e.equipment_type_name && <span className="pill amber" style={{ marginLeft: 6 }}>nuevo</span>}</td>
+                      <td>{e.equipment_type_name || e.custom_type_name} {!e.equipment_type_name && <span className="pill amber" style={{ marginLeft: 6 }}>{t('nuevo')}</span>}</td>
                       <td className="mono">{e.serial_number || '—'}</td>
                       <td>{e.manufacturer || '—'}</td>
                       <td>{e.model || '—'}</td>
-                      <td><button className="link-btn" onClick={() => deleteEquip(e.id)}>Eliminar</button></td>
+                      <td><button className="link-btn" onClick={() => deleteEquip(e.id)}>{t('Eliminar')}</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -148,12 +150,12 @@ export default function VehicleDetail() {
 
         <div className="card">
           <div className="card-title">
-            Órdenes de trabajo
-            <button className="btn btn-sm btn-primary" onClick={openWoModal}>+ Nueva orden de trabajo</button>
+            {t('Órdenes de trabajo')}
+            <button className="btn btn-sm btn-primary" onClick={openWoModal}>{t('+ Nueva orden de trabajo')}</button>
           </div>
-          {vehicle.workOrders.length === 0 ? <div className="empty-state">Sin órdenes de trabajo todavía.</div> : (
+          {vehicle.workOrders.length === 0 ? <div className="empty-state">{t('Sin órdenes de trabajo todavía.')}</div> : (
             <table>
-              <thead><tr><th>Número</th><th>Mecánico</th><th>Estado</th><th>Fecha</th></tr></thead>
+              <thead><tr><th>{t('Número')}</th><th>{t('Mecánico')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th></tr></thead>
               <tbody>
                 {vehicle.workOrders.map((wo) => (
                   <tr key={wo.id}>
@@ -166,63 +168,63 @@ export default function VehicleDetail() {
               </tbody>
             </table>
           )}
-          <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>Gestiona el detalle de horas/servicios de cada orden en <Link to="/ordenes-trabajo">Órdenes de Trabajo</Link>.</div>
+          <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>{t('Gestiona el detalle de horas/servicios de cada orden en')} <Link to="/ordenes-trabajo">{t('Órdenes de Trabajo')}</Link>.</div>
         </div>
       </div>
 
       {equipModalOpen && (
-        <Modal title="Agregar equipo instalado" onClose={() => setEquipModalOpen(false)}>
+        <Modal title={t('Agregar equipo instalado')} onClose={() => setEquipModalOpen(false)}>
           <form onSubmit={saveEquip}>
             {error && <div className="error-banner">{error}</div>}
             <div className="field">
-              <label>Tipo de equipo *</label>
+              <label>{t('Tipo de equipo *')}</label>
               {!useNewType ? (
                 <>
                   <select value={equipForm.equipmentTypeId} onChange={(e) => setEquipForm({ ...equipForm, equipmentTypeId: e.target.value })}>
-                    <option value="">— Seleccionar de la lista —</option>
-                    {equipTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    <option value="">{t('— Seleccionar de la lista —')}</option>
+                    {equipTypes.map((t2) => <option key={t2.id} value={t2.id}>{t2.name}</option>)}
                   </select>
                   <button type="button" className="link-btn" style={{ marginTop: 6 }} onClick={() => { setUseNewType(true); setEquipForm({ ...equipForm, equipmentTypeId: '' }); }}>
-                    No está en la lista, crear uno nuevo
+                    {t('No está en la lista, crear uno nuevo')}
                   </button>
                 </>
               ) : (
                 <>
-                  <input placeholder="Nombre del nuevo tipo de equipo" value={equipForm.customTypeName} onChange={(e) => setEquipForm({ ...equipForm, customTypeName: e.target.value })} />
+                  <input placeholder={t('Nombre del nuevo tipo de equipo')} value={equipForm.customTypeName} onChange={(e) => setEquipForm({ ...equipForm, customTypeName: e.target.value })} />
                   <button type="button" className="link-btn" style={{ marginTop: 6 }} onClick={() => { setUseNewType(false); setEquipForm({ ...equipForm, customTypeName: '' }); }}>
-                    Usar la lista existente
+                    {t('Usar la lista existente')}
                   </button>
                 </>
               )}
             </div>
             <div className="grid grid-2">
-              <div className="field"><label>Número de serie</label><input value={equipForm.serialNumber} onChange={(e) => setEquipForm({ ...equipForm, serialNumber: e.target.value })} /></div>
-              <div className="field"><label>Fabricante</label><input value={equipForm.manufacturer} onChange={(e) => setEquipForm({ ...equipForm, manufacturer: e.target.value })} /></div>
-              <div className="field"><label>Modelo</label><input value={equipForm.model} onChange={(e) => setEquipForm({ ...equipForm, model: e.target.value })} /></div>
+              <div className="field"><label>{t('Número de serie')}</label><input value={equipForm.serialNumber} onChange={(e) => setEquipForm({ ...equipForm, serialNumber: e.target.value })} /></div>
+              <div className="field"><label>{t('Fabricante')}</label><input value={equipForm.manufacturer} onChange={(e) => setEquipForm({ ...equipForm, manufacturer: e.target.value })} /></div>
+              <div className="field"><label>{t('Modelo')}</label><input value={equipForm.model} onChange={(e) => setEquipForm({ ...equipForm, model: e.target.value })} /></div>
             </div>
-            <div className="field"><label>Notas</label><textarea rows={2} value={equipForm.notes} onChange={(e) => setEquipForm({ ...equipForm, notes: e.target.value })} /></div>
+            <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={equipForm.notes} onChange={(e) => setEquipForm({ ...equipForm, notes: e.target.value })} /></div>
             <div className="modal-footer">
-              <button type="button" className="btn" onClick={() => setEquipModalOpen(false)}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Guardar equipo</button>
+              <button type="button" className="btn" onClick={() => setEquipModalOpen(false)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Guardar equipo')}</button>
             </div>
           </form>
         </Modal>
       )}
 
       {woModalOpen && (
-        <Modal title="Nueva orden de trabajo" onClose={() => setWoModalOpen(false)} wide>
+        <Modal title={t('Nueva orden de trabajo')} onClose={() => setWoModalOpen(false)} wide>
           <form onSubmit={saveWorkOrder}>
             {error && <div className="error-banner">{error}</div>}
             <div className="field">
-              <label>Mecánico asignado</label>
+              <label>{t('Mecánico asignado')}</label>
               <select value={woMechanicId} onChange={(e) => setWoMechanicId(e.target.value)}>
-                <option value="">— Sin asignar —</option>
+                <option value="">{t('— Sin asignar —')}</option>
                 {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>Servicios a realizar</label>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Servicios a realizar')}</label>
             <table className="line-items-table" style={{ marginTop: 6 }}>
-              <thead><tr><th>Servicio</th><th>Descripción</th><th style={{ width: 120 }}>Tipo</th><th style={{ width: 80 }}>Horas</th><th style={{ width: 100 }}>$/hora</th><th style={{ width: 110 }}>$ fijo</th><th style={{ width: 90 }}>Total</th><th></th></tr></thead>
+              <thead><tr><th>{t('Servicio')}</th><th>{t('Descripción')}</th><th style={{ width: 120 }}>{t('Tipo')}</th><th style={{ width: 80 }}>{t('Horas')}</th><th style={{ width: 100 }}>{t('$/hora')}</th><th style={{ width: 110 }}>{t('$ fijo')}</th><th style={{ width: 90 }}>{t('Total')}</th><th></th></tr></thead>
               <tbody>
                 {woServices.map((s, idx) => {
                   const total = s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0);
@@ -237,8 +239,8 @@ export default function VehicleDetail() {
                       <td><input value={s.description} onChange={(e) => updateWoService(idx, 'description', e.target.value)} /></td>
                       <td>
                         <select value={s.pricingType} onChange={(e) => updateWoService(idx, 'pricingType', e.target.value)}>
-                          <option value="hora">Por hora</option>
-                          <option value="servicio_completo">Servicio completo</option>
+                          <option value="hora">{t('Por hora')}</option>
+                          <option value="servicio_completo">{t('Servicio completo')}</option>
                         </select>
                       </td>
                       <td><input type="number" step="0.25" disabled={s.pricingType !== 'hora'} value={s.hours} onChange={(e) => updateWoService(idx, 'hours', e.target.value)} /></td>
@@ -251,11 +253,11 @@ export default function VehicleDetail() {
                 })}
               </tbody>
             </table>
-            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addWoServiceRow}>+ Agregar servicio</button>
-            <div className="text-right" style={{ marginTop: 10, fontWeight: 700 }}>Total estimado: ${woTotalPreview.toLocaleString()}</div>
+            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addWoServiceRow}>{t('+ Agregar servicio')}</button>
+            <div className="text-right" style={{ marginTop: 10, fontWeight: 700 }}>{t('Total estimado:')} ${woTotalPreview.toLocaleString()}</div>
             <div className="modal-footer">
-              <button type="button" className="btn" onClick={() => setWoModalOpen(false)}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Crear orden de trabajo</button>
+              <button type="button" className="btn" onClick={() => setWoModalOpen(false)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Crear orden de trabajo')}</button>
             </div>
           </form>
         </Modal>

@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
+import { useI18n } from '../i18n.jsx';
 
 export default function WorkOrdersList() {
+  const { t } = useI18n();
   const [list, setList] = useState([]);
   const [status, setStatus] = useState('');
   const [mechanics, setMechanics] = useState([]);
@@ -67,22 +69,22 @@ export default function WorkOrdersList() {
   return (
     <>
       <div className="topbar">
-        <div><h1>Órdenes de Trabajo</h1><div className="sub">Servicios asignados a mecánicos por vehículo</div></div>
+        <div><h1>{t('Órdenes de Trabajo')}</h1><div className="sub">{t('Servicios asignados a mecánicos por vehículo')}</div></div>
       </div>
       <div className="content">
         <div className="toolbar">
           <select style={{ width: 200 }} value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">Todos los estados</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="en_proceso">En proceso</option>
-            <option value="completado">Completado</option>
-            <option value="facturado">Facturado</option>
+            <option value="">{t('Todos los estados')}</option>
+            <option value="pendiente">{t('Pendiente')}</option>
+            <option value="en_proceso">{t('En proceso')}</option>
+            <option value="completado">{t('Completado')}</option>
+            <option value="facturado">{t('Facturado')}</option>
           </select>
         </div>
         <div className="card">
-          {list.length === 0 ? <div className="empty-state">No hay órdenes de trabajo todavía. Se crean desde la ficha del vehículo.</div> : (
+          {list.length === 0 ? <div className="empty-state">{t('No hay órdenes de trabajo todavía. Se crean desde la ficha del vehículo.')}</div> : (
             <table>
-              <thead><tr><th>Número</th><th>Vehículo</th><th>Mecánico</th><th>Total</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+              <thead><tr><th>{t('Número')}</th><th>{t('Vehículo')}</th><th>{t('Mecánico')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th></tr></thead>
               <tbody>
                 {list.map((wo) => (
                   <tr key={wo.id}>
@@ -92,7 +94,7 @@ export default function WorkOrdersList() {
                     <td><strong>${Number(wo.total).toLocaleString()}</strong></td>
                     <td><Pill value={wo.status} /></td>
                     <td className="muted">{wo.created_at}</td>
-                    <td><button className="link-btn" onClick={() => openEdit(wo)}>Editar</button></td>
+                    <td><button className="link-btn" onClick={() => openEdit(wo)}>{t('Editar')}</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -102,27 +104,27 @@ export default function WorkOrdersList() {
       </div>
 
       {editing && (
-        <Modal title={`Orden de trabajo ${editing.number}`} onClose={() => setEditing(null)} wide>
+        <Modal title={`${t('Orden de trabajo')} ${editing.number}`} onClose={() => setEditing(null)} wide>
           <form onSubmit={saveEdit}>
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
-              <div className="field"><label>Mecánico</label>
+              <div className="field"><label>{t('Mecánico')}</label>
                 <select value={woMechanicId} onChange={(e) => setWoMechanicId(e.target.value)}>
-                  <option value="">— Sin asignar —</option>
+                  <option value="">{t('— Sin asignar —')}</option>
                   {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               </div>
-              <div className="field"><label>Estado</label>
+              <div className="field"><label>{t('Estado')}</label>
                 <select value={woStatus} onChange={(e) => setWoStatus(e.target.value)}>
-                  <option value="pendiente">Pendiente</option>
-                  <option value="en_proceso">En proceso</option>
-                  <option value="completado">Completado</option>
-                  <option value="facturado">Facturado</option>
+                  <option value="pendiente">{t('Pendiente')}</option>
+                  <option value="en_proceso">{t('En proceso')}</option>
+                  <option value="completado">{t('Completado')}</option>
+                  <option value="facturado">{t('Facturado')}</option>
                 </select>
               </div>
             </div>
             <table className="line-items-table">
-              <thead><tr><th>Servicio</th><th>Descripción</th><th style={{ width: 120 }}>Tipo</th><th style={{ width: 80 }}>Horas</th><th style={{ width: 100 }}>$/hora</th><th style={{ width: 110 }}>$ fijo</th><th style={{ width: 90 }}>Total</th><th></th></tr></thead>
+              <thead><tr><th>{t('Servicio')}</th><th>{t('Descripción')}</th><th style={{ width: 120 }}>{t('Tipo')}</th><th style={{ width: 80 }}>{t('Horas')}</th><th style={{ width: 100 }}>{t('$/hora')}</th><th style={{ width: 110 }}>{t('$ fijo')}</th><th style={{ width: 90 }}>{t('Total')}</th><th></th></tr></thead>
               <tbody>
                 {woServices.map((s, idx) => {
                   const rowTotal = s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0);
@@ -137,8 +139,8 @@ export default function WorkOrdersList() {
                       <td><input value={s.description} onChange={(e) => updateWoService(idx, 'description', e.target.value)} /></td>
                       <td>
                         <select value={s.pricingType} onChange={(e) => updateWoService(idx, 'pricingType', e.target.value)}>
-                          <option value="hora">Por hora</option>
-                          <option value="servicio_completo">Servicio completo</option>
+                          <option value="hora">{t('Por hora')}</option>
+                          <option value="servicio_completo">{t('Servicio completo')}</option>
                         </select>
                       </td>
                       <td><input type="number" step="0.25" disabled={s.pricingType !== 'hora'} value={s.hours} onChange={(e) => updateWoService(idx, 'hours', e.target.value)} /></td>
@@ -151,11 +153,11 @@ export default function WorkOrdersList() {
                 })}
               </tbody>
             </table>
-            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addRow}>+ Agregar servicio</button>
-            <div className="text-right" style={{ marginTop: 10, fontWeight: 700 }}>Total: ${total.toLocaleString()}</div>
+            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addRow}>{t('+ Agregar servicio')}</button>
+            <div className="text-right" style={{ marginTop: 10, fontWeight: 700 }}>{t('Total')}: ${total.toLocaleString()}</div>
             <div className="modal-footer">
-              <button type="button" className="btn" onClick={() => setEditing(null)}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Guardar</button>
+              <button type="button" className="btn" onClick={() => setEditing(null)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Guardar')}</button>
             </div>
           </form>
         </Modal>

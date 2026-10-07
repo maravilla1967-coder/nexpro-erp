@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
+import { useI18n } from '../i18n.jsx';
 
 const EMPTY = { type: 'empresa', name: '', taxId: '', email: '', phone: '', address: '', city: '', industry: '', status: 'lead', source: '', notes: '' };
 
 export default function CustomersList() {
+  const { t } = useI18n();
   const [list, setList] = useState([]);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
@@ -34,29 +36,29 @@ export default function CustomersList() {
     <>
       <div className="topbar">
         <div>
-          <h1>Clientes (CRM)</h1>
-          <div className="sub">Empresas, municipios y contactos</div>
+          <h1>{t('Clientes (CRM)')}</h1>
+          <div className="sub">{t('Empresas, municipios y contactos')}</div>
         </div>
-        <button className="btn btn-primary" onClick={openNew}>+ Nuevo cliente</button>
+        <button className="btn btn-primary" onClick={openNew}>{t('+ Nuevo cliente')}</button>
       </div>
       <div className="content">
         <div className="toolbar">
-          <input className="search-input" placeholder="Buscar por nombre, email, teléfono…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="search-input" placeholder={t('Buscar por nombre, email, teléfono…')} value={q} onChange={(e) => setQ(e.target.value)} />
           <select style={{ width: 180 }} value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">Todos los estados</option>
-            <option value="lead">Lead</option>
-            <option value="prospecto">Prospecto</option>
-            <option value="cliente">Cliente</option>
-            <option value="inactivo">Inactivo</option>
+            <option value="">{t('Todos los estados')}</option>
+            <option value="lead">{t('Lead')}</option>
+            <option value="prospecto">{t('Prospecto')}</option>
+            <option value="cliente">{t('Cliente')}</option>
+            <option value="inactivo">{t('Inactivo')}</option>
           </select>
         </div>
         <div className="card">
           {list.length === 0 ? (
-            <div className="empty-state">No hay clientes todavía. Crea el primero con "+ Nuevo cliente".</div>
+            <div className="empty-state">{t('No hay clientes todavía. Crea el primero con "+ Nuevo cliente".')}</div>
           ) : (
             <table>
               <thead>
-                <tr><th>Nombre</th><th>Industria</th><th>Contacto</th><th>Ciudad</th><th>Estado</th></tr>
+                <tr><th>{t('Nombre')}</th><th>{t('Industria')}</th><th>{t('Contacto')}</th><th>{t('Ciudad')}</th><th>{t('Estado')}</th></tr>
               </thead>
               <tbody>
                 {list.map((c) => (
@@ -75,66 +77,66 @@ export default function CustomersList() {
       </div>
 
       {modalOpen && (
-        <Modal title="Nuevo cliente" onClose={() => setModalOpen(false)}>
+        <Modal title={t('Nuevo cliente')} onClose={() => setModalOpen(false)}>
           <form onSubmit={save}>
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
               <div className="field">
-                <label>Nombre / Empresa *</label>
+                <label>{t('Nombre / Empresa *')}</label>
                 <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
               <div className="field">
-                <label>Tipo</label>
+                <label>{t('Tipo')}</label>
                 <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  <option value="empresa">Empresa / Municipio</option>
-                  <option value="persona">Persona</option>
+                  <option value="empresa">{t('Empresa / Municipio')}</option>
+                  <option value="persona">{t('Persona')}</option>
                 </select>
               </div>
               <div className="field">
-                <label>Industria</label>
+                <label>{t('Industria')}</label>
                 <input placeholder="municipal, utilities, construction..." value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
               </div>
               <div className="field">
-                <label>Estado</label>
+                <label>{t('Estado')}</label>
                 <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                  <option value="lead">Lead</option>
-                  <option value="prospecto">Prospecto</option>
-                  <option value="cliente">Cliente</option>
-                  <option value="inactivo">Inactivo</option>
+                  <option value="lead">{t('Lead')}</option>
+                  <option value="prospecto">{t('Prospecto')}</option>
+                  <option value="cliente">{t('Cliente')}</option>
+                  <option value="inactivo">{t('Inactivo')}</option>
                 </select>
               </div>
               <div className="field">
-                <label>Email</label>
+                <label>{t('Email')}</label>
                 <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
               </div>
               <div className="field">
-                <label>Teléfono</label>
+                <label>{t('Teléfono')}</label>
                 <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
               <div className="field">
-                <label>Dirección</label>
+                <label>{t('Dirección')}</label>
                 <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
               </div>
               <div className="field">
-                <label>Ciudad</label>
+                <label>{t('Ciudad')}</label>
                 <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
               </div>
               <div className="field">
-                <label>NIT / Identificación</label>
+                <label>{t('NIT / Identificación')}</label>
                 <input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} />
               </div>
               <div className="field">
-                <label>Fuente</label>
-                <input placeholder="referido, web, llamada..." value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} />
+                <label>{t('Fuente')}</label>
+                <input placeholder={t('referido, web, llamada...')} value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} />
               </div>
             </div>
             <div className="field">
-              <label>Notas</label>
+              <label>{t('Notas')}</label>
               <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Guardar</button>
+              <button type="button" className="btn" onClick={() => setModalOpen(false)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Guardar')}</button>
             </div>
           </form>
         </Modal>

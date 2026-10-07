@@ -1,8 +1,10 @@
 import React from 'react';
+import { useI18n } from '../i18n.jsx';
 
 // items: [{ productId, description, quantity, unitPrice }]
 // priceLabel: etiqueta de la columna de precio ("Costo unit." o "Precio unit.")
 export default function LineItemsEditor({ items, setItems, products, priceLabel = 'Precio unit.', priceSourceField = 'selling_price' }) {
+  const { t } = useI18n();
   function update(idx, field, value) {
     const copy = [...items];
     copy[idx] = { ...copy[idx], [field]: value };
@@ -28,7 +30,7 @@ export default function LineItemsEditor({ items, setItems, products, priceLabel 
     <div>
       <table className="line-items-table">
         <thead>
-          <tr><th>Producto</th><th>Descripción</th><th style={{ width: 90 }}>Cant.</th><th style={{ width: 120 }}>{priceLabel}</th><th style={{ width: 110 }}>Subtotal</th><th></th></tr>
+          <tr><th>{t('Producto')}</th><th>{t('Descripción')}</th><th style={{ width: 90 }}>{t('Cant.')}</th><th style={{ width: 120 }}>{t(priceLabel)}</th><th style={{ width: 110 }}>{t('Subtotal')}</th><th></th></tr>
         </thead>
         <tbody>
           {items.map((it, idx) => (
@@ -48,8 +50,8 @@ export default function LineItemsEditor({ items, setItems, products, priceLabel 
           ))}
         </tbody>
       </table>
-      <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addRow}>+ Agregar línea</button>
-      <div className="text-right" style={{ marginTop: 10, fontWeight: 700 }}>Total: ${total.toLocaleString()}</div>
+      <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addRow}>+ {t('Agregar línea')}</button>
+      <div className="text-right" style={{ marginTop: 10, fontWeight: 700 }}>{t('Total')}: ${total.toLocaleString()}</div>
     </div>
   );
 }

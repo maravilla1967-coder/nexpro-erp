@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
+import { useI18n } from '../i18n.jsx';
 
 const EMPTY = { name: '', specialty: '', phone: '', email: '', active: true };
 
 export default function MechanicsList() {
+  const { t } = useI18n();
   const [list, setList] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -30,21 +32,21 @@ export default function MechanicsList() {
     } catch (err) { setError(err.message); }
   }
   async function remove(id) {
-    if (!window.confirm('¿Eliminar este mecánico?')) return;
+    if (!window.confirm(t('¿Eliminar este mecánico?'))) return;
     await api.del(`/mechanics/${id}`); load();
   }
 
   return (
     <>
       <div className="topbar">
-        <div><h1>Mecánicos</h1><div className="sub">Equipo del taller</div></div>
-        <button className="btn btn-primary" onClick={openNew}>+ Nuevo mecánico</button>
+        <div><h1>{t('Mecánicos')}</h1><div className="sub">{t('Equipo del taller')}</div></div>
+        <button className="btn btn-primary" onClick={openNew}>{t('+ Nuevo mecánico')}</button>
       </div>
       <div className="content">
         <div className="card">
-          {list.length === 0 ? <div className="empty-state">No hay mecánicos registrados todavía.</div> : (
+          {list.length === 0 ? <div className="empty-state">{t('No hay mecánicos registrados todavía.')}</div> : (
             <table>
-              <thead><tr><th>Nombre</th><th>Especialidad</th><th>Contacto</th><th></th></tr></thead>
+              <thead><tr><th>{t('Nombre')}</th><th>{t('Especialidad')}</th><th>{t('Contacto')}</th><th></th></tr></thead>
               <tbody>
                 {list.map((m) => (
                   <tr key={m.id} style={{ opacity: m.active ? 1 : 0.5 }}>
@@ -52,8 +54,8 @@ export default function MechanicsList() {
                     <td className="muted">{m.specialty || '—'}</td>
                     <td className="muted">{m.phone || m.email || '—'}</td>
                     <td>
-                      <button className="link-btn" onClick={() => openEdit(m)}>Editar</button>{' '}
-                      <button className="link-btn" style={{ color: 'var(--red)' }} onClick={() => remove(m.id)}>Eliminar</button>
+                      <button className="link-btn" onClick={() => openEdit(m)}>{t('Editar')}</button>{' '}
+                      <button className="link-btn" style={{ color: 'var(--red)' }} onClick={() => remove(m.id)}>{t('Eliminar')}</button>
                     </td>
                   </tr>
                 ))}
@@ -64,21 +66,21 @@ export default function MechanicsList() {
       </div>
 
       {modalOpen && (
-        <Modal title={editing ? 'Editar mecánico' : 'Nuevo mecánico'} onClose={() => setModalOpen(false)}>
+        <Modal title={editing ? t('Editar mecánico') : t('Nuevo mecánico')} onClose={() => setModalOpen(false)}>
           <form onSubmit={save}>
             {error && <div className="error-banner">{error}</div>}
-            <div className="field"><label>Nombre *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-            <div className="field"><label>Especialidad</label><input placeholder="Hidráulica, eléctrica, general..." value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} /></div>
+            <div className="field"><label>{t('Nombre *')}</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+            <div className="field"><label>{t('Especialidad')}</label><input placeholder={t('Hidráulica, eléctrica, general...')} value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} /></div>
             <div className="grid grid-2">
-              <div className="field"><label>Teléfono</label><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-              <div className="field"><label>Email</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+              <div className="field"><label>{t('Teléfono')}</label><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+              <div className="field"><label>{t('Email')}</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             </div>
             <div className="field">
-              <label><input type="checkbox" style={{ width: 'auto', marginRight: 6 }} checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Activo</label>
+              <label><input type="checkbox" style={{ width: 'auto', marginRight: 6 }} checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> {t('Activo')}</label>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button type="submit" className="btn btn-primary">Guardar</button>
+              <button type="button" className="btn" onClick={() => setModalOpen(false)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Guardar')}</button>
             </div>
           </form>
         </Modal>
