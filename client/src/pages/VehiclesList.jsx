@@ -102,7 +102,7 @@ export default function VehiclesList() {
             <div className="empty-state">{t('No se han recibido vehículos todavía.')}</div>
           ) : (
             <table>
-              <thead><tr><th></th><th>VIN</th><th>{t('Vehículo')}</th><th>{t('Cliente')}</th><th>{t('Recibido')}</th><th>{t('Estado')}</th></tr></thead>
+              <thead><tr><th></th><th>VIN</th><th>{t('Vehículo')}</th><th>{t('Cliente')}</th><th>{t('Recibido')}</th><th>{t('Estado')}</th><th></th></tr></thead>
               <tbody>
                 {list.map((v) => (
                   <tr key={v.id} className="clickable" onClick={() => navigate(`/vehiculos/${v.id}`)}>
@@ -112,6 +112,9 @@ export default function VehiclesList() {
                     <td className="muted">{v.customer_name || '—'}</td>
                     <td className="muted">{v.received_at}</td>
                     <td><Pill value={v.status} /></td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <Link className="link-btn" to={`/vehiculos/${v.id}/documento`}>{t('Imprimir')}</Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>

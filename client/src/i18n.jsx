@@ -265,6 +265,14 @@ const DICT = {
   'Foto del vehículo': 'Vehicle photo',
   'Recibir vehículo': 'Receive vehicle',
   'Datos del cliente': 'Customer details',
+  'Imprimir recepción': 'Print reception',
+  'RECEPCIÓN DE VEHÍCULO': 'VEHICLE RECEPTION',
+  'Sin notas registradas.': 'No notes recorded.',
+  'Aún no se ha creado una orden de trabajo para este vehículo. Este documento se puede imprimir y firmar ahora, en la recepción; el diagnóstico y el trabajo realizado se agregarán aquí una vez que se registre la orden de trabajo.':
+    'No work order has been created for this vehicle yet. This document can be printed and signed now, at reception; the diagnosis and work performed will be added here once a work order is recorded.',
+  'Al firmar, el cliente confirma haber entregado el vehículo con la información descrita en este documento.':
+    'By signing, the client confirms having dropped off the vehicle with the information described in this document.',
+  'Diagnóstico y trabajo realizado': 'Diagnosis and work performed',
 
   // Detalle de vehículo
   '¿Eliminar este vehículo y todo su historial?': 'Delete this vehicle and all its history?',

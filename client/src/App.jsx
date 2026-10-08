@@ -16,6 +16,7 @@ import InvoicesList from './pages/InvoicesList.jsx';
 import InvoiceView from './pages/InvoiceView.jsx';
 import VehiclesList from './pages/VehiclesList.jsx';
 import VehicleDetail from './pages/VehicleDetail.jsx';
+import VehicleReceptionDocument from './pages/VehicleReceptionDocument.jsx';
 import ServicesList from './pages/ServicesList.jsx';
 import MechanicsList from './pages/MechanicsList.jsx';
 import WorkOrdersList from './pages/WorkOrdersList.jsx';
@@ -209,6 +210,7 @@ function MainShell() {
           <Route path="/facturas/:id" element={<InvoiceView />} />
           <Route path="/vehiculos" element={<VehiclesList />} />
           <Route path="/vehiculos/:id" element={<VehicleDetail />} />
+          <Route path="/vehiculos/:id/documento" element={<VehicleReceptionDocument />} />
           <Route path="/servicios" element={<ServicesList />} />
           <Route path="/mecanicos" element={<MechanicsList />} />
           <Route path="/ordenes-trabajo" element={<WorkOrdersList />} />

@@ -21,6 +21,17 @@ function withDetails(vehicle) {
      WHERE wo.vehicle_id = ? ORDER BY wo.created_at DESC`,
     [vehicle.id]
   );
+  // Adjunta servicios y partes de cada orden de trabajo, para poder imprimir el
+  // documento de recepción del vehículo (firmable) aunque todavía no exista ninguna
+  // orden de trabajo, y mostrar el trabajo realizado una vez que sí exista.
+  vehicle.workOrders.forEach((wo) => {
+    wo.services = all(
+      `SELECT wos.*, s.name as service_name FROM work_order_services wos
+       LEFT JOIN services s ON s.id = wos.service_id WHERE wos.work_order_id = ?`,
+      [wo.id]
+    );
+    wo.parts = all('SELECT * FROM work_order_parts WHERE work_order_id = ? ORDER BY id', [wo.id]);
+  });
   return vehicle;
 }
 
