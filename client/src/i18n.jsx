@@ -252,6 +252,7 @@ const DICT = {
   Placa: 'Plate',
   'Foto del vehículo': 'Vehicle photo',
   'Recibir vehículo': 'Receive vehicle',
+  'Datos del cliente': 'Customer details',
 
   // Detalle de vehículo
   '¿Eliminar este vehículo y todo su historial?': 'Delete this vehicle and all its history?',

@@ -135,6 +135,14 @@ export default function VehicleDetail() {
             <div className="card-title">{t('Datos del vehículo')}</div>
             {vehicle.photo_url && <img src={vehicle.photo_url} className="thumb-lg" style={{ marginBottom: 12 }} />}
             <div><strong>{t('Cliente:')}</strong> {vehicle.customer_name ? <Link to={`/clientes/${vehicle.customer_id}`}>{vehicle.customer_name}</Link> : '—'}</div>
+            {vehicle.customer_id && (
+              <>
+                <div><strong>{t('NIT/ID:')}</strong> {vehicle.customer_tax_id || '—'}</div>
+                <div><strong>{t('Dirección:')}</strong> {vehicle.customer_address || '—'} {vehicle.customer_city || ''}</div>
+                <div><strong>{t('Teléfono:')}</strong> {vehicle.customer_phone || '—'}</div>
+                <div><strong>{t('Email:')}</strong> {vehicle.customer_email || '—'}</div>
+              </>
+            )}
             <div><strong>{t('Placa:')}</strong> {vehicle.plate || '—'}</div>
             <div><strong>{t('Recibido:')}</strong> {vehicle.received_at}</div>
             <div><strong>{t('Notas:')}</strong> {vehicle.notes || '—'}</div>
