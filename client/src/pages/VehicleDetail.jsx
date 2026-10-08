@@ -22,7 +22,9 @@ export default function VehicleDetail() {
   const [error, setError] = useState('');
 
   const [woModalOpen, setWoModalOpen] = useState(false);
+  const [editingWo, setEditingWo] = useState(null); // null = nueva orden; si no, se está editando esta orden existente
   const [woMechanicId, setWoMechanicId] = useState('');
+  const [woStatus, setWoStatus] = useState('pendiente');
   const [woServices, setWoServices] = useState([{ serviceId: '', description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 }]);
   const [woNotes, setWoNotes] = useState('');
   const [woDiagnosis, setWoDiagnosis] = useState('');
@@ -62,9 +64,23 @@ export default function VehicleDetail() {
   }
 
   function openWoModal() {
-    setWoMechanicId('');
+    setEditingWo(null);
+    setWoMechanicId(''); setWoStatus('pendiente');
     setWoServices([{ serviceId: '', description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 }]);
     setWoNotes(''); setWoDiagnosis(''); setWoResolution(''); setWoParts([]);
+    setError(''); setWoModalOpen(true);
+  }
+
+  function openEditWo(wo) {
+    setEditingWo(wo);
+    setWoMechanicId(wo.mechanic_id || ''); setWoStatus(wo.status);
+    setWoServices(
+      wo.services.length > 0
+        ? wo.services.map((s) => ({ serviceId: s.service_id || '', description: s.description, pricingType: s.pricing_type, hours: s.hours ?? 0, hourlyRate: s.hourly_rate ?? 0, flatPrice: s.flat_price ?? 0 }))
+        : [{ serviceId: '', description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 }]
+    );
+    setWoNotes(wo.notes || ''); setWoDiagnosis(wo.diagnosis || ''); setWoResolution(wo.resolution || '');
+    setWoParts((wo.parts || []).map((p) => ({ description: p.description, action: p.action, quantity: p.quantity, unitCost: p.unit_cost })));
     setError(''); setWoModalOpen(true);
   }
   function updateWoService(idx, field, value) {
@@ -106,8 +122,14 @@ export default function VehicleDetail() {
         description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
       })),
     };
-    try { await api.post('/work-orders', payload); setWoModalOpen(false); load(); }
-    catch (err) { setError(err.message); }
+    try {
+      if (editingWo) {
+        await api.put(`/work-orders/${editingWo.id}`, { ...payload, status: woStatus });
+      } else {
+        await api.post('/work-orders', payload);
+      }
+      setWoModalOpen(false); setEditingWo(null); load();
+    } catch (err) { setError(err.message); }
   }
 
   if (!vehicle) return <div className="content">{t('Cargando…')}</div>;
@@ -180,7 +202,7 @@ export default function VehicleDetail() {
           </div>
           {vehicle.workOrders.length === 0 ? <div className="empty-state">{t('Sin órdenes de trabajo todavía.')}</div> : (
             <table>
-              <thead><tr><th>{t('Número')}</th><th>{t('Mecánico')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th></tr></thead>
+              <thead><tr><th>{t('Número')}</th><th>{t('Mecánico')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
               <tbody>
                 {vehicle.workOrders.map((wo) => (
                   <tr key={wo.id}>
@@ -188,6 +210,7 @@ export default function VehicleDetail() {
                     <td>{wo.mechanic_name || '—'}</td>
                     <td><Pill value={wo.status} /></td>
                     <td className="muted">{wo.created_at}</td>
+                    <td><button className="link-btn" onClick={() => openEditWo(wo)}>{t('Editar')}</button></td>
                     <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
                   </tr>
                 ))}
@@ -238,15 +261,28 @@ export default function VehicleDetail() {
       )}
 
       {woModalOpen && (
-        <Modal title={t('Nueva orden de trabajo')} onClose={() => setWoModalOpen(false)} wide>
+        <Modal title={editingWo ? `${t('Editar orden de trabajo')} ${editingWo.number}` : t('Nueva orden de trabajo')} onClose={() => { setWoModalOpen(false); setEditingWo(null); }} wide>
           <form onSubmit={saveWorkOrder}>
             {error && <div className="error-banner">{error}</div>}
-            <div className="field">
-              <label>{t('Mecánico asignado')}</label>
-              <select value={woMechanicId} onChange={(e) => setWoMechanicId(e.target.value)}>
-                <option value="">{t('— Sin asignar —')}</option>
-                {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+            <div className="grid grid-2">
+              <div className="field">
+                <label>{t('Mecánico asignado')}</label>
+                <select value={woMechanicId} onChange={(e) => setWoMechanicId(e.target.value)}>
+                  <option value="">{t('— Sin asignar —')}</option>
+                  {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              {editingWo && (
+                <div className="field">
+                  <label>{t('Estado')}</label>
+                  <select value={woStatus} onChange={(e) => setWoStatus(e.target.value)}>
+                    <option value="pendiente">{t('Pendiente')}</option>
+                    <option value="en_proceso">{t('En proceso')}</option>
+                    <option value="completado">{t('Completado')}</option>
+                    <option value="facturado">{t('Facturado')}</option>
+                  </select>
+                </div>
+              )}
             </div>
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Servicios a realizar')}</label>
             <table className="line-items-table" style={{ marginTop: 6 }}>
@@ -309,8 +345,8 @@ export default function VehicleDetail() {
             <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addWoPartRow}>{t('+ Agregar parte')}</button>
 
             <div className="modal-footer">
-              <button type="button" className="btn" onClick={() => setWoModalOpen(false)}>{t('Cancelar')}</button>
-              <button type="submit" className="btn btn-primary">{t('Crear orden de trabajo')}</button>
+              <button type="button" className="btn" onClick={() => { setWoModalOpen(false); setEditingWo(null); }}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{editingWo ? t('Guardar cambios') : t('Crear orden de trabajo')}</button>
             </div>
           </form>
         </Modal>

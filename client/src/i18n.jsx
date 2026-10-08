@@ -121,6 +121,7 @@ const DICT = {
   // Detalle de cliente
   'Sin industria': 'No industry',
   '¿Eliminar este cliente y todo su historial?': 'Delete this customer and all its history?',
+  'Editar cliente': 'Edit customer',
   Info: 'Info',
   Contactos: 'Contacts',
   Oportunidades: 'Opportunities',
@@ -302,6 +303,8 @@ const DICT = {
   'Guardar equipo': 'Save equipment',
   '¿Eliminar este equipo del vehículo?': 'Delete this equipment from the vehicle?',
   'Nueva orden de trabajo': 'New work order',
+  'Editar orden de trabajo': 'Edit work order',
+  'Guardar cambios': 'Save changes',
   'Mecánico asignado': 'Assigned mechanic',
   'Servicios a realizar': 'Services to perform',
   Servicio: 'Service',

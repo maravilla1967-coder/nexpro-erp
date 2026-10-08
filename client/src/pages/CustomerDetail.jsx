@@ -13,7 +13,7 @@ export default function CustomerDetail() {
   const navigate = useNavigate();
   const [customer, setCustomer] = useState(null);
   const [tab, setTab] = useState('info');
-  const [modal, setModal] = useState(null); // 'contact' | 'opportunity' | 'activity'
+  const [modal, setModal] = useState(null); // 'contact' | 'opportunity' | 'activity' | 'edit'
   const [form, setForm] = useState({});
   const [error, setError] = useState('');
 
@@ -29,6 +29,22 @@ export default function CustomerDetail() {
   }
 
   function openModal(type, initial = {}) { setForm(initial); setError(''); setModal(type); }
+
+  function openEditCustomer() {
+    setForm({
+      type: customer.type || 'empresa', name: customer.name || '', taxId: customer.tax_id || '',
+      email: customer.email || '', phone: customer.phone || '', address: customer.address || '',
+      city: customer.city || '', industry: customer.industry || '', status: customer.status || 'lead',
+      source: customer.source || '', notes: customer.notes || '',
+    });
+    setError(''); setModal('edit');
+  }
+
+  async function submitEditCustomer(e) {
+    e.preventDefault();
+    try { await api.put(`/customers/${id}`, form); setModal(null); load(); }
+    catch (err) { setError(err.message); }
+  }
 
   async function submitContact(e) {
     e.preventDefault();
@@ -77,6 +93,7 @@ export default function CustomerDetail() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/clientes" className="btn">{t('← Volver')}</Link>
+          <button className="btn btn-primary" onClick={openEditCustomer}>{t('Editar')}</button>
           <button className="btn btn-danger" onClick={remove}>{t('Eliminar')}</button>
         </div>
       </div>
@@ -187,6 +204,72 @@ export default function CustomerDetail() {
           </div>
         )}
       </div>
+
+      {modal === 'edit' && (
+        <Modal title={t('Editar cliente')} onClose={() => setModal(null)}>
+          <form onSubmit={submitEditCustomer}>
+            {error && <div className="error-banner">{error}</div>}
+            <div className="grid grid-2">
+              <div className="field">
+                <label>{t('Nombre / Empresa *')}</label>
+                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>{t('Tipo')}</label>
+                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                  <option value="empresa">{t('Empresa / Municipio')}</option>
+                  <option value="persona">{t('Persona')}</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>{t('Industria')}</label>
+                <input placeholder="municipal, utilities, construction..." value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>{t('Estado')}</label>
+                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  <option value="lead">{t('Lead')}</option>
+                  <option value="prospecto">{t('Prospecto')}</option>
+                  <option value="cliente">{t('Cliente')}</option>
+                  <option value="inactivo">{t('Inactivo')}</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>{t('Email')}</label>
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>{t('Teléfono')}</label>
+                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>{t('Dirección')}</label>
+                <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>{t('Ciudad')}</label>
+                <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>{t('NIT / Identificación')}</label>
+                <input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>{t('Fuente')}</label>
+                <input placeholder={t('referido, web, llamada...')} value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} />
+              </div>
+            </div>
+            <div className="field">
+              <label>{t('Notas')}</label>
+              <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn" onClick={() => setModal(null)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Guardar')}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {modal === 'contact' && (
         <Modal title={t('Nuevo contacto')} onClose={() => setModal(null)}>
