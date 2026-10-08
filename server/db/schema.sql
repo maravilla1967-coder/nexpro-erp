@@ -241,10 +241,11 @@ CREATE TABLE IF NOT EXISTS work_order_parts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   work_order_id INTEGER NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
   description TEXT NOT NULL,
-  action TEXT NOT NULL DEFAULT 'reemplazada', -- 'reemplazada' | 'reparada'
+  action TEXT NOT NULL DEFAULT 'reemplazada', -- 'reemplazada' | 'reparada' | 'garantia' | 'cliente'
   quantity REAL NOT NULL DEFAULT 1,
   unit_cost REAL NOT NULL DEFAULT 0,
-  total REAL NOT NULL DEFAULT 0
+  total REAL NOT NULL DEFAULT 0,
+  notes TEXT
 );
 
 -- ===================== USUARIOS / PERMISOS / APROBACIONES =====================

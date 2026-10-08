@@ -24,6 +24,7 @@ tryAlter('ALTER TABLE work_orders ADD COLUMN resolution TEXT');
 tryAlter('ALTER TABLE services ADD COLUMN name_en TEXT');
 tryAlter('ALTER TABLE services ADD COLUMN description_en TEXT');
 tryAlter('ALTER TABLE suppliers ADD COLUMN code TEXT');
+tryAlter('ALTER TABLE work_order_parts ADD COLUMN notes TEXT');
 
 function all(sql, params = []) {
   const stmt = db.prepare(sql);

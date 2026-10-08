@@ -36,7 +36,7 @@ export default function WorkOrdersList() {
     setWoNotes(wo.notes || '');
     setWoDiagnosis(wo.diagnosis || '');
     setWoResolution(wo.resolution || '');
-    setWoParts((wo.parts || []).map((p) => ({ ...p, unitCost: p.unit_cost ?? 0 })));
+    setWoParts((wo.parts || []).map((p) => ({ ...p, unitCost: p.unit_cost ?? 0, notes: p.notes || '' })));
     setError('');
   }
 
@@ -59,12 +59,28 @@ export default function WorkOrdersList() {
   function addRow() { setWoServices([...woServices, { description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 }]); }
   function removeRow(idx) { setWoServices(woServices.filter((_, i) => i !== idx)); }
 
+  async function saveServiceToCatalog(idx) {
+    const row = woServices[idx];
+    if (!row.description) return;
+    try {
+      const created = await api.post('/services', {
+        name: row.description, pricingType: row.pricingType,
+        hourlyRate: row.hourlyRate || 0, flatPrice: row.flatPrice || 0, active: true,
+      });
+      const refreshed = await api.get('/services', { active: 'true' });
+      setServices(refreshed);
+      const copy = [...woServices];
+      copy[idx] = { ...copy[idx], service_id: created.id, serviceId: created.id };
+      setWoServices(copy);
+    } catch (err) { setError(err.message); }
+  }
+
   function updatePart(idx, field, value) {
     const copy = [...woParts];
     copy[idx] = { ...copy[idx], [field]: value };
     setWoParts(copy);
   }
-  function addPartRow() { setWoParts([...woParts, { description: '', action: 'reemplazada', quantity: 1, unitCost: 0 }]); }
+  function addPartRow() { setWoParts([...woParts, { description: '', action: 'reemplazada', quantity: 1, unitCost: 0, notes: '' }]); }
   function removePartRow(idx) { setWoParts(woParts.filter((_, i) => i !== idx)); }
 
   async function saveEdit(e) {
@@ -78,6 +94,7 @@ export default function WorkOrdersList() {
       })),
       parts: woParts.filter((p) => p.description).map((p) => ({
         description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
+        notes: p.notes || null,
       })),
     };
     try { await api.put(`/work-orders/${editing.id}`, payload); setEditing(null); load(); }
@@ -157,7 +174,12 @@ export default function WorkOrdersList() {
                           {services.map((sv) => <option key={sv.id} value={sv.id}>{pickLang(sv.name, sv.name_en, lang)}</option>)}
                         </select>
                       </td>
-                      <td><input value={s.description} onChange={(e) => updateWoService(idx, 'description', e.target.value)} /></td>
+                      <td>
+                        <input value={s.description} onChange={(e) => updateWoService(idx, 'description', e.target.value)} />
+                        {!(s.service_id || s.serviceId) && s.description && (
+                          <button type="button" className="link-btn" style={{ fontSize: 11 }} onClick={() => saveServiceToCatalog(idx)}>{t('Guardar en catálogo')}</button>
+                        )}
+                      </td>
                       <td>
                         <select value={s.pricingType} onChange={(e) => updateWoService(idx, 'pricingType', e.target.value)}>
                           <option value="hora">{t('Por hora')}</option>
@@ -183,7 +205,7 @@ export default function WorkOrdersList() {
 
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes reemplazadas o reparadas')}</label>
             <table className="line-items-table" style={{ marginTop: 6 }}>
-              <thead><tr><th>{t('Descripción')}</th><th style={{ width: 130 }}>{t('Acción')}</th><th style={{ width: 80 }}>{t('Cant.')}</th><th style={{ width: 110 }}>{t('Costo unit.')}</th><th></th></tr></thead>
+              <thead><tr><th>{t('Descripción')}</th><th style={{ width: 150 }}>{t('Acción')}</th><th style={{ width: 80 }}>{t('Cant.')}</th><th style={{ width: 110 }}>{t('Costo unit.')}</th><th style={{ width: 200 }}>{t('Nota (opcional)')}</th><th></th></tr></thead>
               <tbody>
                 {woParts.map((p, idx) => (
                   <tr key={idx}>
@@ -192,10 +214,13 @@ export default function WorkOrdersList() {
                       <select value={p.action} onChange={(e) => updatePart(idx, 'action', e.target.value)}>
                         <option value="reemplazada">{t('Reemplazada')}</option>
                         <option value="reparada">{t('Reparada')}</option>
+                        <option value="garantia">{t('Garantía')}</option>
+                        <option value="cliente">{t('Suministrada por el cliente')}</option>
                       </select>
                     </td>
                     <td><input type="number" step="1" value={p.quantity} onChange={(e) => updatePart(idx, 'quantity', e.target.value)} /></td>
                     <td><input type="number" step="0.01" value={p.unitCost} onChange={(e) => updatePart(idx, 'unitCost', e.target.value)} /></td>
+                    <td><input placeholder={t('Nota sobre la parte (ej. garantía, quién la suministró, etc.)')} value={p.notes || ''} onChange={(e) => updatePart(idx, 'notes', e.target.value)} /></td>
                     <td><button type="button" className="link-btn" onClick={() => removePartRow(idx)}>✕</button></td>
                   </tr>
                 ))}

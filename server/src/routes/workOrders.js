@@ -46,9 +46,9 @@ function insertParts(workOrderId, parts) {
     if (!p.description) continue;
     const total = calcPartTotal(p);
     run(
-      `INSERT INTO work_order_parts (work_order_id, description, action, quantity, unit_cost, total)
-       VALUES (?,?,?,?,?,?)`,
-      [workOrderId, p.description, p.action || 'reemplazada', Number(p.quantity ?? 1), Number(p.unitCost ?? p.unit_cost ?? 0), total]
+      `INSERT INTO work_order_parts (work_order_id, description, action, quantity, unit_cost, total, notes)
+       VALUES (?,?,?,?,?,?,?)`,
+      [workOrderId, p.description, p.action || 'reemplazada', Number(p.quantity ?? 1), Number(p.unitCost ?? p.unit_cost ?? 0), total, p.notes || null]
     );
   }
 }
