@@ -193,6 +193,8 @@ CREATE TABLE IF NOT EXISTS services (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   description TEXT,
+  name_en TEXT,
+  description_en TEXT,
   pricing_type TEXT NOT NULL DEFAULT 'hora',
   hourly_rate REAL DEFAULT 0,
   flat_price REAL DEFAULT 0,

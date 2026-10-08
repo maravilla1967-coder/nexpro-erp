@@ -21,8 +21,8 @@ router.post('/', (req, res) => {
   const b = req.body;
   if (!b.name) return res.status(400).json({ error: 'El nombre del servicio es obligatorio' });
   const result = run(
-    `INSERT INTO services (name, description, pricing_type, hourly_rate, flat_price, active) VALUES (?,?,?,?,?,?)`,
-    [b.name, b.description || null, b.pricingType || 'hora', b.hourlyRate ?? 0, b.flatPrice ?? 0, b.active === false ? 0 : 1]
+    `INSERT INTO services (name, description, name_en, description_en, pricing_type, hourly_rate, flat_price, active) VALUES (?,?,?,?,?,?,?,?)`,
+    [b.name, b.description || null, b.nameEn || null, b.descriptionEn || null, b.pricingType || 'hora', b.hourlyRate ?? 0, b.flatPrice ?? 0, b.active === false ? 0 : 1]
   );
   res.status(201).json(get('SELECT * FROM services WHERE id = ?', [result.lastInsertRowid]));
 });
@@ -32,8 +32,10 @@ router.put('/:id', (req, res) => {
   const existing = get('SELECT * FROM services WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Servicio no encontrado' });
   run(
-    `UPDATE services SET name=?, description=?, pricing_type=?, hourly_rate=?, flat_price=?, active=? WHERE id=?`,
-    [b.name ?? existing.name, b.description ?? existing.description, b.pricingType ?? existing.pricing_type,
+    `UPDATE services SET name=?, description=?, name_en=?, description_en=?, pricing_type=?, hourly_rate=?, flat_price=?, active=? WHERE id=?`,
+    [b.name ?? existing.name, b.description ?? existing.description,
+     b.nameEn ?? existing.name_en, b.descriptionEn ?? existing.description_en,
+     b.pricingType ?? existing.pricing_type,
      b.hourlyRate ?? existing.hourly_rate, b.flatPrice ?? existing.flat_price,
      b.active !== undefined ? (b.active ? 1 : 0) : existing.active, req.params.id]
   );

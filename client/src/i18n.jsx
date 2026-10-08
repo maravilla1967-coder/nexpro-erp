@@ -308,6 +308,10 @@ const DICT = {
   'Precio del servicio completo ($)': 'Flat service price ($)',
   Activo: 'Active',
   '¿Eliminar este servicio?': 'Delete this service?',
+  'Nombre (inglés)': 'Name (English)',
+  'Descripción (inglés)': 'Description (English)',
+  'Se muestra cuando el idioma de la app está en inglés. Si se deja vacío, se usa el nombre en español.':
+    'Shown when the app language is set to English. If left blank, the Spanish name is used instead.',
 
   // Mecánicos
   Mecánicos: 'Mechanics',
@@ -471,4 +475,12 @@ export function useI18n() {
   const ctx = useContext(LanguageContext);
   if (!ctx) throw new Error('useI18n debe usarse dentro de <LanguageProvider>');
   return ctx;
+}
+
+// Para datos bilingües guardados por el usuario (p. ej. nombre/descripción de un
+// servicio): devuelve la versión en inglés si el idioma activo es 'en' y existe
+// una traducción guardada; si no, siempre cae de vuelta al texto en español.
+export function pickLang(es, en, lang) {
+  if (lang === 'en' && en) return en;
+  return es;
 }

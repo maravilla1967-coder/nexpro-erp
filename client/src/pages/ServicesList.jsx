@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
-import { useI18n } from '../i18n.jsx';
+import { useI18n, pickLang } from '../i18n.jsx';
 
-const EMPTY = { name: '', description: '', pricingType: 'hora', hourlyRate: '', flatPrice: '', active: true };
+const EMPTY = { name: '', description: '', nameEn: '', descriptionEn: '', pricingType: 'hora', hourlyRate: '', flatPrice: '', active: true };
 
 export default function ServicesList() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [list, setList] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -19,7 +19,11 @@ export default function ServicesList() {
   function openNew() { setEditing(null); setForm(EMPTY); setError(''); setModalOpen(true); }
   function openEdit(s) {
     setEditing(s);
-    setForm({ name: s.name, description: s.description || '', pricingType: s.pricing_type, hourlyRate: s.hourly_rate, flatPrice: s.flat_price, active: !!s.active });
+    setForm({
+      name: s.name, description: s.description || '',
+      nameEn: s.name_en || '', descriptionEn: s.description_en || '',
+      pricingType: s.pricing_type, hourlyRate: s.hourly_rate, flatPrice: s.flat_price, active: !!s.active,
+    });
     setError(''); setModalOpen(true);
   }
 
@@ -50,8 +54,8 @@ export default function ServicesList() {
               <tbody>
                 {list.map((s) => (
                   <tr key={s.id} style={{ opacity: s.active ? 1 : 0.5 }}>
-                    <td onClick={() => openEdit(s)} className="clickable"><strong>{s.name}</strong></td>
-                    <td className="muted">{s.description || '—'}</td>
+                    <td onClick={() => openEdit(s)} className="clickable"><strong>{pickLang(s.name, s.name_en, lang)}</strong></td>
+                    <td className="muted">{pickLang(s.description, s.description_en, lang) || '—'}</td>
                     <td>{s.pricing_type === 'hora' ? t('Por hora') : t('Servicio completo')}</td>
                     <td>{s.pricing_type === 'hora' ? `$${s.hourly_rate}${t('/hora')}` : `$${s.flat_price}`}</td>
                     <td>
@@ -72,6 +76,15 @@ export default function ServicesList() {
             {error && <div className="error-banner">{error}</div>}
             <div className="field"><label>{t('Nombre *')}</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
             <div className="field"><label>{t('Descripción')}</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+            <div className="field">
+              <label>{t('Nombre (inglés)')}</label>
+              <input value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} />
+              <div className="hint">{t('Se muestra cuando el idioma de la app está en inglés. Si se deja vacío, se usa el nombre en español.')}</div>
+            </div>
+            <div className="field">
+              <label>{t('Descripción (inglés)')}</label>
+              <textarea rows={2} value={form.descriptionEn} onChange={(e) => setForm({ ...form, descriptionEn: e.target.value })} />
+            </div>
             <div className="field"><label>{t('Tipo de tarifa')}</label>
               <select value={form.pricingType} onChange={(e) => setForm({ ...form, pricingType: e.target.value })}>
                 <option value="hora">{t('Por hora')}</option>

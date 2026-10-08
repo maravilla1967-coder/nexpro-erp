@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
-import { useI18n } from '../i18n.jsx';
+import { useI18n, pickLang } from '../i18n.jsx';
 
 export default function WorkOrdersList() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [list, setList] = useState([]);
   const [status, setStatus] = useState('');
   const [mechanics, setMechanics] = useState([]);
@@ -49,7 +49,7 @@ export default function WorkOrdersList() {
     const svc = services.find((s) => String(s.id) === String(serviceId));
     const copy = [...woServices];
     copy[idx] = {
-      ...copy[idx], service_id: serviceId, description: svc ? svc.name : copy[idx].description,
+      ...copy[idx], service_id: serviceId, description: svc ? pickLang(svc.name, svc.name_en, lang) : copy[idx].description,
       pricingType: svc ? svc.pricing_type : copy[idx].pricingType,
       hourlyRate: svc ? svc.hourly_rate : copy[idx].hourlyRate,
       flatPrice: svc ? svc.flat_price : copy[idx].flatPrice,
@@ -154,7 +154,7 @@ export default function WorkOrdersList() {
                       <td>
                         <select value={s.service_id || s.serviceId || ''} onChange={(e) => pickService(idx, e.target.value)}>
                           <option value="">— manual —</option>
-                          {services.map((sv) => <option key={sv.id} value={sv.id}>{sv.name}</option>)}
+                          {services.map((sv) => <option key={sv.id} value={sv.id}>{pickLang(sv.name, sv.name_en, lang)}</option>)}
                         </select>
                       </td>
                       <td><input value={s.description} onChange={(e) => updateWoService(idx, 'description', e.target.value)} /></td>
