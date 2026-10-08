@@ -1,6 +1,6 @@
 const express = require('express');
 const { all, get, run } = require('../../db');
-const { nextNumber } = require('../utils/numbering');
+const { nextDocNumber, withStageSuffix } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
@@ -76,11 +76,12 @@ router.post('/', (req, res) => {
   let items = b.items;
   let customerId = b.customerId;
   let salesOrderId = b.salesOrderId || null;
+  let sourceSalesOrder = null;
 
   if (salesOrderId) {
-    const so = get('SELECT * FROM sales_orders WHERE id = ?', [salesOrderId]);
-    if (!so) return res.status(404).json({ error: 'Pedido no encontrado' });
-    customerId = so.customer_id;
+    sourceSalesOrder = get('SELECT * FROM sales_orders WHERE id = ?', [salesOrderId]);
+    if (!sourceSalesOrder) return res.status(404).json({ error: 'Pedido no encontrado' });
+    customerId = sourceSalesOrder.customer_id;
     items = all('SELECT * FROM sales_order_items WHERE sales_order_id = ?', [salesOrderId]);
   }
 
@@ -90,7 +91,11 @@ router.post('/', (req, res) => {
 
   const taxRate = b.taxRate ?? 0;
   const { subtotal, taxAmount, total } = computeTotals(items, taxRate);
-  const number = nextNumber('invoices', 'FAC');
+  // Si la factura nace de un pedido (cotización), conserva el mismo número base
+  // NX-AAAAMMDD-NN pero con la etapa 2 (factura); si es una factura directa, genera su
+  // propio número base del día con etapa 2.
+  const baseNumber = sourceSalesOrder ? sourceSalesOrder.number : nextDocNumber('invoices');
+  const number = withStageSuffix(baseNumber, 2);
 
   const result = run(
     `INSERT INTO invoices (number, customer_id, sales_order_id, status, due_date, subtotal, tax_rate, tax_amount, total, notes)

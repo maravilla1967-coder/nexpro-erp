@@ -3,7 +3,7 @@ import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import { useI18n } from '../i18n.jsx';
 
-const EMPTY = { name: '', taxId: '', email: '', phone: '', address: '', notes: '' };
+const EMPTY = { name: '', code: '', taxId: '', email: '', phone: '', address: '', notes: '' };
 
 export default function SuppliersList() {
   const { t } = useI18n();
@@ -20,7 +20,7 @@ export default function SuppliersList() {
   function openNew() { setEditing(null); setForm(EMPTY); setError(''); setModalOpen(true); }
   function openEdit(s) {
     setEditing(s);
-    setForm({ name: s.name, taxId: s.tax_id || '', email: s.email || '', phone: s.phone || '', address: s.address || '', notes: s.notes || '' });
+    setForm({ name: s.name, code: s.code || '', taxId: s.tax_id || '', email: s.email || '', phone: s.phone || '', address: s.address || '', notes: s.notes || '' });
     setError(''); setModalOpen(true);
   }
 
@@ -48,11 +48,12 @@ export default function SuppliersList() {
         <div className="card">
           {list.length === 0 ? <div className="empty-state">{t('No hay proveedores todavía.')}</div> : (
             <table>
-              <thead><tr><th>{t('Nombre')}</th><th>{t('NIT')}</th><th>{t('Contacto')}</th><th></th></tr></thead>
+              <thead><tr><th>{t('Nombre')}</th><th>{t('Código')}</th><th>{t('NIT')}</th><th>{t('Contacto')}</th><th></th></tr></thead>
               <tbody>
                 {list.map((s) => (
                   <tr key={s.id}>
                     <td onClick={() => openEdit(s)} className="clickable"><strong>{s.name}</strong></td>
+                    <td className="mono muted">{s.code || '—'}</td>
                     <td className="muted">{s.tax_id || '—'}</td>
                     <td className="muted">{s.email || s.phone || '—'}</td>
                     <td>
@@ -71,7 +72,14 @@ export default function SuppliersList() {
         <Modal title={editing ? t('Editar proveedor') : t('Nuevo proveedor')} onClose={() => setModalOpen(false)}>
           <form onSubmit={save}>
             {error && <div className="error-banner">{error}</div>}
-            <div className="field"><label>{t('Nombre *')}</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+            <div className="grid grid-2">
+              <div className="field"><label>{t('Nombre *')}</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div className="field">
+                <label>{t('Código (2 letras)')}</label>
+                <input maxLength={2} style={{ textTransform: 'uppercase' }} placeholder={t('Auto')} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} />
+                <div className="hint">{t('Se usa en el número de las órdenes de compra: NX-XX-001. Si se deja vacío, se toma de las primeras letras del nombre.')}</div>
+              </div>
+            </div>
             <div className="grid grid-2">
               <div className="field"><label>{t('NIT')}</label><input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} /></div>
               <div className="field"><label>{t('Email')}</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>

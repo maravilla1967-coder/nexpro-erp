@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS product_types (
 CREATE TABLE IF NOT EXISTS suppliers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
+  code TEXT,
   tax_id TEXT,
   email TEXT,
   phone TEXT,

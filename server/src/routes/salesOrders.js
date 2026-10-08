@@ -1,6 +1,6 @@
 const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
-const { nextNumber } = require('../utils/numbering');
+const { nextDocNumber, withStageSuffix } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
@@ -45,7 +45,12 @@ router.get('/', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const so = get('SELECT * FROM sales_orders WHERE id = ?', [req.params.id]);
+  const so = get(
+    `SELECT so.*, c.name as customer_name, c.address as customer_address, c.city as customer_city,
+            c.tax_id as customer_tax_id, c.phone as customer_phone, c.email as customer_email
+     FROM sales_orders so LEFT JOIN customers c ON c.id = so.customer_id WHERE so.id = ?`,
+    [req.params.id]
+  );
   if (!so) return res.status(404).json({ error: 'Pedido no encontrado' });
   res.json(withItems(so));
 });
@@ -56,7 +61,9 @@ router.post('/', (req, res) => {
   if (!b.customerId || !Array.isArray(b.items) || b.items.length === 0) {
     return res.status(400).json({ error: 'Cliente e items son obligatorios' });
   }
-  const number = nextNumber('sales_orders', 'PED');
+  // Esquema NX-AAAAMMDD-NN-1: el pedido es la "cotización" (etapa 1); si más adelante
+  // se convierte en factura, la factura reutiliza el mismo número base con etapa 2.
+  const number = withStageSuffix(nextDocNumber('sales_orders'), 1);
   const result = run(
     `INSERT INTO sales_orders (number, customer_id, status, notes) VALUES (?,?,?,?)`,
     [number, b.customerId, b.status || 'pendiente', b.notes || null]

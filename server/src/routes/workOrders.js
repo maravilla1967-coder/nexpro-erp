@@ -1,6 +1,6 @@
 const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
-const { nextNumber } = require('../utils/numbering');
+const { nextDocNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
@@ -83,7 +83,8 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   const b = req.body;
   if (!b.vehicleId) return res.status(400).json({ error: 'El vehículo es obligatorio' });
-  const number = nextNumber('work_orders', 'OT');
+  // Número de recepción/orden de trabajo: NX-AAAAMMDD-NN (sin sufijo de etapa).
+  const number = nextDocNumber('work_orders');
   const result = run(
     `INSERT INTO work_orders (number, vehicle_id, mechanic_id, status, notes, diagnosis, resolution) VALUES (?,?,?,?,?,?,?)`,
     [number, b.vehicleId, b.mechanicId || null, b.status || 'pendiente', b.notes || null, b.diagnosis || null, b.resolution || null]

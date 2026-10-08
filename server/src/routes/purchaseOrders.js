@@ -1,6 +1,6 @@
 const express = require('express');
 const { all, get, run } = require('../../db');
-const { nextNumber } = require('../utils/numbering');
+const { nextPoNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
@@ -31,7 +31,10 @@ router.post('/', (req, res) => {
   if (!b.supplierId || !Array.isArray(b.items) || b.items.length === 0) {
     return res.status(400).json({ error: 'Proveedor e items son obligatorios' });
   }
-  const number = nextNumber('purchase_orders', 'OC');
+  const supplier = get('SELECT * FROM suppliers WHERE id = ?', [b.supplierId]);
+  if (!supplier) return res.status(404).json({ error: 'Proveedor no encontrado' });
+  const vendorCode = supplier.code || supplier.name;
+  const number = nextPoNumber(vendorCode);
   const result = run(
     `INSERT INTO purchase_orders (number, supplier_id, status, notes) VALUES (?,?,?,?)`,
     [number, b.supplierId, b.status || 'borrador', b.notes || null]

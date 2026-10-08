@@ -24,12 +24,19 @@ router.get('/:id', (req, res) => {
   res.json(supplier);
 });
 
+// Deriva un código de 2 letras a partir del nombre del proveedor (p. ej. "Acme Parts" -> "AC").
+function deriveCode(name) {
+  const letters = String(name || '').toUpperCase().replace(/[^A-Z]/g, '');
+  return (letters.slice(0, 2) || 'XX').padEnd(2, 'X');
+}
+
 router.post('/', (req, res) => {
   const b = req.body;
   if (!b.name) return res.status(400).json({ error: 'El nombre es obligatorio' });
+  const code = (b.code && String(b.code).trim()) ? String(b.code).trim().toUpperCase().slice(0, 2) : deriveCode(b.name);
   const result = run(
-    `INSERT INTO suppliers (name, tax_id, email, phone, address, notes) VALUES (?,?,?,?,?,?)`,
-    [b.name, b.taxId || null, b.email || null, b.phone || null, b.address || null, b.notes || null]
+    `INSERT INTO suppliers (name, code, tax_id, email, phone, address, notes) VALUES (?,?,?,?,?,?,?)`,
+    [b.name, code, b.taxId || null, b.email || null, b.phone || null, b.address || null, b.notes || null]
   );
   res.status(201).json(get('SELECT * FROM suppliers WHERE id = ?', [result.lastInsertRowid]));
 });
@@ -38,9 +45,12 @@ router.put('/:id', (req, res) => {
   const b = req.body;
   const existing = get('SELECT * FROM suppliers WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Proveedor no encontrado' });
+  const code = (b.code !== undefined && String(b.code).trim())
+    ? String(b.code).trim().toUpperCase().slice(0, 2)
+    : (existing.code || deriveCode(b.name ?? existing.name));
   run(
-    `UPDATE suppliers SET name=?, tax_id=?, email=?, phone=?, address=?, notes=? WHERE id=?`,
-    [b.name ?? existing.name, b.taxId ?? existing.tax_id, b.email ?? existing.email, b.phone ?? existing.phone,
+    `UPDATE suppliers SET name=?, code=?, tax_id=?, email=?, phone=?, address=?, notes=? WHERE id=?`,
+    [b.name ?? existing.name, code, b.taxId ?? existing.tax_id, b.email ?? existing.email, b.phone ?? existing.phone,
      b.address ?? existing.address, b.notes ?? existing.notes, req.params.id]
   );
   res.json(get('SELECT * FROM suppliers WHERE id = ?', [req.params.id]));

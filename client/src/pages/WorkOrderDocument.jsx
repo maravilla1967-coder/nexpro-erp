@@ -154,6 +154,26 @@ export default function WorkOrderDocument() {
             <div><span>{t('Partes')}</span><span>${partsTotal.toLocaleString()}</span></div>
             <div className="invoice-total-grand"><span>{t('Total')}</span><span>${Number(wo.total).toLocaleString()}</span></div>
           </div>
+
+          <div className="doc-box" style={{ marginTop: 14 }}>
+            <div className="doc-box-title">{t('Conformidad del cliente')}</div>
+            <div className="muted" style={{ fontSize: 13 }}>{t('Al firmar, el cliente confirma haber recibido el vehículo y aceptar el trabajo realizado y descrito en este documento.')}</div>
+          </div>
+
+          <div className="signature-block">
+            <div className="signature-box">
+              <div className="signature-line"></div>
+              <div className="muted">{t('Firma del cliente')}</div>
+            </div>
+            <div className="signature-box">
+              <div className="signature-line"></div>
+              <div className="muted">{t('Recibido por (técnico/asesor)')}</div>
+            </div>
+            <div className="signature-box">
+              <div className="signature-line"></div>
+              <div className="muted">{t('Fecha')}</div>
+            </div>
+          </div>
         </div>
       </div>
     </>

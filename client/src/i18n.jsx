@@ -193,6 +193,11 @@ const DICT = {
   'Editar proveedor': 'Edit supplier',
   'Nuevo proveedor': 'New supplier',
   '¿Eliminar este proveedor?': 'Delete this supplier?',
+  Código: 'Code',
+  'Código (2 letras)': 'Code (2 letters)',
+  Auto: 'Auto',
+  'Se usa en el número de las órdenes de compra: NX-XX-001. Si se deja vacío, se toma de las primeras letras del nombre.':
+    'Used in purchase order numbers: NX-XX-001. If left blank, it is taken from the first letters of the name.',
 
   // Facturas
   Factura: 'Invoice',
@@ -225,6 +230,7 @@ const DICT = {
   // Órdenes de pedido (ventas)
   'Órdenes de Pedido': 'Sales Orders',
   'Pedidos de clientes, previos a la factura': 'Customer orders, prior to invoicing',
+  'Pedidos / cotizaciones de clientes, previos a la factura': 'Customer orders / quotes, prior to invoicing',
   '+ Nuevo pedido': '+ New order',
   'No hay pedidos todavía.': 'No orders yet.',
   en_proceso: 'in progress',
@@ -232,6 +238,12 @@ const DICT = {
   'Generar factura a partir del pedido': 'Generate an invoice from order',
   'Nuevo pedido': 'New order',
   Pedido: 'Order',
+  'Editar pedido': 'Edit order',
+  Imprimir: 'Print',
+  'ORDEN DE PEDIDO': 'SALES ORDER',
+  'Firma del cliente — Acepta el pedido': 'Client signature — Accepts the order',
+  'Los cambios se enviaron para autorización del administrador.': 'The changes were sent for administrator approval.',
+  'La eliminación se envió para autorización del administrador.': 'The deletion was sent for administrator approval.',
 
   // Vehículos
   'Recepción de Vehículos': 'Vehicle Reception',
@@ -355,6 +367,11 @@ const DICT = {
   'Mano de obra y servicios': 'Labor & services',
   'Sin servicios registrados.': 'No services recorded.',
   'Mano de obra / servicios': 'Labor / services',
+  'Conformidad del cliente': 'Client acknowledgment',
+  'Al firmar, el cliente confirma haber recibido el vehículo y aceptar el trabajo realizado y descrito en este documento.':
+    'By signing, the client confirms having received the vehicle and accepts the work performed as described in this document.',
+  'Firma del cliente': "Client's signature",
+  'Recibido por (técnico/asesor)': 'Received by (technician/advisor)',
   Partes: 'Parts',
 
   // Usuarios / permisos / aprobaciones
