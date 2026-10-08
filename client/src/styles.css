@@ -231,3 +231,36 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
   .card.invoice-sheet { border: none; box-shadow: none; }
   body { background: #fff; }
 }
+
+/* ---- Login / aceptar invitación ---- */
+.login-shell {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: var(--navy); padding: 20px;
+}
+.login-card {
+  background: #fff; border-radius: var(--radius); width: 100%; max-width: 380px;
+  padding: 28px 26px; box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+}
+.login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+
+/* ---- Menú de cuenta (sidebar) ---- */
+.account-menu { position: relative; padding-bottom: 14px; }
+.account-trigger {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: transparent; border: none; cursor: pointer; padding: 6px 4px; color: #cbd5e1;
+  text-align: left;
+}
+.account-trigger:hover { background: rgba(255,255,255,0.06); border-radius: 8px; }
+.account-avatar {
+  width: 30px; height: 30px; border-radius: 50%; background: var(--orange); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;
+}
+.account-info { display: flex; flex-direction: column; line-height: 1.25; overflow: hidden; }
+.account-info strong { font-size: 13px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-info span { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-dropdown {
+  position: absolute; bottom: calc(100% + 6px); left: 4px; right: 4px;
+  background: #fff; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); overflow: hidden; z-index: 10;
+}
+.account-dropdown .nav-link { color: var(--text); border-left: none; padding: 10px 14px; }
+.account-dropdown .nav-link:hover { background: #f4f6f9; }

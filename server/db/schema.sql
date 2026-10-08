@@ -243,3 +243,48 @@ CREATE TABLE IF NOT EXISTS work_order_parts (
   unit_cost REAL NOT NULL DEFAULT 0,
   total REAL NOT NULL DEFAULT 0
 );
+
+-- ===================== USUARIOS / PERMISOS / APROBACIONES =====================
+-- Configuración interna de la app (p. ej. la clave para firmar sesiones).
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT,
+  role TEXT NOT NULL DEFAULT 'usuario', -- 'admin' | 'usuario'
+  status TEXT NOT NULL DEFAULT 'invitado', -- 'invitado' | 'activo' | 'desactivado'
+  invite_token TEXT,
+  invite_expires_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  activated_at TEXT
+);
+
+-- Permiso de edición por módulo para usuarios no-administradores.
+-- Si no hay fila para (user_id, module), el usuario solo puede ver ese módulo, no editarlo.
+CREATE TABLE IF NOT EXISTS user_permissions (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  module TEXT NOT NULL,
+  can_edit INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, module)
+);
+
+-- Cola de cambios pendientes de autorización del administrador (facturas y pedidos).
+CREATE TABLE IF NOT EXISTS approval_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  entity_type TEXT NOT NULL, -- 'invoice' | 'sales_order'
+  entity_id INTEGER NOT NULL,
+  action TEXT NOT NULL, -- 'update' | 'delete'
+  payload TEXT, -- JSON con los cambios propuestos (para 'update')
+  summary TEXT,
+  requested_by INTEGER NOT NULL REFERENCES users(id),
+  status TEXT NOT NULL DEFAULT 'pendiente', -- 'pendiente' | 'aprobado' | 'rechazado'
+  resolved_by INTEGER REFERENCES users(id),
+  resolved_at TEXT,
+  reject_reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

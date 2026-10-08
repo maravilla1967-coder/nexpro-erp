@@ -1,8 +1,10 @@
 const express = require('express');
 const { all, get, run } = require('../../db');
 const { makeUploader } = require('../middleware/upload');
+const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(requireModuleEdit('vehiculos'));
 const upload = makeUploader('vehicles');
 
 function withDetails(vehicle) {

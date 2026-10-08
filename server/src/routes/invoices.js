@@ -1,8 +1,10 @@
 const express = require('express');
 const { all, get, run } = require('../../db');
 const { nextNumber } = require('../utils/numbering');
+const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(requireModuleEdit('facturas'));
 
 function withItems(inv) {
   if (!inv) return inv;
@@ -15,6 +17,38 @@ function computeTotals(items, taxRate) {
   const taxAmount = Math.round(subtotal * (Number(taxRate || 0) / 100) * 100) / 100;
   const total = Math.round((subtotal + taxAmount) * 100) / 100;
   return { subtotal: Math.round(subtotal * 100) / 100, taxAmount, total };
+}
+
+// ---- Lógica de aplicación real de cambios (usada directamente por admin, o por la
+// ruta de aprobaciones cuando el administrador aprueba la solicitud de otro usuario) ----
+function applyUpdate(id, b) {
+  const existing = get('SELECT * FROM invoices WHERE id = ?', [id]);
+  if (!existing) throw new Error('Factura no encontrada');
+
+  let subtotal = existing.subtotal, taxAmount = existing.tax_amount, total = existing.total;
+  const taxRate = b.taxRate ?? existing.tax_rate;
+
+  if (Array.isArray(b.items)) {
+    run('DELETE FROM invoice_items WHERE invoice_id = ?', [id]);
+    for (const item of b.items) {
+      run(
+        `INSERT INTO invoice_items (invoice_id, product_id, description, quantity, unit_price) VALUES (?,?,?,?,?)`,
+        [id, item.productId || null, item.description, item.quantity, item.unitPrice]
+      );
+    }
+    const totals = computeTotals(b.items, taxRate);
+    subtotal = totals.subtotal; taxAmount = totals.taxAmount; total = totals.total;
+  }
+
+  run(
+    `UPDATE invoices SET status=?, due_date=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, notes=? WHERE id=?`,
+    [b.status ?? existing.status, b.dueDate ?? existing.due_date, subtotal, taxRate, taxAmount, total, b.notes ?? existing.notes, id]
+  );
+  return get('SELECT * FROM invoices WHERE id = ?', [id]);
+}
+
+function applyDelete(id) {
+  run('DELETE FROM invoices WHERE id = ?', [id]);
 }
 
 router.get('/', (req, res) => {
@@ -35,7 +69,8 @@ router.get('/:id', (req, res) => {
   res.json(withItems(inv));
 });
 
-// Crear factura directa (con items propios) o a partir de un pedido (salesOrderId)
+// Crear factura directa (con items propios) o a partir de un pedido (salesOrderId).
+// La creación no pasa por aprobación: solo la edición/eliminación de una factura ya existente.
 router.post('/', (req, res) => {
   const b = req.body;
   let items = b.items;
@@ -75,36 +110,39 @@ router.post('/', (req, res) => {
   res.status(201).json(withItems(get('SELECT * FROM invoices WHERE id = ?', [invId])));
 });
 
+// Editar o eliminar una factura existente: un administrador lo aplica de inmediato;
+// cualquier otro usuario con permiso de edición en "facturas" solo puede proponer el
+// cambio, que queda pendiente de autorización del administrador.
 router.put('/:id', (req, res) => {
-  const b = req.body;
   const existing = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Factura no encontrada' });
 
-  let subtotal = existing.subtotal, taxAmount = existing.tax_amount, total = existing.total;
-  const taxRate = b.taxRate ?? existing.tax_rate;
-
-  if (Array.isArray(b.items)) {
-    run('DELETE FROM invoice_items WHERE invoice_id = ?', [req.params.id]);
-    for (const item of b.items) {
-      run(
-        `INSERT INTO invoice_items (invoice_id, product_id, description, quantity, unit_price) VALUES (?,?,?,?,?)`,
-        [req.params.id, item.productId || null, item.description, item.quantity, item.unitPrice]
-      );
-    }
-    const totals = computeTotals(b.items, taxRate);
-    subtotal = totals.subtotal; taxAmount = totals.taxAmount; total = totals.total;
+  if (req.user.role === 'admin') {
+    return res.json(withItems(applyUpdate(req.params.id, req.body)));
   }
-
-  run(
-    `UPDATE invoices SET status=?, due_date=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, notes=? WHERE id=?`,
-    [b.status ?? existing.status, b.dueDate ?? existing.due_date, subtotal, taxRate, taxAmount, total, b.notes ?? existing.notes, req.params.id]
+  const result = run(
+    `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
+     VALUES ('invoice', ?, 'update', ?, ?, ?)`,
+    [req.params.id, JSON.stringify(req.body), `Cambios en la factura ${existing.number}`, req.user.id]
   );
-  res.json(withItems(get('SELECT * FROM invoices WHERE id = ?', [req.params.id])));
+  res.status(202).json({ pending: true, approvalId: result.lastInsertRowid, message: 'Los cambios se enviaron para autorización del administrador.' });
 });
 
 router.delete('/:id', (req, res) => {
-  run('DELETE FROM invoices WHERE id = ?', [req.params.id]);
-  res.status(204).end();
+  const existing = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
+  if (!existing) return res.status(404).json({ error: 'Factura no encontrada' });
+
+  if (req.user.role === 'admin') {
+    applyDelete(req.params.id);
+    return res.status(204).end();
+  }
+  const result = run(
+    `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
+     VALUES ('invoice', ?, 'delete', NULL, ?, ?)`,
+    [req.params.id, `Eliminar la factura ${existing.number}`, req.user.id]
+  );
+  res.status(202).json({ pending: true, approvalId: result.lastInsertRowid, message: 'La eliminación se envió para autorización del administrador.' });
 });
 
+router.service = { applyUpdate, applyDelete };
 module.exports = router;

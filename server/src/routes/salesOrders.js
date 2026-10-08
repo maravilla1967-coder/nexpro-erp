@@ -1,13 +1,39 @@
 const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
 const { nextNumber } = require('../utils/numbering');
+const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(requireModuleEdit('pedidos'));
 
 function withItems(so) {
   if (!so) return so;
   so.items = all('SELECT * FROM sales_order_items WHERE sales_order_id = ?', [so.id]);
   return so;
+}
+
+// ---- Lógica de aplicación real de cambios (usada directamente por admin, o por la
+// ruta de aprobaciones cuando el administrador aprueba la solicitud de otro usuario) ----
+function applyUpdate(id, b) {
+  const existing = get('SELECT * FROM sales_orders WHERE id = ?', [id]);
+  if (!existing) throw new Error('Pedido no encontrado');
+  run(`UPDATE sales_orders SET status=?, notes=?, updated_at=? WHERE id=?`,
+    [b.status ?? existing.status, b.notes ?? existing.notes, nowIso(), id]);
+
+  if (Array.isArray(b.items)) {
+    run('DELETE FROM sales_order_items WHERE sales_order_id = ?', [id]);
+    for (const item of b.items) {
+      run(
+        `INSERT INTO sales_order_items (sales_order_id, product_id, description, quantity, unit_price) VALUES (?,?,?,?,?)`,
+        [id, item.productId || null, item.description, item.quantity, item.unitPrice]
+      );
+    }
+  }
+  return get('SELECT * FROM sales_orders WHERE id = ?', [id]);
+}
+
+function applyDelete(id) {
+  run('DELETE FROM sales_orders WHERE id = ?', [id]);
 }
 
 router.get('/', (req, res) => {
@@ -24,6 +50,7 @@ router.get('/:id', (req, res) => {
   res.json(withItems(so));
 });
 
+// Crear un pedido nuevo no pasa por aprobación: solo la edición/eliminación de uno existente.
 router.post('/', (req, res) => {
   const b = req.body;
   if (!b.customerId || !Array.isArray(b.items) || b.items.length === 0) {
@@ -44,28 +71,39 @@ router.post('/', (req, res) => {
   res.status(201).json(withItems(get('SELECT * FROM sales_orders WHERE id = ?', [soId])));
 });
 
+// Editar o eliminar un pedido existente: un administrador lo aplica de inmediato;
+// cualquier otro usuario con permiso de edición en "pedidos" solo puede proponer el
+// cambio, que queda pendiente de autorización del administrador.
 router.put('/:id', (req, res) => {
-  const b = req.body;
   const existing = get('SELECT * FROM sales_orders WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Pedido no encontrado' });
-  run(`UPDATE sales_orders SET status=?, notes=?, updated_at=? WHERE id=?`,
-    [b.status ?? existing.status, b.notes ?? existing.notes, nowIso(), req.params.id]);
 
-  if (Array.isArray(b.items)) {
-    run('DELETE FROM sales_order_items WHERE sales_order_id = ?', [req.params.id]);
-    for (const item of b.items) {
-      run(
-        `INSERT INTO sales_order_items (sales_order_id, product_id, description, quantity, unit_price) VALUES (?,?,?,?,?)`,
-        [req.params.id, item.productId || null, item.description, item.quantity, item.unitPrice]
-      );
-    }
+  if (req.user.role === 'admin') {
+    return res.json(withItems(applyUpdate(req.params.id, req.body)));
   }
-  res.json(withItems(get('SELECT * FROM sales_orders WHERE id = ?', [req.params.id])));
+  const result = run(
+    `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
+     VALUES ('sales_order', ?, 'update', ?, ?, ?)`,
+    [req.params.id, JSON.stringify(req.body), `Cambios en el pedido ${existing.number}`, req.user.id]
+  );
+  res.status(202).json({ pending: true, approvalId: result.lastInsertRowid, message: 'Los cambios se enviaron para autorización del administrador.' });
 });
 
 router.delete('/:id', (req, res) => {
-  run('DELETE FROM sales_orders WHERE id = ?', [req.params.id]);
-  res.status(204).end();
+  const existing = get('SELECT * FROM sales_orders WHERE id = ?', [req.params.id]);
+  if (!existing) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+  if (req.user.role === 'admin') {
+    applyDelete(req.params.id);
+    return res.status(204).end();
+  }
+  const result = run(
+    `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
+     VALUES ('sales_order', ?, 'delete', NULL, ?, ?)`,
+    [req.params.id, `Eliminar el pedido ${existing.number}`, req.user.id]
+  );
+  res.status(202).json({ pending: true, approvalId: result.lastInsertRowid, message: 'La eliminación se envió para autorización del administrador.' });
 });
 
+router.service = { applyUpdate, applyDelete };
 module.exports = router;

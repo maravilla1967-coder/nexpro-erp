@@ -1,8 +1,10 @@
 const express = require('express');
 const { all, get, run } = require('../../db');
 const { nextNumber } = require('../utils/numbering');
+const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(requireModuleEdit('compras'));
 
 function withItems(po) {
   if (!po) return po;

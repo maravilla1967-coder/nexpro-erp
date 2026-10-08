@@ -8,6 +8,7 @@ const COLORS = {
   recibido: 'blue', en_servicio: 'orange', completado: 'green', entregado: 'gray',
   nuevo: 'gray', calificado: 'blue', propuesta: 'orange', negociacion: 'amber',
   ganado: 'green', perdido: 'red', activo: 'green',
+  admin: 'blue', usuario: 'gray', invitado: 'amber', desactivado: 'red', rechazado: 'red',
 };
 
 export default function Pill({ value }) {

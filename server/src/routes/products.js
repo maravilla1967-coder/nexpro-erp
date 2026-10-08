@@ -1,8 +1,10 @@
 const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
 const { makeUploader } = require('../middleware/upload');
+const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(requireModuleEdit('inventario'));
 const upload = makeUploader('products');
 
 function calcSellingPrice(cost, freight, marginPercent) {

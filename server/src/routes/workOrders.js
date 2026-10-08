@@ -1,8 +1,10 @@
 const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
 const { nextNumber } = require('../utils/numbering');
+const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(requireModuleEdit('ordenes_trabajo'));
 
 function calcServiceTotal(svc) {
   if (svc.pricingType === 'servicio_completo' || svc.pricing_type === 'servicio_completo') {

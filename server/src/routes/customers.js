@@ -1,7 +1,9 @@
 const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
+const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(requireModuleEdit('clientes'));
 
 // ---- Customers ----
 router.get('/', (req, res) => {
