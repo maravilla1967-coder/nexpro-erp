@@ -327,6 +327,30 @@ const DICT = {
   'No hay órdenes de trabajo todavía. Se crean desde la ficha del vehículo.':
     'No work orders yet. They are created from the vehicle record.',
   'Orden de trabajo': 'Work order',
+  Documento: 'Document',
+
+  // Documento de orden de trabajo (recepción de vehículo)
+  'DOCUMENTO DE SERVICIO': 'SERVICE DOCUMENT',
+  'No.': 'No.',
+  'VIN:': 'VIN:',
+  'Equipos instalados': 'Installed equipment',
+  'Sin equipos registrados.': 'No equipment registered.',
+  'Marca / Fabricante': 'Brand / Manufacturer',
+  'Problema reportado / Síntomas': 'Reported issue / Symptoms',
+  Diagnóstico: 'Diagnosis',
+  'Sin diagnóstico registrado.': 'No diagnosis recorded.',
+  'Solución / Reparación realizada': 'Solution / Repair performed',
+  'Sin solución registrada.': 'No solution recorded.',
+  'Partes reemplazadas o reparadas': 'Parts replaced or repaired',
+  'No se reemplazaron ni repararon partes.': 'No parts were replaced or repaired.',
+  Acción: 'Action',
+  Reemplazada: 'Replaced',
+  Reparada: 'Repaired',
+  '+ Agregar parte': '+ Add part',
+  'Mano de obra y servicios': 'Labor & services',
+  'Sin servicios registrados.': 'No services recorded.',
+  'Mano de obra / servicios': 'Labor / services',
+  Partes: 'Parts',
 
   // Toggle de idioma
   ES: 'ES',

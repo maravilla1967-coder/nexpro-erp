@@ -16,6 +16,7 @@ import VehicleDetail from './pages/VehicleDetail.jsx';
 import ServicesList from './pages/ServicesList.jsx';
 import MechanicsList from './pages/MechanicsList.jsx';
 import WorkOrdersList from './pages/WorkOrdersList.jsx';
+import WorkOrderDocument from './pages/WorkOrderDocument.jsx';
 
 const NAV = [
   { label: 'General', links: [{ to: '/', text: 'Dashboard', icon: '📊' }] },
@@ -113,6 +114,7 @@ export default function App() {
           <Route path="/servicios" element={<ServicesList />} />
           <Route path="/mecanicos" element={<MechanicsList />} />
           <Route path="/ordenes-trabajo" element={<WorkOrdersList />} />
+          <Route path="/ordenes-trabajo/:id/documento" element={<WorkOrderDocument />} />
         </Routes>
       </div>
     </div>

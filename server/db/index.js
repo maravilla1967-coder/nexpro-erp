@@ -10,6 +10,18 @@ db.exec('PRAGMA foreign_keys = ON;');
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 db.exec(schema);
 
+// Migraciones idempotentes para bases de datos ya existentes (CREATE TABLE IF NOT EXISTS
+// no agrega columnas nuevas a una tabla que ya existe con datos).
+function tryAlter(sql) {
+  try {
+    db.exec(sql);
+  } catch (e) {
+    // La columna ya existe; no hacer nada.
+  }
+}
+tryAlter('ALTER TABLE work_orders ADD COLUMN diagnosis TEXT');
+tryAlter('ALTER TABLE work_orders ADD COLUMN resolution TEXT');
+
 function all(sql, params = []) {
   const stmt = db.prepare(sql);
   return stmt.all(...params);

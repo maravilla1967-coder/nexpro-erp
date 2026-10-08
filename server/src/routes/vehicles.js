@@ -62,7 +62,9 @@ router.get('/', (req, res) => {
 
 router.get('/:id', (req, res) => {
   const vehicle = get(
-    `SELECT v.*, c.name as customer_name FROM vehicles v
+    `SELECT v.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone,
+            c.tax_id as customer_tax_id, c.address as customer_address, c.city as customer_city
+     FROM vehicles v
      LEFT JOIN customers c ON c.id = v.customer_id WHERE v.id = ?`,
     [req.params.id]
   );
@@ -71,7 +73,13 @@ router.get('/:id', (req, res) => {
 });
 
 router.get('/by-vin/:vin', (req, res) => {
-  const vehicle = get('SELECT * FROM vehicles WHERE vin = ?', [req.params.vin]);
+  const vehicle = get(
+    `SELECT v.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone,
+            c.tax_id as customer_tax_id, c.address as customer_address, c.city as customer_city
+     FROM vehicles v
+     LEFT JOIN customers c ON c.id = v.customer_id WHERE v.vin = ?`,
+    [req.params.vin]
+  );
   if (!vehicle) return res.status(404).json({ error: 'No existe un vehículo con ese VIN' });
   res.json(withDetails(vehicle));
 });

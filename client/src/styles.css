@@ -219,6 +219,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 .invoice-totals > div { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; }
 .invoice-total-grand { border-top: 2px solid var(--navy); margin-top: 6px; padding-top: 8px !important; font-weight: 800; font-size: 17px; color: var(--navy); }
 
+/* ---- Documento de orden de trabajo (recepción de vehículo) ---- */
+.doc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 700px) { .doc-grid { grid-template-columns: 1fr; } }
+.doc-box { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.doc-box-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--navy); margin-bottom: 8px; }
+
 @media print {
   .sidebar, .topbar.no-print, .modal-overlay { display: none !important; }
   .content { padding: 0; }

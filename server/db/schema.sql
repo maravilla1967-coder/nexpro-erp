@@ -215,6 +215,8 @@ CREATE TABLE IF NOT EXISTS work_orders (
   mechanic_id INTEGER REFERENCES mechanics(id),
   status TEXT NOT NULL DEFAULT 'pendiente',
   notes TEXT,
+  diagnosis TEXT,
+  resolution TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -228,5 +230,16 @@ CREATE TABLE IF NOT EXISTS work_order_services (
   hours REAL DEFAULT 0,
   hourly_rate REAL DEFAULT 0,
   flat_price REAL DEFAULT 0,
+  total REAL NOT NULL DEFAULT 0
+);
+
+-- Partes reemplazadas o reparadas en una orden de trabajo (para el documento de servicio)
+CREATE TABLE IF NOT EXISTS work_order_parts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  work_order_id INTEGER NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  action TEXT NOT NULL DEFAULT 'reemplazada', -- 'reemplazada' | 'reparada'
+  quantity REAL NOT NULL DEFAULT 1,
+  unit_cost REAL NOT NULL DEFAULT 0,
   total REAL NOT NULL DEFAULT 0
 );

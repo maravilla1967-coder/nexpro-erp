@@ -15,6 +15,10 @@ export default function WorkOrdersList() {
   const [woMechanicId, setWoMechanicId] = useState('');
   const [woStatus, setWoStatus] = useState('pendiente');
   const [woServices, setWoServices] = useState([]);
+  const [woNotes, setWoNotes] = useState('');
+  const [woDiagnosis, setWoDiagnosis] = useState('');
+  const [woResolution, setWoResolution] = useState('');
+  const [woParts, setWoParts] = useState([]);
   const [error, setError] = useState('');
 
   function load() { api.get('/work-orders', { status }).then(setList).catch(console.error); }
@@ -29,6 +33,10 @@ export default function WorkOrdersList() {
     setWoMechanicId(wo.mechanic_id || '');
     setWoStatus(wo.status);
     setWoServices(wo.services.map((s) => ({ ...s, hours: s.hours ?? 0, hourlyRate: s.hourly_rate ?? 0, flatPrice: s.flat_price ?? 0, pricingType: s.pricing_type })));
+    setWoNotes(wo.notes || '');
+    setWoDiagnosis(wo.diagnosis || '');
+    setWoResolution(wo.resolution || '');
+    setWoParts((wo.parts || []).map((p) => ({ ...p, unitCost: p.unit_cost ?? 0 })));
     setError('');
   }
 
@@ -51,13 +59,25 @@ export default function WorkOrdersList() {
   function addRow() { setWoServices([...woServices, { description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 }]); }
   function removeRow(idx) { setWoServices(woServices.filter((_, i) => i !== idx)); }
 
+  function updatePart(idx, field, value) {
+    const copy = [...woParts];
+    copy[idx] = { ...copy[idx], [field]: value };
+    setWoParts(copy);
+  }
+  function addPartRow() { setWoParts([...woParts, { description: '', action: 'reemplazada', quantity: 1, unitCost: 0 }]); }
+  function removePartRow(idx) { setWoParts(woParts.filter((_, i) => i !== idx)); }
+
   async function saveEdit(e) {
     e.preventDefault();
     const payload = {
       mechanicId: woMechanicId || null, status: woStatus,
+      notes: woNotes || null, diagnosis: woDiagnosis || null, resolution: woResolution || null,
       services: woServices.filter((s) => s.description).map((s) => ({
         serviceId: s.service_id || s.serviceId || null, description: s.description, pricingType: s.pricingType,
         hours: parseFloat(s.hours) || 0, hourlyRate: parseFloat(s.hourlyRate) || 0, flatPrice: parseFloat(s.flatPrice) || 0,
+      })),
+      parts: woParts.filter((p) => p.description).map((p) => ({
+        description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
       })),
     };
     try { await api.put(`/work-orders/${editing.id}`, payload); setEditing(null); load(); }
@@ -84,7 +104,7 @@ export default function WorkOrdersList() {
         <div className="card">
           {list.length === 0 ? <div className="empty-state">{t('No hay órdenes de trabajo todavía. Se crean desde la ficha del vehículo.')}</div> : (
             <table>
-              <thead><tr><th>{t('Número')}</th><th>{t('Vehículo')}</th><th>{t('Mecánico')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th></tr></thead>
+              <thead><tr><th>{t('Número')}</th><th>{t('Vehículo')}</th><th>{t('Mecánico')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
               <tbody>
                 {list.map((wo) => (
                   <tr key={wo.id}>
@@ -95,6 +115,7 @@ export default function WorkOrdersList() {
                     <td><Pill value={wo.status} /></td>
                     <td className="muted">{wo.created_at}</td>
                     <td><button className="link-btn" onClick={() => openEdit(wo)}>{t('Editar')}</button></td>
+                    <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
                   </tr>
                 ))}
               </tbody>
@@ -155,6 +176,33 @@ export default function WorkOrdersList() {
             </table>
             <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addRow}>{t('+ Agregar servicio')}</button>
             <div className="text-right" style={{ marginTop: 10, fontWeight: 700 }}>{t('Total')}: ${total.toLocaleString()}</div>
+
+            <div className="field" style={{ marginTop: 16 }}><label>{t('Problema reportado / Síntomas')}</label><textarea rows={2} value={woNotes} onChange={(e) => setWoNotes(e.target.value)} /></div>
+            <div className="field"><label>{t('Diagnóstico')}</label><textarea rows={2} value={woDiagnosis} onChange={(e) => setWoDiagnosis(e.target.value)} /></div>
+            <div className="field"><label>{t('Solución / Reparación realizada')}</label><textarea rows={2} value={woResolution} onChange={(e) => setWoResolution(e.target.value)} /></div>
+
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes reemplazadas o reparadas')}</label>
+            <table className="line-items-table" style={{ marginTop: 6 }}>
+              <thead><tr><th>{t('Descripción')}</th><th style={{ width: 130 }}>{t('Acción')}</th><th style={{ width: 80 }}>{t('Cant.')}</th><th style={{ width: 110 }}>{t('Costo unit.')}</th><th></th></tr></thead>
+              <tbody>
+                {woParts.map((p, idx) => (
+                  <tr key={idx}>
+                    <td><input value={p.description} onChange={(e) => updatePart(idx, 'description', e.target.value)} /></td>
+                    <td>
+                      <select value={p.action} onChange={(e) => updatePart(idx, 'action', e.target.value)}>
+                        <option value="reemplazada">{t('Reemplazada')}</option>
+                        <option value="reparada">{t('Reparada')}</option>
+                      </select>
+                    </td>
+                    <td><input type="number" step="1" value={p.quantity} onChange={(e) => updatePart(idx, 'quantity', e.target.value)} /></td>
+                    <td><input type="number" step="0.01" value={p.unitCost} onChange={(e) => updatePart(idx, 'unitCost', e.target.value)} /></td>
+                    <td><button type="button" className="link-btn" onClick={() => removePartRow(idx)}>✕</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addPartRow}>{t('+ Agregar parte')}</button>
+
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => setEditing(null)}>{t('Cancelar')}</button>
               <button type="submit" className="btn btn-primary">{t('Guardar')}</button>
