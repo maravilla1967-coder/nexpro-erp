@@ -27,7 +27,7 @@ export default function Login() {
     <div className="login-shell">
       <form className="login-card" onSubmit={submit}>
         <div className="login-brand">
-          <div className="brand-mark">NX</div>
+          <div className="brand-mark"><img src="/nexpro-icon.png" alt="Nexpro" /></div>
           <div>
             <strong>Nexpro ERP</strong>
             <div className="muted" style={{ fontSize: 12 }}>Trucks &amp; Equipment Corp.</div>

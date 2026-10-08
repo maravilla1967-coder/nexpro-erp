@@ -156,7 +156,7 @@ function MainShell() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">NX</div>
+          <div className="brand-mark"><img src="/nexpro-icon.png" alt="Nexpro" /></div>
           <div className="brand-text">
             <strong>Nexpro ERP</strong>
             <span>Trucks &amp; Equipment Corp.</span>
