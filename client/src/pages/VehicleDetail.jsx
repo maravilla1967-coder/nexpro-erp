@@ -202,7 +202,7 @@ export default function VehicleDetail() {
                       <td className="mono">{e.serial_number || '—'}</td>
                       <td>{e.manufacturer || '—'}</td>
                       <td>{e.model || '—'}</td>
-                      <td><button className="link-btn" onClick={() => deleteEquip(e.id)}>{t('Eliminar')}</button></td>
+                      <td><button className="btn-row-action delete" onClick={() => deleteEquip(e.id)}>{t('Eliminar')}</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -226,7 +226,7 @@ export default function VehicleDetail() {
                     <td>{wo.mechanic_name || '—'}</td>
                     <td><Pill value={wo.status} /></td>
                     <td className="muted">{wo.created_at}</td>
-                    <td><button className="link-btn" onClick={() => openEditWo(wo)}>{t('Editar')}</button></td>
+                    <td><button className="btn-row-action edit" onClick={() => openEditWo(wo)}>{t('Editar')}</button></td>
                     <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
                   </tr>
                 ))}

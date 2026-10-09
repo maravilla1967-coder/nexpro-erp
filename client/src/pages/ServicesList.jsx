@@ -59,8 +59,10 @@ export default function ServicesList() {
                     <td>{s.pricing_type === 'hora' ? t('Por hora') : t('Servicio completo')}</td>
                     <td>{s.pricing_type === 'hora' ? `$${s.hourly_rate}${t('/hora')}` : `$${s.flat_price}`}</td>
                     <td>
-                      <button className="link-btn" onClick={() => openEdit(s)}>{t('Editar')}</button>{' '}
-                      <button className="link-btn" style={{ color: 'var(--red)' }} onClick={() => remove(s.id)}>{t('Eliminar')}</button>
+                      <div className="row-actions">
+                        <button className="btn-row-action edit" onClick={() => openEdit(s)}>{t('Editar')}</button>
+                        <button className="btn-row-action delete" onClick={() => remove(s.id)}>{t('Eliminar')}</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

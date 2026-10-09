@@ -54,8 +54,10 @@ export default function MechanicsList() {
                     <td className="muted">{m.specialty || '—'}</td>
                     <td className="muted">{m.phone || m.email || '—'}</td>
                     <td>
-                      <button className="link-btn" onClick={() => openEdit(m)}>{t('Editar')}</button>{' '}
-                      <button className="link-btn" style={{ color: 'var(--red)' }} onClick={() => remove(m.id)}>{t('Eliminar')}</button>
+                      <div className="row-actions">
+                        <button className="btn-row-action edit" onClick={() => openEdit(m)}>{t('Editar')}</button>
+                        <button className="btn-row-action delete" onClick={() => remove(m.id)}>{t('Eliminar')}</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

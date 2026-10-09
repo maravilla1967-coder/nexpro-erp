@@ -104,10 +104,12 @@ export default function SalesOrdersList() {
                     </td>
                     <td className="muted">{so.created_at}</td>
                     <td>
-                      <button className="link-btn" onClick={() => openEdit(so.id)}>{t('Editar')}</button>{' '}
-                      <Link className="link-btn" to={`/pedidos/${so.id}/documento`}>{t('Imprimir')}</Link>{' '}
-                      {so.status !== 'facturado' && <button className="link-btn" onClick={() => convertToInvoice(so)}>{t('Facturar')}</button>}
-                      {so.status === 'facturado' && <Pill value="facturado" />}
+                      <div className="row-actions">
+                        <button className="btn-row-action edit" onClick={() => openEdit(so.id)}>{t('Editar')}</button>
+                        <Link className="btn-row-action" to={`/pedidos/${so.id}/documento`}>{t('Imprimir')}</Link>
+                        {so.status !== 'facturado' && <button className="btn-row-action" onClick={() => convertToInvoice(so)}>{t('Facturar')}</button>}
+                        {so.status === 'facturado' && <Pill value="facturado" />}
+                      </div>
                     </td>
                   </tr>
                 ))}

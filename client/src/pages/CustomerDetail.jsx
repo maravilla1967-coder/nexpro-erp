@@ -129,7 +129,7 @@ export default function CustomerDetail() {
                   {customer.contacts.map((c) => (
                     <tr key={c.id}>
                       <td>{c.name}</td><td>{c.role || '—'}</td><td>{c.email || '—'}</td><td>{c.phone || '—'}</td>
-                      <td><button className="link-btn" onClick={() => deleteContact(c.id)}>{t('Eliminar')}</button></td>
+                      <td><button className="btn-row-action delete" onClick={() => deleteContact(c.id)}>{t('Eliminar')}</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -156,7 +156,7 @@ export default function CustomerDetail() {
                           {STAGES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
                         </select>
                       </td>
-                      <td><button className="link-btn" onClick={() => deleteOpportunity(o.id)}>{t('Eliminar')}</button></td>
+                      <td><button className="btn-row-action delete" onClick={() => deleteOpportunity(o.id)}>{t('Eliminar')}</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -176,7 +176,7 @@ export default function CustomerDetail() {
                     <tr key={a.id} style={{ opacity: a.done ? 0.5 : 1 }}>
                       <td><input type="checkbox" checked={!!a.done} onChange={() => toggleActivityDone(a)} /></td>
                       <td>{a.type}</td><td>{a.subject}</td><td>{a.due_date || '—'}</td><td className="muted">{a.notes || '—'}</td>
-                      <td><button className="link-btn" onClick={() => deleteActivity(a.id)}>{t('Eliminar')}</button></td>
+                      <td><button className="btn-row-action delete" onClick={() => deleteActivity(a.id)}>{t('Eliminar')}</button></td>
                     </tr>
                   ))}
                 </tbody>

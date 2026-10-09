@@ -206,6 +206,22 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 .mono { font-family: 'Courier New', monospace; }
 .link-btn { background: none; border: none; color: var(--orange); font-weight: 600; cursor: pointer; padding: 0; font-size: 13px; }
 
+/* Botones de acción en filas de tablas (editar, eliminar, etc.) presentados como cajas
+   separadas, para que no se puedan confundir por error entre sí como pasaba cuando eran
+   simples enlaces de texto uno al lado del otro. */
+.row-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.btn-row-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+  background: #fff; color: var(--steel); font-size: 12px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.btn-row-action:hover { border-color: var(--steel); background: #f8fafc; }
+.btn-row-action.edit { color: var(--orange-dark); border-color: #fcd9bb; background: #fff7f2; }
+.btn-row-action.edit:hover { background: #ffedd5; border-color: var(--orange); }
+.btn-row-action.delete { color: var(--red); border-color: #fecaca; background: #fef2f2; }
+.btn-row-action.delete:hover { background: #fee2e2; border-color: var(--red); }
+
 /* ---- Factura imprimible ---- */
 .invoice-sheet { max-width: 760px; margin: 0 auto; }
 .invoice-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--navy); padding-bottom: 16px; margin-bottom: 16px; }

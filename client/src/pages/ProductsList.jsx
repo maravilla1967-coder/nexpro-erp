@@ -129,8 +129,10 @@ export default function ProductsList() {
                     <td><strong>${Number(p.selling_price).toLocaleString()}</strong></td>
                     <td className={p.stock_qty <= 0 ? 'muted' : ''}>{p.stock_qty} {p.unit}</td>
                     <td>
-                      <button className="link-btn" onClick={() => openEdit(p)}>{t('Editar')}</button>{' '}
-                      <button className="link-btn" style={{ color: 'var(--red)' }} onClick={() => remove(p.id)}>{t('Eliminar')}</button>
+                      <div className="row-actions">
+                        <button className="btn-row-action edit" onClick={() => openEdit(p)}>{t('Editar')}</button>
+                        <button className="btn-row-action delete" onClick={() => remove(p.id)}>{t('Eliminar')}</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -211,7 +213,7 @@ export default function ProductsList() {
           <table>
             <tbody>
               {types.map((t2) => (
-                <tr key={t2.id}><td>{t2.name}</td><td style={{ textAlign: 'right' }}><button className="link-btn" onClick={() => deleteType(t2.id)}>{t('Eliminar')}</button></td></tr>
+                <tr key={t2.id}><td>{t2.name}</td><td style={{ textAlign: 'right' }}><button className="btn-row-action delete" onClick={() => deleteType(t2.id)}>{t('Eliminar')}</button></td></tr>
               ))}
             </tbody>
           </table>

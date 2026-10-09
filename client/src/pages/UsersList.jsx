@@ -134,23 +134,18 @@ export default function UsersList() {
                           : MODULES.filter((m) => u.permissions?.[m.key]).map((m) => t(m.label)).join(', '))}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <button type="button" className="link-btn" onClick={() => openEdit(u)}>{t('Editar')}</button>
-                      {' · '}
-                      {u.status === 'invitado' && (
-                        <>
-                          <button type="button" className="link-btn" onClick={() => reinvite(u)}>{t('Reenviar invitación')}</button>
-                          {' · '}
-                        </>
-                      )}
-                      {u.status !== 'invitado' && (
-                        <>
-                          <button type="button" className="link-btn" onClick={() => toggleStatus(u)}>
+                      <div className="row-actions">
+                        <button type="button" className="btn-row-action edit" onClick={() => openEdit(u)}>{t('Editar')}</button>
+                        {u.status === 'invitado' && (
+                          <button type="button" className="btn-row-action" onClick={() => reinvite(u)}>{t('Reenviar invitación')}</button>
+                        )}
+                        {u.status !== 'invitado' && (
+                          <button type="button" className="btn-row-action" onClick={() => toggleStatus(u)}>
                             {u.status === 'desactivado' ? t('Activar') : t('Desactivar')}
                           </button>
-                          {' · '}
-                        </>
-                      )}
-                      <button type="button" className="link-btn" style={{ color: 'var(--red)' }} onClick={() => removeUser(u)}>{t('Eliminar')}</button>
+                        )}
+                        <button type="button" className="btn-row-action delete" onClick={() => removeUser(u)}>{t('Eliminar')}</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

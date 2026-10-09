@@ -131,7 +131,7 @@ export default function WorkOrdersList() {
                     <td><strong>${Number(wo.total).toLocaleString()}</strong></td>
                     <td><Pill value={wo.status} /></td>
                     <td className="muted">{wo.created_at}</td>
-                    <td><button className="link-btn" onClick={() => openEdit(wo)}>{t('Editar')}</button></td>
+                    <td><button className="btn-row-action edit" onClick={() => openEdit(wo)}>{t('Editar')}</button></td>
                     <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
                   </tr>
                 ))}

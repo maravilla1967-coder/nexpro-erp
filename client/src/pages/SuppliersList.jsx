@@ -57,8 +57,10 @@ export default function SuppliersList() {
                     <td className="muted">{s.tax_id || '—'}</td>
                     <td className="muted">{s.email || s.phone || '—'}</td>
                     <td>
-                      <button className="link-btn" onClick={() => openEdit(s)}>{t('Editar')}</button>{' '}
-                      <button className="link-btn" style={{ color: 'var(--red)' }} onClick={() => remove(s.id)}>{t('Eliminar')}</button>
+                      <div className="row-actions">
+                        <button className="btn-row-action edit" onClick={() => openEdit(s)}>{t('Editar')}</button>
+                        <button className="btn-row-action delete" onClick={() => remove(s.id)}>{t('Eliminar')}</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
