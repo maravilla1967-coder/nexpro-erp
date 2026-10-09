@@ -147,7 +147,7 @@ export default function VehiclesList() {
                 <div className="doc-box-title">{t('Datos del cliente')}</div>
                 <div><strong>{selectedCustomer.name}</strong></div>
                 <div className="muted">{selectedCustomer.tax_id && `${t('NIT/ID:')} ${selectedCustomer.tax_id}`}</div>
-                <div className="muted">{selectedCustomer.address || ''} {selectedCustomer.city || ''}</div>
+                <div className="muted">{selectedCustomer.address || ''} {selectedCustomer.city || ''} {selectedCustomer.zip || ''}</div>
                 <div className="muted">{selectedCustomer.phone} {selectedCustomer.phone && selectedCustomer.email ? '|' : ''} {selectedCustomer.email}</div>
               </div>
             )}

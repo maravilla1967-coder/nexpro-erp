@@ -37,10 +37,10 @@ router.post('/', (req, res) => {
   const b = req.body;
   if (!b.name) return res.status(400).json({ error: 'El nombre es obligatorio' });
   const result = run(
-    `INSERT INTO customers (type, name, tax_id, email, phone, address, city, industry, status, source, notes)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO customers (type, name, tax_id, email, phone, address, city, zip, industry, status, source, notes)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     [b.type || 'empresa', b.name, b.taxId || null, b.email || null, b.phone || null, b.address || null,
-     b.city || null, b.industry || null, b.status || 'lead', b.source || null, b.notes || null]
+     b.city || null, b.zip || null, b.industry || null, b.status || 'lead', b.source || null, b.notes || null]
   );
   res.status(201).json(get('SELECT * FROM customers WHERE id = ?', [result.lastInsertRowid]));
 });
@@ -50,10 +50,10 @@ router.put('/:id', (req, res) => {
   const existing = get('SELECT * FROM customers WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Cliente no encontrado' });
   run(
-    `UPDATE customers SET type=?, name=?, tax_id=?, email=?, phone=?, address=?, city=?, industry=?, status=?, source=?, notes=?, updated_at=?
+    `UPDATE customers SET type=?, name=?, tax_id=?, email=?, phone=?, address=?, city=?, zip=?, industry=?, status=?, source=?, notes=?, updated_at=?
      WHERE id=?`,
     [b.type ?? existing.type, b.name ?? existing.name, b.taxId ?? existing.tax_id, b.email ?? existing.email,
-     b.phone ?? existing.phone, b.address ?? existing.address, b.city ?? existing.city, b.industry ?? existing.industry,
+     b.phone ?? existing.phone, b.address ?? existing.address, b.city ?? existing.city, b.zip ?? existing.zip, b.industry ?? existing.industry,
      b.status ?? existing.status, b.source ?? existing.source, b.notes ?? existing.notes, nowIso(), req.params.id]
   );
   res.json(get('SELECT * FROM customers WHERE id = ?', [req.params.id]));

@@ -35,8 +35,8 @@ router.post('/', (req, res) => {
   if (!b.name) return res.status(400).json({ error: 'El nombre es obligatorio' });
   const code = (b.code && String(b.code).trim()) ? String(b.code).trim().toUpperCase().slice(0, 2) : deriveCode(b.name);
   const result = run(
-    `INSERT INTO suppliers (name, code, tax_id, email, phone, address, notes) VALUES (?,?,?,?,?,?,?)`,
-    [b.name, code, b.taxId || null, b.email || null, b.phone || null, b.address || null, b.notes || null]
+    `INSERT INTO suppliers (name, code, tax_id, email, phone, address, city, zip, notes) VALUES (?,?,?,?,?,?,?,?,?)`,
+    [b.name, code, b.taxId || null, b.email || null, b.phone || null, b.address || null, b.city || null, b.zip || null, b.notes || null]
   );
   res.status(201).json(get('SELECT * FROM suppliers WHERE id = ?', [result.lastInsertRowid]));
 });
@@ -49,9 +49,9 @@ router.put('/:id', (req, res) => {
     ? String(b.code).trim().toUpperCase().slice(0, 2)
     : (existing.code || deriveCode(b.name ?? existing.name));
   run(
-    `UPDATE suppliers SET name=?, code=?, tax_id=?, email=?, phone=?, address=?, notes=? WHERE id=?`,
+    `UPDATE suppliers SET name=?, code=?, tax_id=?, email=?, phone=?, address=?, city=?, zip=?, notes=? WHERE id=?`,
     [b.name ?? existing.name, code, b.taxId ?? existing.tax_id, b.email ?? existing.email, b.phone ?? existing.phone,
-     b.address ?? existing.address, b.notes ?? existing.notes, req.params.id]
+     b.address ?? existing.address, b.city ?? existing.city, b.zip ?? existing.zip, b.notes ?? existing.notes, req.params.id]
   );
   res.json(get('SELECT * FROM suppliers WHERE id = ?', [req.params.id]));
 });

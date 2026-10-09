@@ -60,7 +60,7 @@ export default function WorkOrderDocument() {
             <div className="doc-box">
               <div className="doc-box-title">{t('Cliente')}</div>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{vehicle.customer_name || '—'}</div>
-              <div className="muted">{vehicle.customer_address || ''} {vehicle.customer_city || ''}</div>
+              <div className="muted">{vehicle.customer_address || ''} {vehicle.customer_city || ''} {vehicle.customer_zip || ''}</div>
               <div className="muted">{vehicle.customer_tax_id && `${t('NIT/ID:')} ${vehicle.customer_tax_id}`}</div>
               <div className="muted">{vehicle.customer_phone} {vehicle.customer_phone && vehicle.customer_email ? '|' : ''} {vehicle.customer_email}</div>
             </div>

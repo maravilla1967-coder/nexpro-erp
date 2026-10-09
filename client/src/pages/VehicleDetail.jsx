@@ -177,7 +177,7 @@ export default function VehicleDetail() {
             {vehicle.customer_id && (
               <>
                 <div><strong>{t('NIT/ID:')}</strong> {vehicle.customer_tax_id || '—'}</div>
-                <div><strong>{t('Dirección:')}</strong> {vehicle.customer_address || '—'} {vehicle.customer_city || ''}</div>
+                <div><strong>{t('Dirección:')}</strong> {vehicle.customer_address || '—'} {vehicle.customer_city || ''} {vehicle.customer_zip || ''}</div>
                 <div><strong>{t('Teléfono:')}</strong> {vehicle.customer_phone || '—'}</div>
                 <div><strong>{t('Email:')}</strong> {vehicle.customer_email || '—'}</div>
               </>

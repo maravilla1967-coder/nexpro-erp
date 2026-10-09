@@ -46,7 +46,7 @@ router.get('/', (req, res) => {
 
 router.get('/:id', (req, res) => {
   const so = get(
-    `SELECT so.*, c.name as customer_name, c.address as customer_address, c.city as customer_city,
+    `SELECT so.*, c.name as customer_name, c.address as customer_address, c.city as customer_city, c.zip as customer_zip,
             c.tax_id as customer_tax_id, c.phone as customer_phone, c.email as customer_email
      FROM sales_orders so LEFT JOIN customers c ON c.id = so.customer_id WHERE so.id = ?`,
     [req.params.id]

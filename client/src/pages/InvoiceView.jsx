@@ -44,7 +44,7 @@ export default function InvoiceView() {
           <div className="invoice-bill-to">
             <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase' }}>{t('Facturar a')}</div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{invoice.customer_name}</div>
-            <div className="muted">{invoice.customer_address}</div>
+            <div className="muted">{invoice.customer_address} {invoice.customer_city || ''} {invoice.customer_zip || ''}</div>
             <div className="muted">{invoice.customer_tax_id && `${t('NIT/ID:')} ${invoice.customer_tax_id}`}</div>
             <div className="muted">{invoice.customer_email} {invoice.customer_phone}</div>
           </div>

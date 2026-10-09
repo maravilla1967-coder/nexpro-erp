@@ -34,7 +34,7 @@ export default function CustomerDetail() {
     setForm({
       type: customer.type || 'empresa', name: customer.name || '', taxId: customer.tax_id || '',
       email: customer.email || '', phone: customer.phone || '', address: customer.address || '',
-      city: customer.city || '', industry: customer.industry || '', status: customer.status || 'lead',
+      city: customer.city || '', zip: customer.zip || '', industry: customer.industry || '', status: customer.status || 'lead',
       source: customer.source || '', notes: customer.notes || '',
     });
     setError(''); setModal('edit');
@@ -112,6 +112,7 @@ export default function CustomerDetail() {
             <div><strong>{t('Teléfono:')}</strong> {customer.phone || '—'}</div>
             <div><strong>{t('Dirección:')}</strong> {customer.address || '—'}</div>
             <div><strong>{t('Ciudad')}:</strong> {customer.city || '—'}</div>
+            <div><strong>{t('Código postal:')}</strong> {customer.zip || '—'}</div>
             <div><strong>{t('NIT / ID:')}</strong> {customer.tax_id || '—'}</div>
             <div><strong>{t('Fuente:')}</strong> {customer.source || '—'}</div>
             <div style={{ gridColumn: '1 / -1' }}><strong>{t('Notas:')}</strong> {customer.notes || '—'}</div>
@@ -249,6 +250,10 @@ export default function CustomerDetail() {
               <div className="field">
                 <label>{t('Ciudad')}</label>
                 <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>{t('Código postal')}</label>
+                <input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} />
               </div>
               <div className="field">
                 <label>{t('NIT / Identificación')}</label>

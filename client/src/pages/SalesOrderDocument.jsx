@@ -45,7 +45,7 @@ export default function SalesOrderDocument() {
           <div className="invoice-bill-to">
             <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase' }}>{t('Cliente')}</div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{so.customer_name}</div>
-            <div className="muted">{so.customer_address} {so.customer_city || ''}</div>
+            <div className="muted">{so.customer_address} {so.customer_city || ''} {so.customer_zip || ''}</div>
             <div className="muted">{so.customer_tax_id && `${t('NIT/ID:')} ${so.customer_tax_id}`}</div>
             <div className="muted">{so.customer_email} {so.customer_phone}</div>
           </div>

@@ -3,7 +3,7 @@ import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import { useI18n } from '../i18n.jsx';
 
-const EMPTY = { name: '', code: '', taxId: '', email: '', phone: '', address: '', notes: '' };
+const EMPTY = { name: '', code: '', taxId: '', email: '', phone: '', address: '', city: '', zip: '', notes: '' };
 
 export default function SuppliersList() {
   const { t } = useI18n();
@@ -20,7 +20,7 @@ export default function SuppliersList() {
   function openNew() { setEditing(null); setForm(EMPTY); setError(''); setModalOpen(true); }
   function openEdit(s) {
     setEditing(s);
-    setForm({ name: s.name, code: s.code || '', taxId: s.tax_id || '', email: s.email || '', phone: s.phone || '', address: s.address || '', notes: s.notes || '' });
+    setForm({ name: s.name, code: s.code || '', taxId: s.tax_id || '', email: s.email || '', phone: s.phone || '', address: s.address || '', city: s.city || '', zip: s.zip || '', notes: s.notes || '' });
     setError(''); setModalOpen(true);
   }
 
@@ -85,6 +85,8 @@ export default function SuppliersList() {
               <div className="field"><label>{t('Email')}</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
               <div className="field"><label>{t('Teléfono')}</label><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
               <div className="field"><label>{t('Dirección')}</label><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+              <div className="field"><label>{t('Ciudad')}</label><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+              <div className="field"><label>{t('Código postal')}</label><input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} /></div>
             </div>
             <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
             <div className="modal-footer">

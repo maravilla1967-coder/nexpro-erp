@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS customers (
   phone TEXT,
   address TEXT,
   city TEXT,
+  zip TEXT,
   industry TEXT,
   status TEXT NOT NULL DEFAULT 'lead',
   source TEXT,
@@ -68,6 +69,8 @@ CREATE TABLE IF NOT EXISTS suppliers (
   email TEXT,
   phone TEXT,
   address TEXT,
+  city TEXT,
+  zip TEXT,
   notes TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

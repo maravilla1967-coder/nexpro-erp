@@ -5,7 +5,7 @@ import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import { useI18n } from '../i18n.jsx';
 
-const EMPTY = { type: 'empresa', name: '', taxId: '', email: '', phone: '', address: '', city: '', industry: '', status: 'lead', source: '', notes: '' };
+const EMPTY = { type: 'empresa', name: '', taxId: '', email: '', phone: '', address: '', city: '', zip: '', industry: '', status: 'lead', source: '', notes: '' };
 
 export default function CustomersList() {
   const { t } = useI18n();
@@ -120,6 +120,10 @@ export default function CustomersList() {
               <div className="field">
                 <label>{t('Ciudad')}</label>
                 <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>{t('Código postal')}</label>
+                <input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} />
               </div>
               <div className="field">
                 <label>{t('NIT / Identificación')}</label>

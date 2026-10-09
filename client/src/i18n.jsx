@@ -54,6 +54,8 @@ const DICT = {
   'Proveedor:': 'Supplier:',
   Contacto: 'Contact',
   Ciudad: 'City',
+  'Código postal': 'ZIP code',
+  'Código postal:': 'ZIP code:',
   Producto: 'Product',
   'Agregar línea': 'Add line',
 
