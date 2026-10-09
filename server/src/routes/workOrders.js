@@ -83,8 +83,9 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   const b = req.body;
   if (!b.vehicleId) return res.status(400).json({ error: 'El vehículo es obligatorio' });
-  // Número de recepción/orden de trabajo: NX-AAAAMMDD-NN (sin sufijo de etapa).
-  const number = nextDocNumber('work_orders');
+  // Número de orden de trabajo: NX-WO-AAAAMMDD-NN (el código WO identifica que es una
+  // orden de trabajo y no un pedido o una factura).
+  const number = nextDocNumber('work_orders', 'WO');
   const result = run(
     `INSERT INTO work_orders (number, vehicle_id, mechanic_id, status, notes, diagnosis, resolution) VALUES (?,?,?,?,?,?,?)`,
     [number, b.vehicleId, b.mechanicId || null, b.status || 'pendiente', b.notes || null, b.diagnosis || null, b.resolution || null]

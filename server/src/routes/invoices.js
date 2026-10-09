@@ -1,6 +1,6 @@
 const express = require('express');
 const { all, get, run } = require('../../db');
-const { nextDocNumber, withStageSuffix } = require('../utils/numbering');
+const { nextDocNumber, asInvoiceNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
@@ -91,11 +91,12 @@ router.post('/', (req, res) => {
 
   const taxRate = b.taxRate ?? 0;
   const { subtotal, taxAmount, total } = computeTotals(items, taxRate);
-  // Si la factura nace de un pedido (cotización), conserva el mismo número base
-  // NX-AAAAMMDD-NN pero con la etapa 2 (factura); si es una factura directa, genera su
-  // propio número base del día con etapa 2.
-  const baseNumber = sourceSalesOrder ? sourceSalesOrder.number : nextDocNumber('invoices');
-  const number = withStageSuffix(baseNumber, 2);
+  // Número de factura: NX-INV-AAAAMMDD-NN (el código INV identifica que es una factura
+  // y no un pedido o una orden de trabajo). Si la factura nace de un pedido (cotización),
+  // conserva la misma fecha y consecutivo del pedido, cambiando el código QT por INV, para
+  // que quede clara la relación entre ambos documentos; si es una factura directa, genera
+  // su propio número del día.
+  const number = sourceSalesOrder ? asInvoiceNumber(sourceSalesOrder.number) : nextDocNumber('invoices', 'INV');
 
   const result = run(
     `INSERT INTO invoices (number, customer_id, sales_order_id, status, due_date, subtotal, tax_rate, tax_amount, total, notes)

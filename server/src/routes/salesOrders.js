@@ -1,6 +1,6 @@
 const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
-const { nextDocNumber, withStageSuffix } = require('../utils/numbering');
+const { nextDocNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
@@ -61,9 +61,11 @@ router.post('/', (req, res) => {
   if (!b.customerId || !Array.isArray(b.items) || b.items.length === 0) {
     return res.status(400).json({ error: 'Cliente e items son obligatorios' });
   }
-  // Esquema NX-AAAAMMDD-NN-1: el pedido es la "cotización" (etapa 1); si más adelante
-  // se convierte en factura, la factura reutiliza el mismo número base con etapa 2.
-  const number = withStageSuffix(nextDocNumber('sales_orders'), 1);
+  // Número de pedido/cotización: NX-QT-AAAAMMDD-NN (el código QT identifica que es un
+  // pedido y no una orden de trabajo o una factura). Si más adelante se convierte en
+  // factura, la factura reutiliza la misma fecha y consecutivo, cambiando QT por INV
+  // (ver asInvoiceNumber en invoices.js).
+  const number = nextDocNumber('sales_orders', 'QT');
   const result = run(
     `INSERT INTO sales_orders (number, customer_id, status, notes) VALUES (?,?,?,?)`,
     [number, b.customerId, b.status || 'pendiente', b.notes || null]
