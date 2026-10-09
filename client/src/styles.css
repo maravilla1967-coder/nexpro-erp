@@ -246,10 +246,19 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 .signature-line { border-bottom: 1px solid var(--navy); height: 40px; margin-bottom: 6px; }
 
 @media print {
-  @page { size: letter; margin: 0.4in; }
+  /* El margen de la página se maneja con padding propio (más abajo), no con el margen de
+     @page: distintos navegadores y controladores de impresión interpretan @page margin de
+     forma inconsistente entre la vista previa y la impresión/PDF final (es la causa más común
+     de que el margen se vea bien en pantalla pero el contenido se corra hacia arriba al
+     imprimir de verdad). Con @page margin: 0 el motor de impresión no tiene margen que
+     reinterpretar, y el espacio real lo controla siempre nuestro propio CSS.*/
+  @page { size: letter; margin: 0; }
+  html, body, #root { height: auto !important; min-height: 0 !important; margin: 0 !important; }
+  .app-shell { display: block !important; min-height: 0 !important; }
+  .main { display: block !important; }
   .sidebar, .topbar.no-print, .modal-overlay { display: none !important; }
-  .content { padding: 0; }
-  .card.invoice-sheet { border: none; box-shadow: none; margin-bottom: 0; padding: 0; max-width: 100%; }
+  .content { padding: 0.4in !important; margin: 0 !important; }
+  .card.invoice-sheet { border: none; box-shadow: none; margin: 0 !important; padding: 0; max-width: 100%; }
   body { background: #fff; font-size: 12px; }
   .invoice-header { padding-bottom: 10px; margin-bottom: 10px; }
   .invoice-logo { max-height: 46px; }
@@ -261,6 +270,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
   .signature-block { margin-top: 18px !important; gap: 20px; page-break-inside: avoid; }
   .signature-line { height: 26px; margin-bottom: 4px; }
   table { font-size: 11px; }
+  /* En documentos con muchas líneas (factura, pedido) que ocupan más de una hoja: repetir el
+     encabezado de la tabla en cada página, no cortar una fila a la mitad, y mantener el bloque
+     de totales junto con la última fila para que no quede "huérfano" solo en la hoja siguiente. */
+  thead { display: table-header-group; }
+  tbody tr, .invoice-totals { page-break-inside: avoid; }
+  .invoice-header { page-break-after: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
