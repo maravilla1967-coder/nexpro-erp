@@ -229,10 +229,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 .signature-line { border-bottom: 1px solid var(--navy); height: 40px; margin-bottom: 6px; }
 
 @media print {
+  @page { size: letter; margin: 0.4in; }
   .sidebar, .topbar.no-print, .modal-overlay { display: none !important; }
   .content { padding: 0; }
-  .card.invoice-sheet { border: none; box-shadow: none; }
-  body { background: #fff; }
+  .card.invoice-sheet { border: none; box-shadow: none; margin-bottom: 0; padding: 0; max-width: 100%; }
+  body { background: #fff; font-size: 12px; }
+  .invoice-header { padding-bottom: 10px; margin-bottom: 10px; }
+  .invoice-logo { max-height: 46px; }
+  .invoice-meta h2 { font-size: 16px; }
+  .doc-grid { gap: 8px; }
+  .doc-box { padding: 7px 10px !important; margin-top: 8px !important; page-break-inside: avoid; }
+  .doc-box-title { margin-bottom: 3px; }
+  .signature-block { margin-top: 18px !important; gap: 20px; page-break-inside: avoid; }
+  .signature-line { height: 26px; margin-bottom: 4px; }
+  table { font-size: 11px; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 /* ---- Login / aceptar invitación ---- */
