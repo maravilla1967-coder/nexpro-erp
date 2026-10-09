@@ -227,6 +227,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 .invoice-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--navy); padding-bottom: 16px; margin-bottom: 16px; }
 .invoice-logo { max-height: 70px; max-width: 220px; object-fit: contain; }
 .invoice-brand-fallback strong { color: var(--navy); font-size: 18px; letter-spacing: .02em; }
+.doc-brand-contact { margin-top: 6px; font-size: 12px; line-height: 1.5; }
 .invoice-meta { text-align: right; }
 .invoice-meta h2 { margin: 0 0 8px; color: var(--orange-dark); letter-spacing: .05em; }
 .invoice-bill-to { margin-bottom: 10px; }
@@ -253,6 +254,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
   .invoice-header { padding-bottom: 10px; margin-bottom: 10px; }
   .invoice-logo { max-height: 46px; }
   .invoice-meta h2 { font-size: 16px; }
+  .doc-brand-contact { font-size: 10px; line-height: 1.4; }
   .doc-grid { gap: 8px; }
   .doc-box { padding: 7px 10px !important; margin-top: 8px !important; page-break-inside: avoid; }
   .doc-box-title { margin-bottom: 3px; }

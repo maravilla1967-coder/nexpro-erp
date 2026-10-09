@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
+import DocumentBrand from '../components/DocumentBrand.jsx';
 import { useI18n } from '../i18n.jsx';
 
 // Datos de la cuenta de Nexpro para recibir transferencias (ACH/wire). Es información fija
@@ -57,14 +58,7 @@ export default function InvoiceView() {
       <div className="content">
         <div className="card invoice-sheet">
           <div className="invoice-header">
-            <div className="invoice-brand">
-              <img src="/nexpro-logo.png" alt="Nexpro Trucks & Equipment Corp." className="invoice-logo"
-                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-              <div className="invoice-brand-fallback" style={{ display: 'none' }}>
-                <strong>NEXPRO TRUCKS &amp; EQUIPMENT CORP.</strong>
-              </div>
-              <div className="muted" style={{ marginTop: 6 }}>7380 NW 77th CT, Miami, FL 33166</div>
-            </div>
+            <DocumentBrand />
             <div className="invoice-meta">
               <h2>{t('FACTURA')}</h2>
               <div><strong>No.</strong> {invoice.number}</div>

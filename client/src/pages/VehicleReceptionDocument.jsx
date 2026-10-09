@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
+import DocumentBrand from '../components/DocumentBrand.jsx';
 import { useI18n } from '../i18n.jsx';
 
 const PART_ACTION_LABELS = { reemplazada: 'Reemplazada', reparada: 'Reparada', garantia: 'Garantía', cliente: 'Suministrada por el cliente' };
@@ -43,14 +44,7 @@ export default function VehicleReceptionDocument() {
       <div className="content">
         <div className="card invoice-sheet">
           <div className="invoice-header">
-            <div className="invoice-brand">
-              <img src="/nexpro-logo.png" alt="Nexpro Trucks & Equipment Corp." className="invoice-logo"
-                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
-              <div className="invoice-brand-fallback" style={{ display: 'none' }}>
-                <strong>NEXPRO TRUCKS &amp; EQUIPMENT CORP.</strong>
-              </div>
-              <div className="muted" style={{ marginTop: 6 }}>7380 NW 77th CT, Miami, FL 33166 · Tel: 786-631-5922</div>
-            </div>
+            <DocumentBrand />
             <div className="invoice-meta">
               <h2>{t('RECEPCIÓN DE VEHÍCULO')}</h2>
               <div><strong>{t('Recibido:')}</strong> {vehicle.received_at}</div>
