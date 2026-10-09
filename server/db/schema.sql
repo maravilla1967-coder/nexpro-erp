@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   tax_amount REAL NOT NULL DEFAULT 0,
   total REAL NOT NULL DEFAULT 0,
   notes TEXT,
+  include_wire_info INTEGER NOT NULL DEFAULT 0, -- si se incluye el bloque de datos de transferencia bancaria al imprimir
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

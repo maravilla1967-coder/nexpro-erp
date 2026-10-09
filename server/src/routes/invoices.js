@@ -40,9 +40,10 @@ function applyUpdate(id, b) {
     subtotal = totals.subtotal; taxAmount = totals.taxAmount; total = totals.total;
   }
 
+  const includeWireInfo = b.includeWireInfo !== undefined ? (b.includeWireInfo ? 1 : 0) : existing.include_wire_info;
   run(
-    `UPDATE invoices SET status=?, due_date=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, notes=? WHERE id=?`,
-    [b.status ?? existing.status, b.dueDate ?? existing.due_date, subtotal, taxRate, taxAmount, total, b.notes ?? existing.notes, id]
+    `UPDATE invoices SET status=?, due_date=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, notes=?, include_wire_info=? WHERE id=?`,
+    [b.status ?? existing.status, b.dueDate ?? existing.due_date, subtotal, taxRate, taxAmount, total, b.notes ?? existing.notes, includeWireInfo, id]
   );
   return get('SELECT * FROM invoices WHERE id = ?', [id]);
 }

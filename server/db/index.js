@@ -29,6 +29,7 @@ tryAlter('ALTER TABLE customers ADD COLUMN zip TEXT');
 tryAlter('ALTER TABLE suppliers ADD COLUMN city TEXT');
 tryAlter('ALTER TABLE suppliers ADD COLUMN zip TEXT');
 tryAlter('ALTER TABLE work_orders ADD COLUMN invoice_id INTEGER REFERENCES invoices(id)');
+tryAlter('ALTER TABLE invoices ADD COLUMN include_wire_info INTEGER NOT NULL DEFAULT 0');
 
 function all(sql, params = []) {
   const stmt = db.prepare(sql);

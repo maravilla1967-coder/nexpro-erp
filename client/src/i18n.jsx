@@ -361,6 +361,8 @@ const DICT = {
   'Facturar seleccionadas': 'Invoice selected',
   'Generando…': 'Generating…',
   'Ver factura': 'View invoice',
+  '+ Agregar datos de transferencia': '+ Add wire transfer info',
+  'Quitar datos de transferencia': 'Remove wire transfer info',
   '¿Generar una factura con estas órdenes de trabajo?': 'Generate an invoice with these work orders?',
   '¿Generar una factura a partir de la orden de trabajo': 'Generate an invoice from work order',
   'Las órdenes marcadas como "completado" pueden facturarse: selecciónalas con la casilla y haz clic en "Facturar seleccionadas".':
