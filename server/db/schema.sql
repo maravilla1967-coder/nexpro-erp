@@ -223,6 +223,8 @@ CREATE TABLE IF NOT EXISTS work_orders (
   notes TEXT,
   diagnosis TEXT,
   resolution TEXT,
+  invoice_id INTEGER REFERENCES invoices(id), -- se marca al facturar (ver /invoices/from-work-orders); una
+                                               -- factura puede cubrir varias órdenes de trabajo del mismo vehículo
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

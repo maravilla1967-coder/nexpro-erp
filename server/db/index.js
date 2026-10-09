@@ -28,6 +28,7 @@ tryAlter('ALTER TABLE work_order_parts ADD COLUMN notes TEXT');
 tryAlter('ALTER TABLE customers ADD COLUMN zip TEXT');
 tryAlter('ALTER TABLE suppliers ADD COLUMN city TEXT');
 tryAlter('ALTER TABLE suppliers ADD COLUMN zip TEXT');
+tryAlter('ALTER TABLE work_orders ADD COLUMN invoice_id INTEGER REFERENCES invoices(id)');
 
 function all(sql, params = []) {
   const stmt = db.prepare(sql);

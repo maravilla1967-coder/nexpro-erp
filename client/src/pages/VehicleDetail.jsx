@@ -30,6 +30,8 @@ export default function VehicleDetail() {
   const [woDiagnosis, setWoDiagnosis] = useState('');
   const [woResolution, setWoResolution] = useState('');
   const [woParts, setWoParts] = useState([]);
+  const [selectedWoIds, setSelectedWoIds] = useState([]);
+  const [invoicing, setInvoicing] = useState(false);
 
   function load() { api.get(`/vehicles/${id}`).then(setVehicle).catch(console.error); }
   useEffect(() => { load(); }, [id]);
@@ -148,6 +150,24 @@ export default function VehicleDetail() {
     } catch (err) { setError(err.message); }
   }
 
+  function toggleWoSelect(woId) {
+    setSelectedWoIds((cur) => (cur.includes(woId) ? cur.filter((x) => x !== woId) : [...cur, woId]));
+  }
+
+  async function invoiceSelected() {
+    if (selectedWoIds.length === 0) return;
+    const numbers = vehicle.workOrders.filter((wo) => selectedWoIds.includes(wo.id)).map((wo) => wo.number).join(', ');
+    if (!window.confirm(`${t('¿Generar una factura con estas órdenes de trabajo?')} ${numbers}`)) return;
+    setInvoicing(true);
+    try {
+      const invoice = await api.post('/invoices/from-work-orders', { workOrderIds: selectedWoIds });
+      navigate(`/facturas/${invoice.id}`);
+    } catch (err) {
+      alert(err.message);
+      setInvoicing(false);
+    }
+  }
+
   if (!vehicle) return <div className="content">{t('Cargando…')}</div>;
 
   const woTotalPreview = woServices.reduce((sum, s) => {
@@ -214,26 +234,47 @@ export default function VehicleDetail() {
         <div className="card">
           <div className="card-title">
             {t('Órdenes de trabajo')}
-            <button className="btn btn-sm btn-primary" onClick={openWoModal}>{t('+ Nueva orden de trabajo')}</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {selectedWoIds.length > 0 && (
+                <button type="button" className="btn btn-sm btn-primary" disabled={invoicing} onClick={invoiceSelected}>
+                  {invoicing ? t('Generando…') : `${t('Facturar seleccionadas')} (${selectedWoIds.length})`}
+                </button>
+              )}
+              <button className="btn btn-sm btn-primary" onClick={openWoModal}>{t('+ Nueva orden de trabajo')}</button>
+            </div>
           </div>
           {vehicle.workOrders.length === 0 ? <div className="empty-state">{t('Sin órdenes de trabajo todavía.')}</div> : (
             <table>
-              <thead><tr><th>{t('Número')}</th><th>{t('Mecánico')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
+              <thead><tr><th></th><th>{t('Número')}</th><th>{t('Mecánico')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
               <tbody>
-                {vehicle.workOrders.map((wo) => (
-                  <tr key={wo.id}>
-                    <td className="mono">{wo.number}</td>
-                    <td>{wo.mechanic_name || '—'}</td>
-                    <td><Pill value={wo.status} /></td>
-                    <td className="muted">{wo.created_at}</td>
-                    <td><button className="btn-row-action edit" onClick={() => openEditWo(wo)}>{t('Editar')}</button></td>
-                    <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
-                  </tr>
-                ))}
+                {vehicle.workOrders.map((wo) => {
+                  const facturable = wo.status === 'completado' && !wo.invoice_id;
+                  return (
+                    <tr key={wo.id}>
+                      <td>
+                        {facturable && (
+                          <input type="checkbox" style={{ width: 'auto' }} checked={selectedWoIds.includes(wo.id)} onChange={() => toggleWoSelect(wo.id)} />
+                        )}
+                      </td>
+                      <td className="mono">{wo.number}</td>
+                      <td>{wo.mechanic_name || '—'}</td>
+                      <td><Pill value={wo.status} /></td>
+                      <td className="muted">{wo.created_at}</td>
+                      <td>
+                        {wo.invoice_id ? (
+                          <Link className="btn-row-action" to={`/facturas/${wo.invoice_id}`}>{t('Ver factura')} {wo.invoice_number}</Link>
+                        ) : (
+                          <button className="btn-row-action edit" onClick={() => openEditWo(wo)}>{t('Editar')}</button>
+                        )}
+                      </td>
+                      <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
-          <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>{t('Gestiona el detalle de horas/servicios de cada orden en')} <Link to="/ordenes-trabajo">{t('Órdenes de Trabajo')}</Link>.</div>
+          <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>{t('Gestiona el detalle de horas/servicios de cada orden en')} <Link to="/ordenes-trabajo">{t('Órdenes de Trabajo')}</Link>. {t('Las órdenes marcadas como "completado" pueden facturarse: selecciónalas con la casilla y haz clic en "Facturar seleccionadas".')}</div>
         </div>
       </div>
 

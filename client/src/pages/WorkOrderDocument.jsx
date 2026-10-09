@@ -31,7 +31,10 @@ export default function WorkOrderDocument() {
       <div className="topbar no-print">
         <div>
           <h1 className="mono">{wo.number}</h1>
-          <div className="sub"><Pill value={wo.status} /></div>
+          <div className="sub">
+            <Pill value={wo.status} />
+            {wo.invoice_id && <> · <Link to={`/facturas/${wo.invoice_id}`}>{t('Ver factura')} {wo.invoice_number}</Link></>}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to={`/vehiculos/${wo.vehicle_id}`} className="btn">{t('← Volver')}</Link>

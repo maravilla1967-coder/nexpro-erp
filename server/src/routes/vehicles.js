@@ -16,8 +16,9 @@ function withDetails(vehicle) {
     [vehicle.id]
   );
   vehicle.workOrders = all(
-    `SELECT wo.*, m.name as mechanic_name FROM work_orders wo
+    `SELECT wo.*, m.name as mechanic_name, i.number as invoice_number FROM work_orders wo
      LEFT JOIN mechanics m ON m.id = wo.mechanic_id
+     LEFT JOIN invoices i ON i.id = wo.invoice_id
      WHERE wo.vehicle_id = ? ORDER BY wo.created_at DESC`,
     [vehicle.id]
   );

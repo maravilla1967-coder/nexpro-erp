@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
@@ -7,6 +7,7 @@ import { useI18n, pickLang } from '../i18n.jsx';
 
 export default function WorkOrdersList() {
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
   const [list, setList] = useState([]);
   const [status, setStatus] = useState('');
   const [mechanics, setMechanics] = useState([]);
@@ -101,6 +102,14 @@ export default function WorkOrdersList() {
     catch (err) { setError(err.message); }
   }
 
+  async function invoiceWorkOrder(wo) {
+    if (!window.confirm(`${t('¿Generar una factura a partir de la orden de trabajo')} ${wo.number}?`)) return;
+    try {
+      const invoice = await api.post('/invoices/from-work-orders', { workOrderIds: [wo.id] });
+      navigate(`/facturas/${invoice.id}`);
+    } catch (err) { alert(err.message); }
+  }
+
   const total = woServices.reduce((sum, s) => sum + (s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0)), 0);
 
   return (
@@ -131,7 +140,16 @@ export default function WorkOrdersList() {
                     <td><strong>${Number(wo.total).toLocaleString()}</strong></td>
                     <td><Pill value={wo.status} /></td>
                     <td className="muted">{wo.created_at}</td>
-                    <td><button className="btn-row-action edit" onClick={() => openEdit(wo)}>{t('Editar')}</button></td>
+                    <td>
+                      <div className="row-actions">
+                        <button className="btn-row-action edit" onClick={() => openEdit(wo)}>{t('Editar')}</button>
+                        {wo.invoice_id ? (
+                          <Link className="btn-row-action" to={`/facturas/${wo.invoice_id}`}>{t('Ver factura')}</Link>
+                        ) : (
+                          wo.status === 'completado' && <button className="btn-row-action" onClick={() => invoiceWorkOrder(wo)}>{t('Facturar')}</button>
+                        )}
+                      </div>
+                    </td>
                     <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
                   </tr>
                 ))}

@@ -55,9 +55,11 @@ function insertParts(workOrderId, parts) {
 
 router.get('/', (req, res) => {
   const { status } = req.query;
-  let sql = `SELECT wo.*, v.vin, v.make, v.model, v.year, v.chassis_type, v.plate, m.name as mechanic_name FROM work_orders wo
+  let sql = `SELECT wo.*, v.vin, v.make, v.model, v.year, v.chassis_type, v.plate, m.name as mechanic_name, i.number as invoice_number
+             FROM work_orders wo
              LEFT JOIN vehicles v ON v.id = wo.vehicle_id
-             LEFT JOIN mechanics m ON m.id = wo.mechanic_id WHERE 1=1`;
+             LEFT JOIN mechanics m ON m.id = wo.mechanic_id
+             LEFT JOIN invoices i ON i.id = wo.invoice_id WHERE 1=1`;
   const params = [];
   if (status) {
     sql += ' AND wo.status = ?';
@@ -70,10 +72,11 @@ router.get('/', (req, res) => {
 
 router.get('/:id', (req, res) => {
   const wo = get(
-    `SELECT wo.*, v.vin, v.make, v.model, v.year, v.chassis_type, v.plate, v.customer_id, m.name as mechanic_name
+    `SELECT wo.*, v.vin, v.make, v.model, v.year, v.chassis_type, v.plate, v.customer_id, m.name as mechanic_name, i.number as invoice_number
      FROM work_orders wo
      LEFT JOIN vehicles v ON v.id = wo.vehicle_id
-     LEFT JOIN mechanics m ON m.id = wo.mechanic_id WHERE wo.id = ?`,
+     LEFT JOIN mechanics m ON m.id = wo.mechanic_id
+     LEFT JOIN invoices i ON i.id = wo.invoice_id WHERE wo.id = ?`,
     [req.params.id]
   );
   if (!wo) return res.status(404).json({ error: 'Orden de trabajo no encontrada' });

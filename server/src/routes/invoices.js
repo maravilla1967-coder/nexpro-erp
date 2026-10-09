@@ -116,6 +116,98 @@ router.post('/', (req, res) => {
   res.status(201).json(withItems(get('SELECT * FROM invoices WHERE id = ?', [invId])));
 });
 
+// Facturar una o varias órdenes de trabajo ya completadas, directamente desde la ficha
+// del vehículo o la lista de órdenes de trabajo (sin tener que armar la factura a mano).
+// Cada línea del detalle de la factura se arma a partir de los servicios y partes de las
+// órdenes seleccionadas, y queda identificada con el número de la orden de trabajo de
+// origen para poder rastrearla después.
+//
+// Para evitar facturar dos veces lo mismo, o mezclar trabajo de clientes distintos en una
+// sola factura por error, se valida que cada orden de trabajo: exista, esté "completada",
+// no tenga ya una factura asociada (una vez facturada queda marcada, así que no puede
+// volver a elegirse), y pertenezca al mismo cliente que las demás órdenes seleccionadas.
+// No se intenta adivinar qué órdenes "son de la misma visita" por fecha: el usuario elige
+// explícitamente cuáles facturar juntas, y el sistema solo evita duplicar o mezclar clientes.
+router.post('/from-work-orders', (req, res) => {
+  const workOrderIds = Array.isArray(req.body.workOrderIds) ? req.body.workOrderIds : [];
+  if (workOrderIds.length === 0) {
+    return res.status(400).json({ error: 'Seleccione al menos una orden de trabajo para facturar' });
+  }
+
+  const placeholders = workOrderIds.map(() => '?').join(',');
+  const workOrders = all(
+    `SELECT wo.*, v.customer_id FROM work_orders wo
+     LEFT JOIN vehicles v ON v.id = wo.vehicle_id WHERE wo.id IN (${placeholders})`,
+    workOrderIds
+  );
+  if (workOrders.length !== workOrderIds.length) {
+    return res.status(404).json({ error: 'Una o más órdenes de trabajo no existen' });
+  }
+  const alreadyInvoiced = workOrders.find((wo) => wo.invoice_id);
+  if (alreadyInvoiced) {
+    return res.status(400).json({ error: `La orden ${alreadyInvoiced.number} ya fue facturada` });
+  }
+  const notCompleted = workOrders.find((wo) => wo.status !== 'completado');
+  if (notCompleted) {
+    return res.status(400).json({ error: `La orden ${notCompleted.number} no está completada todavía` });
+  }
+  const customerId = workOrders[0].customer_id;
+  if (!customerId) {
+    return res.status(400).json({ error: 'El vehículo de la orden de trabajo no tiene cliente asignado' });
+  }
+  const mixedCustomer = workOrders.find((wo) => wo.customer_id !== customerId);
+  if (mixedCustomer) {
+    return res.status(400).json({ error: 'No se pueden facturar juntas órdenes de trabajo de clientes distintos' });
+  }
+
+  const items = [];
+  for (const wo of workOrders) {
+    const services = all('SELECT * FROM work_order_services WHERE work_order_id = ?', [wo.id]);
+    const parts = all('SELECT * FROM work_order_parts WHERE work_order_id = ?', [wo.id]);
+    for (const s of services) {
+      const isFlat = s.pricing_type === 'servicio_completo';
+      items.push({
+        description: `${wo.number} — ${s.description}`,
+        quantity: isFlat ? 1 : Number(s.hours || 0),
+        unitPrice: isFlat ? Number(s.flat_price || 0) : Number(s.hourly_rate || 0),
+      });
+    }
+    for (const p of parts) {
+      items.push({
+        description: `${wo.number} — ${p.description}`,
+        quantity: Number(p.quantity || 1),
+        unitPrice: Number(p.unit_cost || 0),
+      });
+    }
+  }
+  if (items.length === 0) {
+    return res.status(400).json({ error: 'Las órdenes de trabajo seleccionadas no tienen servicios ni partes que facturar' });
+  }
+
+  const taxRate = req.body.taxRate ?? 0;
+  const { subtotal, taxAmount, total } = computeTotals(items, taxRate);
+  const number = nextDocNumber('invoices', 'INV');
+
+  const result = run(
+    `INSERT INTO invoices (number, customer_id, status, due_date, subtotal, tax_rate, tax_amount, total, notes)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [number, customerId, 'pendiente', req.body.dueDate || null, subtotal, taxRate, taxAmount, total,
+     `Generada desde ${workOrders.map((wo) => wo.number).join(', ')}`]
+  );
+  const invId = result.lastInsertRowid;
+  for (const item of items) {
+    run(
+      `INSERT INTO invoice_items (invoice_id, description, quantity, unit_price) VALUES (?,?,?,?)`,
+      [invId, item.description, item.quantity, item.unitPrice]
+    );
+  }
+  for (const wo of workOrders) {
+    run(`UPDATE work_orders SET invoice_id = ?, status = 'facturado', updated_at = ? WHERE id = ?`, [invId, new Date().toISOString().slice(0, 19).replace('T', ' '), wo.id]);
+  }
+
+  res.status(201).json(withItems(get('SELECT * FROM invoices WHERE id = ?', [invId])));
+});
+
 // Editar o eliminar una factura existente: un administrador lo aplica de inmediato;
 // cualquier otro usuario con permiso de edición en "facturas" solo puede proponer el
 // cambio, que queda pendiente de autorización del administrador.
