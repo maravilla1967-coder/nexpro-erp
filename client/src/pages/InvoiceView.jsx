@@ -22,6 +22,7 @@ export default function InvoiceView() {
   const { id } = useParams();
   const [invoice, setInvoice] = useState(null);
   const [savingWireInfo, setSavingWireInfo] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => { api.get(`/invoices/${id}`).then(setInvoice).catch(console.error); }, [id]);
 
@@ -41,14 +42,59 @@ export default function InvoiceView() {
     }
   }
 
+  // Si después de facturar se agrega un servicio o una parte nueva en alguna de las
+  // órdenes de trabajo que originaron esta factura (por ejemplo, el mecánico suma una
+  // reparación que apareció después), esto trae esas líneas nuevas a la factura sin tocar
+  // ni borrar ninguna línea que ya estaba.
+  async function syncWorkOrders() {
+    setSyncing(true);
+    try {
+      const result = await api.post(`/invoices/${id}/sync-work-orders`, {});
+      if (result && result.pending) {
+        alert(result.message || t('Los cambios se enviaron para autorización del administrador.'));
+      } else if (result && result.added === 0) {
+        alert(t('La factura ya tiene todas las líneas de sus órdenes de trabajo: no hay nada nuevo que agregar.'));
+      } else if (result && result.invoice) {
+        setInvoice(result.invoice);
+        alert(t('Se agregaron {n} línea(s) nueva(s) a la factura.').replace('{n}', result.added));
+      }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   if (!invoice) return <div className="content">{t('Cargando…')}</div>;
 
   return (
     <>
       <div className="topbar no-print">
-        <div><h1>{t('Factura')} {invoice.number}</h1><div className="sub"><Pill value={invoice.status} /></div></div>
+        <div>
+          <h1>{t('Factura')} {invoice.number}</h1>
+          <div className="sub">
+            <Pill value={invoice.status} />
+            {invoice.workOrders && invoice.workOrders.length > 0 && (
+              <>
+                {' · '}
+                {t('Generada desde')}{' '}
+                {invoice.workOrders.map((wo, i) => (
+                  <React.Fragment key={wo.id}>
+                    {i > 0 && ', '}
+                    <Link to={`/ordenes-trabajo/${wo.id}/documento`}>{wo.number}</Link>
+                  </React.Fragment>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/facturas" className="btn">{t('← Volver')}</Link>
+          {invoice.workOrders && invoice.workOrders.length > 0 && (
+            <button type="button" className="btn" disabled={syncing} onClick={syncWorkOrders}>
+              {syncing ? t('Sincronizando…') : t('Agregar líneas nuevas de la orden de trabajo')}
+            </button>
+          )}
           <button type="button" className="btn" disabled={savingWireInfo} onClick={toggleWireInfo}>
             {invoice.include_wire_info ? t('Quitar datos de transferencia') : t('+ Agregar datos de transferencia')}
           </button>

@@ -363,6 +363,12 @@ const DICT = {
   'Ver factura': 'View invoice',
   '+ Agregar datos de transferencia': '+ Add wire transfer info',
   'Quitar datos de transferencia': 'Remove wire transfer info',
+  'Generada desde': 'Generated from',
+  'Sincronizando…': 'Syncing…',
+  'Agregar líneas nuevas de la orden de trabajo': 'Add new lines from work order',
+  'La factura ya tiene todas las líneas de sus órdenes de trabajo: no hay nada nuevo que agregar.':
+    'The invoice already has every line from its work orders: there is nothing new to add.',
+  'Se agregaron {n} línea(s) nueva(s) a la factura.': '{n} new line(s) were added to the invoice.',
   '¿Generar una factura con estas órdenes de trabajo?': 'Generate an invoice with these work orders?',
   '¿Generar una factura a partir de la orden de trabajo': 'Generate an invoice from work order',
   'Las órdenes marcadas como "completado" pueden facturarse: selecciónalas con la casilla y haz clic en "Facturar seleccionadas".':

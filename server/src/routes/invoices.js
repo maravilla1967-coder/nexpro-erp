@@ -12,6 +12,25 @@ function withItems(inv) {
   return inv;
 }
 
+// Devuelve la factura completa tal como la necesita el cliente: datos del cliente (vía
+// JOIN), sus líneas, y las órdenes de trabajo que la originaron. Se usa en todas las rutas
+// que responden con una factura -no solo GET /:id- para que ninguna respuesta deje "a
+// medias" los datos del cliente o el enlace a sus órdenes de trabajo (eso fue justo el bug:
+// una respuesta armada a mano con un SELECT * FROM invoices, sin el JOIN, vaciaba en
+// pantalla la sección "Facturar a" en cuanto se usaba esa respuesta para actualizar la
+// factura en pantalla sin recargar la página).
+function getFullInvoice(id) {
+  const inv = get(
+    `SELECT i.*, c.name as customer_name, c.address as customer_address, c.city as customer_city, c.zip as customer_zip, c.tax_id as customer_tax_id, c.phone as customer_phone, c.email as customer_email
+     FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id WHERE i.id = ?`,
+    [id]
+  );
+  if (!inv) return inv;
+  withItems(inv);
+  inv.workOrders = all('SELECT id, number, status FROM work_orders WHERE invoice_id = ?', [inv.id]);
+  return inv;
+}
+
 function computeTotals(items, taxRate) {
   const subtotal = items.reduce((sum, it) => sum + Number(it.quantity) * Number(it.unitPrice ?? it.unit_price), 0);
   const taxAmount = Math.round(subtotal * (Number(taxRate || 0) / 100) * 100) / 100;
@@ -61,13 +80,9 @@ router.get('/', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const inv = get(
-    `SELECT i.*, c.name as customer_name, c.address as customer_address, c.city as customer_city, c.zip as customer_zip, c.tax_id as customer_tax_id, c.phone as customer_phone, c.email as customer_email
-     FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id WHERE i.id = ?`,
-    [req.params.id]
-  );
+  const inv = getFullInvoice(req.params.id);
   if (!inv) return res.status(404).json({ error: 'Factura no encontrada' });
-  res.json(withItems(inv));
+  res.json(inv);
 });
 
 // Crear factura directa (con items propios) o a partir de un pedido (salesOrderId).
@@ -114,7 +129,7 @@ router.post('/', (req, res) => {
   if (salesOrderId) {
     run(`UPDATE sales_orders SET status = 'facturado' WHERE id = ?`, [salesOrderId]);
   }
-  res.status(201).json(withItems(get('SELECT * FROM invoices WHERE id = ?', [invId])));
+  res.status(201).json(getFullInvoice(invId));
 });
 
 // Facturar una o varias órdenes de trabajo ya completadas, directamente desde la ficha
@@ -206,7 +221,87 @@ router.post('/from-work-orders', (req, res) => {
     run(`UPDATE work_orders SET invoice_id = ?, status = 'facturado', updated_at = ? WHERE id = ?`, [invId, new Date().toISOString().slice(0, 19).replace('T', ' '), wo.id]);
   }
 
-  res.status(201).json(withItems(get('SELECT * FROM invoices WHERE id = ?', [invId])));
+  res.status(201).json(getFullInvoice(invId));
+});
+
+// Agregar a una factura ya generada las líneas nuevas que se hayan sumado después en
+// alguna de sus órdenes de trabajo de origen (por ejemplo, una parte que el mecánico
+// cargó después de facturar). Nunca toca ni borra una línea que ya está en la factura:
+// solo agrega las que todavía faltan, comparando la lista actual de servicios/partes de
+// cada orden de trabajo contra lo que ya hay facturado (por descripción, que ya incluye
+// el número de orden). Así una factura ya enviada al cliente no cambia de golpe, salvo
+// por lo nuevo que efectivamente se agrega.
+router.post('/:id/sync-work-orders', (req, res) => {
+  const invoiceId = req.params.id;
+  const invoice = get('SELECT * FROM invoices WHERE id = ?', [invoiceId]);
+  if (!invoice) return res.status(404).json({ error: 'Factura no encontrada' });
+
+  const workOrders = all('SELECT * FROM work_orders WHERE invoice_id = ?', [invoiceId]);
+  if (workOrders.length === 0) {
+    return res.status(400).json({ error: 'Esta factura no fue generada desde órdenes de trabajo' });
+  }
+
+  const expectedItems = [];
+  for (const wo of workOrders) {
+    const services = all('SELECT * FROM work_order_services WHERE work_order_id = ?', [wo.id]);
+    const parts = all('SELECT * FROM work_order_parts WHERE work_order_id = ?', [wo.id]);
+    for (const s of services) {
+      const isFlat = s.pricing_type === 'servicio_completo';
+      expectedItems.push({
+        description: `${wo.number} — ${s.description}`,
+        quantity: isFlat ? 1 : Number(s.hours || 0),
+        unitPrice: isFlat ? Number(s.flat_price || 0) : Number(s.hourly_rate || 0),
+      });
+    }
+    for (const p of parts) {
+      expectedItems.push({
+        description: `${wo.number} — ${p.description}`,
+        quantity: Number(p.quantity || 1),
+        unitPrice: Number(p.unit_cost || 0),
+      });
+    }
+  }
+
+  const existingItems = all('SELECT * FROM invoice_items WHERE invoice_id = ?', [invoiceId]);
+  const existingCounts = {};
+  for (const it of existingItems) existingCounts[it.description] = (existingCounts[it.description] || 0) + 1;
+
+  // Si una orden tiene dos líneas con la misma descripción, se cuenta cuántas hay de cada
+  // lado (facturadas vs. actuales en la orden), para no duplicar ni perder ninguna.
+  const newItems = [];
+  const seenCount = {};
+  for (const it of expectedItems) {
+    seenCount[it.description] = (seenCount[it.description] || 0) + 1;
+    if (seenCount[it.description] > (existingCounts[it.description] || 0)) {
+      newItems.push(it);
+    }
+  }
+
+  if (newItems.length === 0) {
+    return res.json({ added: 0, invoice: getFullInvoice(invoiceId) });
+  }
+
+  // Se reutiliza la misma ruta de aplicación (applyUpdate) que cualquier otra edición de
+  // factura: se manda la lista completa (lo que ya había + lo nuevo) como si fuera una
+  // edición normal de items, así el camino de aprobación para usuarios no-admin ya
+  // funciona sin cambios.
+  const mergedItems = [
+    ...existingItems.map((it) => ({ description: it.description, quantity: it.quantity, unitPrice: it.unit_price, productId: it.product_id })),
+    ...newItems,
+  ];
+  const payload = { items: mergedItems, taxRate: invoice.tax_rate };
+
+  if (req.user.role === 'admin') {
+    applyUpdate(invoiceId, payload);
+    return res.json({ added: newItems.length, invoice: getFullInvoice(invoiceId) });
+  }
+
+  const result = run(
+    `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
+     VALUES ('invoice', ?, 'update', ?, ?, ?)`,
+    [invoiceId, JSON.stringify(payload), `Agregar ${newItems.length} línea(s) nueva(s) de orden(es) de trabajo a la factura ${invoice.number}`, req.user.id]
+  );
+  res.status(202).json({ pending: true, newItemsCount: newItems.length, approvalId: result.lastInsertRowid, message: 'Los cambios se enviaron para autorización del administrador.' });
 });
 
 // Editar o eliminar una factura existente: un administrador lo aplica de inmediato;
@@ -217,7 +312,8 @@ router.put('/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Factura no encontrada' });
 
   if (req.user.role === 'admin') {
-    return res.json(withItems(applyUpdate(req.params.id, req.body)));
+    applyUpdate(req.params.id, req.body);
+    return res.json(getFullInvoice(req.params.id));
   }
   const result = run(
     `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
