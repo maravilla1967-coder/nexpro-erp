@@ -28,4 +28,24 @@ function makeUploader(subfolder) {
   });
 }
 
-module.exports = { makeUploader, UPLOADS_ROOT };
+// Para adjuntar cualquier tipo de documento (cotización del proveedor en PDF, fotos,
+// etc.) sin restringir el tipo de archivo, a diferencia de makeUploader() que solo
+// acepta imágenes.
+function makeDocUploader(subfolder) {
+  const dest = path.join(UPLOADS_ROOT, subfolder);
+  fs.mkdirSync(dest, { recursive: true });
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, dest),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname) || '';
+      const base = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      cb(null, base + ext);
+    },
+  });
+  return multer({
+    storage,
+    limits: { fileSize: 20 * 1024 * 1024 },
+  });
+}
+
+module.exports = { makeUploader, makeDocUploader, UPLOADS_ROOT };

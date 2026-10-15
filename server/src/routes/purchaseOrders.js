@@ -2,13 +2,16 @@ const express = require('express');
 const { all, get, run } = require('../../db');
 const { nextPoNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
+const { makeDocUploader } = require('../middleware/upload');
 
 const router = express.Router();
 router.use(requireModuleEdit('compras'));
+const docUpload = makeDocUploader('purchase-order-docs');
 
 function withItems(po) {
   if (!po) return po;
   po.items = all('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?', [po.id]);
+  po.attachments = all('SELECT * FROM purchase_order_attachments WHERE purchase_order_id = ? ORDER BY id', [po.id]);
   return po;
 }
 
@@ -87,6 +90,25 @@ router.put('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   run('DELETE FROM purchase_orders WHERE id = ?', [req.params.id]);
+  res.status(204).end();
+});
+
+// ---- Documentos adjuntos (cotización del proveedor, factura final, etc.) ----
+router.post('/:id/attachments', docUpload.array('files', 10), (req, res) => {
+  const po = get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id]);
+  if (!po) return res.status(404).json({ error: 'Orden de compra no encontrada' });
+  const files = req.files || [];
+  for (const f of files) {
+    run(
+      'INSERT INTO purchase_order_attachments (purchase_order_id, file_url, original_name) VALUES (?,?,?)',
+      [req.params.id, `/uploads/purchase-order-docs/${f.filename}`, f.originalname]
+    );
+  }
+  res.status(201).json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id])));
+});
+
+router.delete('/:id/attachments/:attachmentId', (req, res) => {
+  run('DELETE FROM purchase_order_attachments WHERE id = ? AND purchase_order_id = ?', [req.params.attachmentId, req.params.id]);
   res.status(204).end();
 });
 

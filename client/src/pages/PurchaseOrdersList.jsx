@@ -19,6 +19,7 @@ export default function PurchaseOrdersList() {
   const [orderDate, setOrderDate] = useState(todayStr());
   const [items, setItems] = useState([{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
   const [error, setError] = useState('');
+  const [uploadingDocs, setUploadingDocs] = useState(false);
 
   function load() { api.get('/purchase-orders').then(setList).catch(console.error); }
   useEffect(() => {
@@ -45,6 +46,28 @@ export default function PurchaseOrdersList() {
         : [{ productId: '', description: '', quantity: 1, unitPrice: 0 }]
     );
     setError(''); setModalOpen(true);
+  }
+
+  async function uploadPoDocs(fileList) {
+    if (!editingPo || !fileList || fileList.length === 0) return;
+    const fd = new FormData();
+    Array.from(fileList).forEach((file) => fd.append('files', file));
+    setUploadingDocs(true);
+    try {
+      const updated = await api.postForm(`/purchase-orders/${editingPo.id}/attachments`, fd);
+      setEditingPo(updated);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploadingDocs(false);
+    }
+  }
+
+  async function deletePoDoc(attachmentId) {
+    if (!editingPo || !window.confirm(t('¿Eliminar este archivo adjunto?'))) return;
+    await api.del(`/purchase-orders/${editingPo.id}/attachments/${attachmentId}`);
+    const updated = await api.get(`/purchase-orders/${editingPo.id}`);
+    setEditingPo(updated);
   }
 
   async function save(e) {
@@ -121,6 +144,25 @@ export default function PurchaseOrdersList() {
             </div>
             <LineItemsEditor items={items} setItems={setItems} products={products} priceLabel="Costo unit." priceSourceField="purchase_cost" />
             {editingPo && <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{t('Puedes ajustar cantidades y líneas mientras la orden no esté marcada como recibida.')}</div>}
+
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)', marginTop: 16, display: 'block' }}>{t('Archivos adjuntos')}</label>
+            {editingPo ? (
+              <div className="file-list">
+                {(editingPo.attachments || []).map((a) => (
+                  <div className="file-list-item" key={a.id}>
+                    <a href={a.file_url} target="_blank" rel="noreferrer">{a.original_name || a.file_url.split('/').pop()}</a>
+                    <button type="button" className="link-btn" onClick={() => deletePoDoc(a.id)}>✕</button>
+                  </div>
+                ))}
+                <label className="btn btn-sm" style={{ marginTop: 6, display: 'inline-block', cursor: 'pointer' }}>
+                  {uploadingDocs ? t('Subiendo…') : t('+ Adjuntar archivo')}
+                  <input type="file" multiple hidden disabled={uploadingDocs} onChange={(e) => { uploadPoDocs(e.target.files); e.target.value = ''; }} />
+                </label>
+              </div>
+            ) : (
+              <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{t('Guarda la orden primero para poder adjuntar archivos (cotización del proveedor, etc.).')}</div>
+            )}
+
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => { setModalOpen(false); setEditingPo(null); }}>{t('Cancelar')}</button>
               <button type="submit" className="btn btn-primary">{editingPo ? t('Guardar cambios') : t('Guardar')}</button>
@@ -142,6 +184,18 @@ export default function PurchaseOrdersList() {
               ))}
             </tbody>
           </table>
+          {viewing.attachments && viewing.attachments.length > 0 && (
+            <>
+              <p style={{ marginTop: 14, marginBottom: 4 }}><strong>{t('Archivos adjuntos:')}</strong></p>
+              <div className="file-list">
+                {viewing.attachments.map((a) => (
+                  <div className="file-list-item" key={a.id}>
+                    <a href={a.file_url} target="_blank" rel="noreferrer">{a.original_name || a.file_url.split('/').pop()}</a>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </Modal>
       )}
     </>

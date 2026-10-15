@@ -114,6 +114,16 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
   unit_cost REAL NOT NULL
 );
 
+-- Documentos adjuntos a una orden de compra (cotización del proveedor, factura final,
+-- etc.). Cualquier tipo de archivo, no solo imágenes.
+CREATE TABLE IF NOT EXISTS purchase_order_attachments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ===================== PEDIDOS DE VENTA =====================
 CREATE TABLE IF NOT EXISTS sales_orders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
