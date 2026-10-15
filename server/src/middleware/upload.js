@@ -2,8 +2,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+// En producción (Railway), UPLOADS_DIR apunta al volumen persistente (p. ej. /data/uploads).
+// Debe coincidir exactamente con el valor que usa server/src/index.js para servir /uploads,
+// o los archivos se guardan en un lado y se sirven desde otro (404 aunque la subida funcione).
+const UPLOADS_ROOT = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
+
 function makeUploader(subfolder) {
-  const dest = path.join(__dirname, '..', '..', 'uploads', subfolder);
+  const dest = path.join(UPLOADS_ROOT, subfolder);
   fs.mkdirSync(dest, { recursive: true });
   const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, dest),
@@ -23,4 +28,4 @@ function makeUploader(subfolder) {
   });
 }
 
-module.exports = { makeUploader };
+module.exports = { makeUploader, UPLOADS_ROOT };
