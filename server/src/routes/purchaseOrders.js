@@ -24,7 +24,16 @@ router.get('/', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const po = get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id]);
+  // Trae también los datos del proveedor (nombre, dirección, contacto, etc.) para que el
+  // documento imprimible de la orden de compra tenga la información completa del proveedor
+  // sin necesidad de otra consulta.
+  const po = get(
+    `SELECT po.*, s.name as supplier_name, s.code as supplier_code, s.tax_id as supplier_tax_id,
+            s.email as supplier_email, s.phone as supplier_phone, s.address as supplier_address,
+            s.city as supplier_city, s.zip as supplier_zip
+     FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id WHERE po.id = ?`,
+    [req.params.id]
+  );
   if (!po) return res.status(404).json({ error: 'Orden de compra no encontrada' });
   res.json(withItems(po));
 });

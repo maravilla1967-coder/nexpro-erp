@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
@@ -115,6 +116,7 @@ export default function PurchaseOrdersList() {
                     <td><Pill value={po.status} /></td>
                     <td className="muted">{po.order_date || po.created_at}</td>
                     <td style={{ display: 'flex', gap: 10 }}>
+                      <Link className="link-btn" to={`/compras/${po.id}/documento`}>{t('Imprimir')}</Link>
                       {po.status !== 'recibida' && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
                       {po.status === 'borrador' && <button className="link-btn" onClick={() => markStatus(po, 'enviada')}>{t('Marcar enviada')}</button>}
                       {po.status !== 'recibida' && <button className="link-btn" onClick={() => markStatus(po, 'recibida')}>{t('Marcar recibida')}</button>}
@@ -173,6 +175,9 @@ export default function PurchaseOrdersList() {
 
       {viewing && (
         <Modal title={`${t('Orden de compra')} ${viewing.number}`} onClose={() => setViewing(null)} wide>
+          <div style={{ marginBottom: 10 }}>
+            <Link className="btn btn-sm" to={`/compras/${viewing.id}/documento`}>{t('🖨️ Imprimir / Guardar PDF')}</Link>
+          </div>
           <p><strong>{t('Proveedor:')}</strong> {viewing.supplier_id && suppliers.find((s) => s.id === viewing.supplier_id)?.name}</p>
           <p><strong>{t('Estado:')}</strong> <Pill value={viewing.status} /></p>
           <p><strong>{t('Fecha de la orden:')}</strong> {viewing.order_date || '—'}</p>

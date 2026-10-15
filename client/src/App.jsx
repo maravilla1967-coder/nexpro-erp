@@ -10,6 +10,7 @@ import CustomerDetail from './pages/CustomerDetail.jsx';
 import ProductsList from './pages/ProductsList.jsx';
 import SuppliersList from './pages/SuppliersList.jsx';
 import PurchaseOrdersList from './pages/PurchaseOrdersList.jsx';
+import PurchaseOrderDocument from './pages/PurchaseOrderDocument.jsx';
 import SalesOrdersList from './pages/SalesOrdersList.jsx';
 import SalesOrderDocument from './pages/SalesOrderDocument.jsx';
 import InvoicesList from './pages/InvoicesList.jsx';
@@ -204,6 +205,7 @@ function MainShell() {
           <Route path="/inventario" element={<ProductsList />} />
           <Route path="/proveedores" element={<SuppliersList />} />
           <Route path="/compras" element={<PurchaseOrdersList />} />
+          <Route path="/compras/:id/documento" element={<PurchaseOrderDocument />} />
           <Route path="/pedidos" element={<SalesOrdersList />} />
           <Route path="/pedidos/:id/documento" element={<SalesOrderDocument />} />
           <Route path="/facturas" element={<InvoicesList />} />
