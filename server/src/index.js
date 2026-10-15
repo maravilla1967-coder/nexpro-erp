@@ -27,6 +27,15 @@ try {
   console.error('No se pudo cargar el seed inicial:', err.message);
 }
 
+// Importa una sola vez las órdenes de compra históricas que Jorge llevaba en su Excel de
+// control. Protegido por una bandera en app_settings, así que es seguro llamarlo en cada
+// arranque: después de la primera vez no hace nada.
+try {
+  require('../db/import-historical-pos').importHistoricalPOs();
+} catch (err) {
+  console.error('No se pudo importar las órdenes de compra históricas:', err.message);
+}
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Autenticación: login, aceptar invitación, etc. No requiere sesión previa.

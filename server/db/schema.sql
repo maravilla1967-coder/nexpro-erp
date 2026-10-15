@@ -99,7 +99,8 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   number TEXT NOT NULL UNIQUE,
   supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
-  status TEXT NOT NULL DEFAULT 'borrador',
+  status TEXT NOT NULL DEFAULT 'borrador', -- 'borrador' (editable) -> 'enviada' (colocada con el proveedor) -> 'recibida'
+  order_date TEXT, -- fecha real de la orden (AAAA-MM-DD); puede ser distinta de created_at en órdenes importadas
   notes TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

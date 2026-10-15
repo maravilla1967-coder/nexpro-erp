@@ -35,9 +35,10 @@ router.post('/', (req, res) => {
   if (!supplier) return res.status(404).json({ error: 'Proveedor no encontrado' });
   const vendorCode = supplier.code || supplier.name;
   const number = nextPoNumber(vendorCode);
+  const orderDate = b.orderDate || new Date().toISOString().slice(0, 10);
   const result = run(
-    `INSERT INTO purchase_orders (number, supplier_id, status, notes) VALUES (?,?,?,?)`,
-    [number, b.supplierId, b.status || 'borrador', b.notes || null]
+    `INSERT INTO purchase_orders (number, supplier_id, status, order_date, notes) VALUES (?,?,?,?,?)`,
+    [number, b.supplierId, b.status || 'borrador', orderDate, b.notes || null]
   );
   const poId = result.lastInsertRowid;
   for (const item of b.items) {
@@ -53,7 +54,15 @@ router.put('/:id', (req, res) => {
   const b = req.body;
   const existing = get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Orden de compra no encontrada' });
-  run(`UPDATE purchase_orders SET status=?, notes=? WHERE id=?`, [b.status ?? existing.status, b.notes ?? existing.notes, req.params.id]);
+  // Una orden ya recibida queda bloqueada: no se pueden cambiar sus items (ya afectaron
+  // el inventario), para que la orden siga reflejando con exactitud lo que realmente llegó.
+  if (Array.isArray(b.items) && existing.status === 'recibida') {
+    return res.status(400).json({ error: 'No se pueden editar los items de una orden ya recibida' });
+  }
+  run(
+    `UPDATE purchase_orders SET status=?, order_date=?, notes=? WHERE id=?`,
+    [b.status ?? existing.status, b.orderDate ?? existing.order_date, b.notes ?? existing.notes, req.params.id]
+  );
 
   if (Array.isArray(b.items)) {
     run('DELETE FROM purchase_order_items WHERE purchase_order_id = ?', [req.params.id]);
