@@ -2,9 +2,11 @@ const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
 const { nextDocNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
+const { makeUploader } = require('../middleware/upload');
 
 const router = express.Router();
 router.use(requireModuleEdit('ordenes_trabajo'));
+const upload = makeUploader('work-orders');
 
 function calcServiceTotal(svc) {
   if (svc.pricingType === 'servicio_completo' || svc.pricing_type === 'servicio_completo') {
@@ -34,6 +36,7 @@ function withDetails(wo) {
   );
   wo.services = services;
   wo.parts = parts;
+  wo.photos = all('SELECT * FROM work_order_photos WHERE work_order_id = ? ORDER BY id', [wo.id]);
   const servicesTotal = services.reduce((sum, s) => sum + Number(s.total), 0);
   const partsTotal = parts.reduce((sum, p) => sum + Number(p.total), 0);
   wo.total = Math.round((servicesTotal + partsTotal) * 100) / 100;
@@ -142,6 +145,22 @@ router.put('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   run('DELETE FROM work_orders WHERE id = ?', [req.params.id]);
+  res.status(204).end();
+});
+
+// ---- Fotos de la orden de trabajo (evidencia del daño, repuestos, trabajo terminado...) ----
+router.post('/:id/photos', upload.array('photos', 10), (req, res) => {
+  const wo = get('SELECT * FROM work_orders WHERE id = ?', [req.params.id]);
+  if (!wo) return res.status(404).json({ error: 'Orden de trabajo no encontrada' });
+  const files = req.files || [];
+  for (const f of files) {
+    run('INSERT INTO work_order_photos (work_order_id, photo_url) VALUES (?,?)', [req.params.id, `/uploads/work-orders/${f.filename}`]);
+  }
+  res.status(201).json(withDetails(get('SELECT * FROM work_orders WHERE id = ?', [req.params.id])));
+});
+
+router.delete('/:id/photos/:photoId', (req, res) => {
+  run('DELETE FROM work_order_photos WHERE id = ? AND work_order_id = ?', [req.params.photoId, req.params.id]);
   res.status(204).end();
 });
 

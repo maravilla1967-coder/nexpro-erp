@@ -254,6 +254,16 @@ CREATE TABLE IF NOT EXISTS work_order_parts (
   notes TEXT
 );
 
+-- Fotos adjuntas a una orden de trabajo (evidencia del daño, del repuesto, del trabajo
+-- terminado, etc.). Una orden puede tener varias.
+CREATE TABLE IF NOT EXISTS work_order_photos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  work_order_id INTEGER NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
+  photo_url TEXT NOT NULL,
+  caption TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ===================== USUARIOS / PERMISOS / APROBACIONES =====================
 -- Configuración interna de la app (p. ej. la clave para firmar sesiones).
 CREATE TABLE IF NOT EXISTS app_settings (

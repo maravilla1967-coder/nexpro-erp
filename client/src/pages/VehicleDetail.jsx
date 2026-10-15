@@ -32,6 +32,7 @@ export default function VehicleDetail() {
   const [woParts, setWoParts] = useState([]);
   const [selectedWoIds, setSelectedWoIds] = useState([]);
   const [invoicing, setInvoicing] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   function load() { api.get(`/vehicles/${id}`).then(setVehicle).catch(console.error); }
   useEffect(() => { load(); }, [id]);
@@ -148,6 +149,30 @@ export default function VehicleDetail() {
       }
       setWoModalOpen(false); setEditingWo(null); load();
     } catch (err) { setError(err.message); }
+  }
+
+  async function uploadWoPhotos(fileList) {
+    if (!editingWo || !fileList || fileList.length === 0) return;
+    const fd = new FormData();
+    Array.from(fileList).forEach((file) => fd.append('photos', file));
+    setUploadingPhotos(true);
+    try {
+      const updated = await api.postForm(`/work-orders/${editingWo.id}/photos`, fd);
+      setEditingWo(updated);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploadingPhotos(false);
+    }
+  }
+
+  async function deleteWoPhoto(photoId) {
+    if (!editingWo || !window.confirm(t('¿Eliminar esta foto?'))) return;
+    await api.del(`/work-orders/${editingWo.id}/photos/${photoId}`);
+    const updated = await api.get(`/work-orders/${editingWo.id}`);
+    setEditingWo(updated);
+    load();
   }
 
   function toggleWoSelect(woId) {
@@ -408,6 +433,24 @@ export default function VehicleDetail() {
               </tbody>
             </table>
             <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addWoPartRow}>{t('+ Agregar parte')}</button>
+
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)', marginTop: 16, display: 'block' }}>{t('Fotos')}</label>
+            {editingWo ? (
+              <div className="photo-gallery">
+                {(editingWo.photos || []).map((p) => (
+                  <div className="photo-gallery-item" key={p.id}>
+                    <img src={p.photo_url} />
+                    <button type="button" className="photo-gallery-remove" onClick={() => deleteWoPhoto(p.id)}>✕</button>
+                  </div>
+                ))}
+                <label className="photo-gallery-add">
+                  {uploadingPhotos ? t('Subiendo…') : t('+ Agregar fotos')}
+                  <input type="file" accept="image/*" multiple hidden disabled={uploadingPhotos} onChange={(e) => { uploadWoPhotos(e.target.files); e.target.value = ''; }} />
+                </label>
+              </div>
+            ) : (
+              <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{t('Guarda la orden de trabajo primero para poder adjuntar fotos.')}</div>
+            )}
 
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => { setWoModalOpen(false); setEditingWo(null); }}>{t('Cancelar')}</button>

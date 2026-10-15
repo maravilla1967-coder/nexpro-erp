@@ -157,6 +157,19 @@ export default function WorkOrderDocument() {
             <div className="invoice-total-grand"><span>{t('Total')}</span><span>${Number(wo.total).toLocaleString()}</span></div>
           </div>
 
+          {wo.photos && wo.photos.length > 0 && (
+            <div className="doc-box" style={{ marginTop: 14 }}>
+              <div className="doc-box-title">{t('Fotos')}</div>
+              <div className="photo-gallery">
+                {wo.photos.map((p) => (
+                  <div className="photo-gallery-item" key={p.id} style={{ width: 150, height: 150 }}>
+                    <img src={p.photo_url} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="doc-box" style={{ marginTop: 14 }}>
             <div className="doc-box-title">{t('Conformidad del cliente')}</div>
             <div className="muted" style={{ fontSize: 13 }}>{t('Al firmar, el cliente confirma haber recibido el vehículo y aceptar el trabajo realizado y descrito en este documento.')}</div>

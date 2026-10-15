@@ -32,6 +32,7 @@ function withDetails(vehicle) {
       [wo.id]
     );
     wo.parts = all('SELECT * FROM work_order_parts WHERE work_order_id = ? ORDER BY id', [wo.id]);
+    wo.photos = all('SELECT * FROM work_order_photos WHERE work_order_id = ? ORDER BY id', [wo.id]);
   });
   return vehicle;
 }
