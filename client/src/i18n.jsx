@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Comprobante de pago': 'Payment record',
   'Indica la fecha del pago.': 'Enter the payment date.',
   'Escribe el monto del pago (por ejemplo 9070 o 9,070.00).': 'Enter the payment amount (e.g. 9070 or 9,070.00).',
   'El recargo no es un número válido.': 'The surcharge is not a valid number.',

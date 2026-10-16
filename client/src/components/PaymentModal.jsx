@@ -19,13 +19,16 @@ export async function uploadPaymentFiles(basePath, paymentId, files) {
 }
 
 // Lista de comprobantes de un pago, con enlace para abrirlos (y ✕ si se permite borrar).
+// Se muestran como "Comprobante de pago" (1, 2…) en vez del nombre del archivo, que suele ser
+// larguísimo (recibos de Square, del banco); el nombre original aparece al pasar el mouse.
 export function PaymentFiles({ files, onRemove }) {
+  const { t } = useI18n();
   if (!files || files.length === 0) return null;
   return (
     <div className="payment-files">
-      {files.map((f) => (
+      {files.map((f, i) => (
         <span key={f.id} className="payment-file">
-          📎 <a href={f.file_url} target="_blank" rel="noreferrer">{f.original_name || f.file_url.split('/').pop()}</a>
+          📎 <a href={f.file_url} target="_blank" rel="noreferrer" title={f.original_name || ''}>{t('Comprobante de pago')}{files.length > 1 ? ` ${i + 1}` : ''}</a>
           {onRemove && <button type="button" className="link-btn no-print" style={{ marginLeft: 4 }} onClick={() => onRemove(f)}>✕</button>}
         </span>
       ))}
