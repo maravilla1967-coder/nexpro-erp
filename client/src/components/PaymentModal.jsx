@@ -52,11 +52,12 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
   const [form, setForm] = useState(initial ? {
     paymentDate: initial.payment_date, amount: Number(initial.amount).toFixed(2),
     surcharge: initial.surcharge ? Number(initial.surcharge).toFixed(2) : '',
+    processorFee: initial.processor_fee ? Number(initial.processor_fee).toFixed(2) : '',
     method: initial.method || 'cheque', reference: initial.reference || '', notes: initial.notes || '',
   } : {
     paymentDate: new Date().toISOString().slice(0, 10),
     amount: balance > 0 ? Number(balance).toFixed(2) : '',
-    surcharge: '', method: 'cheque', reference: '', notes: '',
+    surcharge: '', processorFee: '', method: 'cheque', reference: '', notes: '',
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -65,6 +66,8 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
 
   const amountN = parseAmount(form.amount);
   const surchargeN = form.surcharge === '' ? 0 : parseAmount(form.surcharge);
+  const feeN = form.processorFee === '' ? 0 : parseAmount(form.processorFee);
+  const totalCharged = (amountN || 0) + (surchargeN || 0);
   const isCard = ['square', 'tarjeta'].includes(form.method);
 
   async function submit(e) {
@@ -73,8 +76,9 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
     if (!form.paymentDate) { setError(t('Indica la fecha del pago.')); return; }
     if (!(amountN > 0)) { setError(t('Escribe el monto del pago (por ejemplo 9070 o 9,070.00).')); return; }
     if (Number.isNaN(surchargeN) || surchargeN < 0) { setError(t('El recargo no es un número válido.')); return; }
+    if (Number.isNaN(feeN) || feeN < 0) { setError(t('La comisión no es un número válida.')); return; }
     setSaving(true);
-    try { await onSave({ ...form, amount: amountN, surcharge: surchargeN }, files); }
+    try { await onSave({ ...form, amount: amountN, surcharge: surchargeN, processorFee: feeN }, files); }
     catch (err) { setError(err.message); setSaving(false); }
   }
 
@@ -100,9 +104,25 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
               <button type="button" className="btn btn-sm" onClick={() => setForm({ ...form, surcharge: (Math.round((amountN || 0) * 3) / 100).toFixed(2) })}>3%</button>
               {form.surcharge !== '' && <button type="button" className="link-btn" onClick={() => setForm({ ...form, surcharge: '' })}>✕</button>}
             </div>
-            {(surchargeN > 0 || isCard) && amountN > 0 && (
-              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('Total cobrado (debe coincidir con el recibo):')} <strong>{money(amountN + (surchargeN || 0))}</strong></div>
-            )}
+          </div>
+        )}
+        {showSurcharge && (isCard || feeN > 0) && (
+          <div className="field">
+            <label>{t('Comisión que nos cobra el procesador (Square)')}</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input inputMode="decimal" placeholder="0.00" value={form.processorFee} onChange={set('processorFee')} />
+              <button type="button" className="btn btn-sm" style={{ whiteSpace: 'nowrap' }}
+                onClick={() => setForm({ ...form, processorFee: (Math.round((totalCharged * 0.035 + 0.15) * 100) / 100).toFixed(2) })}>Square 3.5% + $0.15</button>
+            </div>
+          </div>
+        )}
+        {showSurcharge && amountN > 0 && (surchargeN > 0 || feeN > 0) && (
+          <div className="pay-breakdown">
+            <div><span>{t('Abono a la factura')}</span><span>{money(amountN)}</span></div>
+            {surchargeN > 0 && <div><span>+ {t('Recargo al cliente')}</span><span>{money(surchargeN)}</span></div>}
+            <div className="strong"><span>{t('Total cobrado (recibo de Square)')}</span><span>{money(totalCharged)}</span></div>
+            {feeN > 0 && <div><span>− {t('Comisión del procesador')}</span><span>{money(feeN)}</span></div>}
+            {feeN > 0 && <div className="strong"><span>{t('Neto recibido en el banco')}</span><span>{money(totalCharged - feeN)}</span></div>}
           </div>
         )}
         <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={form.notes} onChange={set('notes')} /></div>

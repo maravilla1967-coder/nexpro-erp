@@ -4,6 +4,15 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Comisión que nos cobra el procesador (Square)': 'Fee charged to us by the processor (Square)',
+  'La comisión no es un número válida.': 'The fee is not a valid number.',
+  'Abono a la factura': 'Applied to invoice',
+  'Recargo al cliente': 'Customer surcharge',
+  'Total cobrado (recibo de Square)': 'Total charged (Square receipt)',
+  'Comisión del procesador': 'Processor fee',
+  'Neto recibido en el banco': 'Net deposited to bank',
+  comisión: 'fee',
+  neto: 'net',
   'Comprobante de pago': 'Payment record',
   'Indica la fecha del pago.': 'Enter the payment date.',
   'Escribe el monto del pago (por ejemplo 9070 o 9,070.00).': 'Enter the payment amount (e.g. 9070 or 9,070.00).',

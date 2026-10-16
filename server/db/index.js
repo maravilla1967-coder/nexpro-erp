@@ -36,6 +36,8 @@ tryAlter('ALTER TABLE products ADD COLUMN track_serials INTEGER NOT NULL DEFAULT
 // Recargo cobrado al cliente aparte del abono (p. ej. 3% por pagar con tarjeta en Square).
 // No reduce el saldo de la factura: el total cobrado = amount + surcharge.
 tryAlter('ALTER TABLE invoice_payments ADD COLUMN surcharge REAL NOT NULL DEFAULT 0');
+// Comisión que cobra el procesador (Square: 3.5% + $0.15). Neto recibido = amount + surcharge - processor_fee.
+tryAlter('ALTER TABLE invoice_payments ADD COLUMN processor_fee REAL NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE warranties ADD COLUMN product_serial_id INTEGER REFERENCES product_serials(id)');
 
 function all(sql, params = []) {

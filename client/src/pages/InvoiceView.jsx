@@ -232,7 +232,8 @@ export default function InvoiceView() {
                           {t('+ comprobante')}<input type="file" multiple hidden onChange={(e) => { addProof(p.id, e.target.files); e.target.value = ''; }} />
                         </label>
                       </td>
-                      <td className="text-right">{money(p.amount)}{p.surcharge > 0 && <div className="muted" style={{ fontSize: 11 }}>+ {money(p.surcharge)} {t('recargo')} = {money(Number(p.amount) + Number(p.surcharge))}</div>}</td>
+                      <td className="text-right">{money(p.amount)}{p.surcharge > 0 && <div className="muted" style={{ fontSize: 11 }}>+ {money(p.surcharge)} {t('recargo')} = {money(Number(p.amount) + Number(p.surcharge))}</div>}
+                        {p.processor_fee > 0 && <div className="muted no-print" style={{ fontSize: 11 }}>− {money(p.processor_fee)} {t('comisión')} = {t('neto')} {money(Number(p.amount) + Number(p.surcharge || 0) - Number(p.processor_fee))}</div>}</td>
                       <td className="no-print" style={{ whiteSpace: 'nowrap' }}>{isAdmin && <><button className="link-btn" onClick={() => setEditingPay(p)}>{t('Editar')}</button> <button className="link-btn" onClick={() => deletePayment(p.id)}>✕</button></>}</td>
                     </tr>
                   ))}
