@@ -36,6 +36,11 @@ try {
   console.error('No se pudo importar las órdenes de compra históricas:', err.message);
 }
 try {
+  require('../db/cleanup-test-invoices').cleanupTestInvoices();
+} catch (err) {
+  console.error('No se pudo borrar la factura de prueba FAC-0001:', err.message);
+}
+try {
   require('../db/import-maxxsuite').importMaxxsuite();
 } catch (err) {
   console.error('No se pudo importar el catálogo de MaxxSuite:', err.message);

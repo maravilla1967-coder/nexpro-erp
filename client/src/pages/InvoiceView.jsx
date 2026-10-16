@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
 import DocumentBrand from '../components/DocumentBrand.jsx';
@@ -41,6 +41,16 @@ export default function InvoiceView() {
     catch (err) { alert(err.message); }
   }
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
+  async function deleteInvoice() {
+    const extra = invoice.paid > 0 ? `\n\n${t('Tiene pagos registrados por')} ${money(invoice.paid)}; ${t('también se borrarán.')}` : '';
+    if (!window.confirm(`${t('¿Eliminar la factura')} ${invoice.number}?${extra}\n\n${t('Esto no se puede deshacer.')}`)) return;
+    try {
+      const r = await api.del(`/invoices/${id}`);
+      if (r && r.pending) { alert(r.message); return; }
+      navigate('/facturas');
+    } catch (err) { alert(err.message); }
+  }
 
   async function savePayment(payload) {
     const updated = await api.post(`/invoices/${id}/payments`, payload);
@@ -117,6 +127,7 @@ export default function InvoiceView() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/facturas" className="btn">{t('← Volver')}</Link>
+          <button type="button" className="btn btn-danger" onClick={deleteInvoice}>{t('Eliminar factura')}</button>
           {invoice.workOrders && invoice.workOrders.length > 0 && (
             <button type="button" className="btn" disabled={syncing} onClick={syncWorkOrders}>
               {syncing ? t('Sincronizando…') : t('Agregar líneas nuevas de la orden de trabajo')}

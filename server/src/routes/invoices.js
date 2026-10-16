@@ -1,5 +1,5 @@
 const express = require('express');
-const { all, get, run } = require('../../db');
+const { db, all, get, run } = require('../../db');
 const { nextDocNumber, asInvoiceNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 const { round2, refreshInvoiceStatus } = require('../utils/payments');
@@ -77,8 +77,28 @@ function applyUpdate(id, b) {
   return get('SELECT * FROM invoices WHERE id = ?', [id]);
 }
 
+// Borrar una factura deja todo lo que estaba ligado a ella como si nunca se hubiera
+// facturado: las órdenes de trabajo vuelven a "completado" (se pueden facturar de nuevo),
+// el pedido de origen vuelve a "aprobado" y los seriales vendidos con ella vuelven a
+// "disponible". Sus líneas y pagos se borran con ella.
 function applyDelete(id) {
-  run('DELETE FROM invoices WHERE id = ?', [id]);
+  db.exec('BEGIN');
+  try {
+    run(`UPDATE work_orders SET invoice_id = NULL, status = 'completado' WHERE invoice_id = ?`, [id]);
+    const inv = get('SELECT sales_order_id FROM invoices WHERE id = ?', [id]);
+    if (inv && inv.sales_order_id) run(`UPDATE sales_orders SET status = 'aprobado' WHERE id = ? AND status = 'facturado'`, [inv.sales_order_id]);
+    const sold = all(`SELECT id FROM product_serials WHERE invoice_id = ?`, [id]);
+    for (const sr of sold) {
+      run(`UPDATE product_serials SET invoice_id = NULL, customer_id = CASE WHEN vehicle_id IS NULL THEN NULL ELSE customer_id END,
+             status = CASE WHEN status = 'vendido' THEN 'disponible' ELSE status END WHERE id = ?`, [sr.id]);
+      run(`INSERT INTO serial_events (serial_id, event, notes) VALUES (?, 'disponible', 'Factura eliminada')`, [sr.id]);
+    }
+    run('DELETE FROM invoices WHERE id = ?', [id]);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
 }
 
 const PAID_SQL = `(SELECT COALESCE(SUM(p.amount),0) FROM invoice_payments p WHERE p.invoice_id = i.id)`;
@@ -105,7 +125,7 @@ router.get('/receivables', (req, res) => {
             i.total, i.status, ROUND(${PAID_SQL}, 2) AS paid, ROUND(i.total - ${PAID_SQL}, 2) AS balance,
             (SELECT MAX(p.payment_date) FROM invoice_payments p WHERE p.invoice_id = i.id) AS last_payment
      FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id
-     WHERE i.status NOT IN ('cancelado','anulada') AND ROUND(i.total - ${PAID_SQL}, 2) > 0.004
+     WHERE i.status NOT IN ('cancelado','anulada') ${req.query.includePaid === '1' ? '' : `AND ROUND(i.total - ${PAID_SQL}, 2) > 0.004`}
      ORDER BY due_date`,
     [termDays]
   );
@@ -114,7 +134,7 @@ router.get('/receivables', (req, res) => {
   for (const r of rows) {
     const days = Math.floor((Date.parse(today) - Date.parse(r.due_date)) / dayMs);
     r.days_overdue = Number.isNaN(days) ? 0 : days;
-    r.bucket = r.days_overdue <= 0 ? 'corriente' : r.days_overdue <= 30 ? '1-30' : r.days_overdue <= 60 ? '31-60' : r.days_overdue <= 90 ? '61-90' : '+90';
+    r.bucket = r.balance <= 0.004 ? 'pagada' : r.days_overdue <= 0 ? 'corriente' : r.days_overdue <= 30 ? '1-30' : r.days_overdue <= 60 ? '31-60' : r.days_overdue <= 90 ? '61-90' : '+90';
     r.due_date_estimated = !!r.due_date_estimated;
   }
   res.json({ today, termDays, rows });

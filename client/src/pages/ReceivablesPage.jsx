@@ -8,7 +8,7 @@ import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../component
 
 // Cartera / cuentas por cobrar: quién debe, cuánto y desde cuándo, por rango de antigüedad.
 export const BUCKETS = ['corriente', '1-30', '31-60', '61-90', '+90'];
-const BUCKET_LABEL = { corriente: 'Corriente', '1-30': '1–30 días', '31-60': '31–60 días', '61-90': '61–90 días', '+90': 'Más de 90' };
+const BUCKET_LABEL = { pagada: 'Pagada', corriente: 'Corriente', '1-30': '1–30 días', '31-60': '31–60 días', '61-90': '61–90 días', '+90': 'Más de 90' };
 
 const rDate = (r) => r.due_date;
 const rNumber = (r) => r.number;
@@ -31,13 +31,15 @@ export default function ReceivablesPage() {
   const [customer, setCustomer] = useState('');
   const [bucket, setBucket] = useState('');
   const [paying, setPaying] = useState(null);
+  const [includePaid, setIncludePaid] = useState(false);
 
-  function load() { api.get('/invoices/receivables', { termDays }).then(setData).catch(console.error); }
-  useEffect(load, [termDays]);
+  function load() { api.get('/invoices/receivables', { termDays, includePaid: includePaid ? '1' : '' }).then(setData).catch(console.error); }
+  useEffect(load, [termDays, includePaid]);
 
   const customers = useMemo(() => {
     const m = new Map();
     for (const r of data.rows) {
+      if (r.bucket === 'pagada') continue;
       const c = m.get(r.customer_id) || { id: r.customer_id, name: r.customer_name, total: 0, buckets: {} };
       c.total += r.balance; c.buckets[r.bucket] = (c.buckets[r.bucket] || 0) + r.balance;
       m.set(r.customer_id, c);
@@ -48,7 +50,7 @@ export default function ReceivablesPage() {
   const totals = useMemo(() => {
     const o = { all: 0 };
     BUCKETS.forEach((b) => { o[b] = 0; });
-    data.rows.forEach((r) => { o[r.bucket] += r.balance; o.all += r.balance; });
+    data.rows.forEach((r) => { if (r.bucket === 'pagada') return; o[r.bucket] += r.balance; o.all += r.balance; });
     return o;
   }, [data]);
 
@@ -102,11 +104,15 @@ export default function ReceivablesPage() {
         <div className="toolbar">
           <select style={{ width: 280 }} value={customer} onChange={(e) => setCustomer(e.target.value)}>
             <option value="">{t('Todos los clientes')}</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {[...new Map(data.rows.map((r) => [r.customer_id, r.customer_name])).entries()].map(([cid, name]) => <option key={cid} value={cid}>{name}</option>)}
           </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <input type="checkbox" style={{ width: 'auto' }} checked={includePaid} onChange={(e) => setIncludePaid(e.target.checked)} />
+            {t('Incluir facturas pagadas (ver todas, como en Facturación)')}
+          </label>
         </div>
         <div className="card">
-          {rows.length === 0 ? <div className="empty-state">{t('No hay facturas con saldo pendiente.')}</div> : (
+          {rows.length === 0 ? <div className="empty-state">{includePaid ? t('No hay facturas.') : t('No hay facturas con saldo pendiente.')}</div> : (
             <>
               <ListExportBar ex={ex} title={customer ? `${t('Estado de cuenta')} — ${customers.find((c) => String(c.id) === customer)?.name || ''}` : t('Cartera')} filename="cartera" columns={R_COLUMNS} />
               <table>
@@ -118,11 +124,11 @@ export default function ReceivablesPage() {
                       <td className="mono"><Link to={`/facturas/${r.id}`}>{r.number}</Link></td>
                       <td>{r.customer_name}</td>
                       <td className="muted">{r.due_date}{r.due_date_estimated && <span title={t('Calculada con los días de crédito')}> *</span>}</td>
-                      <td>{r.days_overdue > 0 ? <span className={`aging-pill b-${r.bucket.replace('+', 'p')}`}>{r.days_overdue} {t('días')}</span> : <Pill value="corriente" />}</td>
+                      <td>{r.bucket === 'pagada' ? <Pill value="pagada" /> : r.days_overdue > 0 ? <span className={`aging-pill b-${r.bucket.replace('+', 'p')}`}>{r.days_overdue} {t('días')}</span> : <Pill value="corriente" />}</td>
                       <td className="text-right">{money(r.total)}</td>
                       <td className="text-right muted">{money(r.paid)}</td>
                       <td className="text-right"><strong>{money(r.balance)}</strong></td>
-                      <td><button className="link-btn" onClick={() => setPaying(r)}>{t('Registrar pago')}</button></td>
+                      <td>{r.balance > 0.004 && <button className="link-btn" onClick={() => setPaying(r)}>{t('Registrar pago')}</button>}</td>
                     </tr>
                   ))}
                 </tbody>

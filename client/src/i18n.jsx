@@ -4,6 +4,14 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Incluir facturas pagadas (ver todas, como en Facturación)': 'Include paid invoices (see all, like in Invoicing)',
+  'No hay facturas.': 'No invoices.',
+  'Pagada': 'Paid',
+  'Eliminar factura': 'Delete invoice',
+  '¿Eliminar la factura': 'Delete invoice',
+  'Tiene pagos registrados por': 'It has payments recorded for',
+  'también se borrarán.': 'they will be deleted too.',
+  'Esto no se puede deshacer.': 'This cannot be undone.',
   // Cobros, cuentas por pagar, recepción y seriales
   '+ Adjuntar archivo': '+ Attach file',
   '+ Agregar seriales': '+ Add serials',
