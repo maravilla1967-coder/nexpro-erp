@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import { useI18n } from '../i18n.jsx';
@@ -19,7 +20,7 @@ const PRODUCT_COLUMNS = [
 
 const EMPTY = {
   name: '', sku: '', description: '', productTypeId: '', purchaseCost: '', freightCost: '',
-  marginPercent: '30', sellingPrice: '', stockQty: '0', unit: 'unidad', supplierId: '', photoUrl: '',
+  marginPercent: '30', sellingPrice: '', stockQty: '0', unit: 'unidad', supplierId: '', photoUrl: '', trackSerials: false,
 };
 
 function computePrice(cost, freight, margin) {
@@ -64,7 +65,7 @@ export default function ProductsList() {
     setForm({
       name: p.name, sku: p.sku || '', description: p.description || '', productTypeId: p.product_type_id || '',
       purchaseCost: p.purchase_cost, freightCost: p.freight_cost, marginPercent: p.margin_percent,
-      sellingPrice: p.selling_price, stockQty: p.stock_qty, unit: p.unit, supplierId: p.supplier_id || '', photoUrl: p.photo_url || '',
+      sellingPrice: p.selling_price, stockQty: p.stock_qty, unit: p.unit, supplierId: p.supplier_id || '', photoUrl: p.photo_url || '', trackSerials: !!p.track_serials,
     });
     setPhotoFile(null); setOverridePrice(false); setError(''); setModalOpen(true);
   }
@@ -144,7 +145,7 @@ export default function ProductsList() {
                     <td>${(p.purchase_cost + p.freight_cost).toLocaleString()}</td>
                     <td>{p.margin_percent}%</td>
                     <td><strong>${Number(p.selling_price).toLocaleString()}</strong></td>
-                    <td className={p.stock_qty <= 0 ? 'muted' : ''}>{p.stock_qty} {p.unit}</td>
+                    <td className={p.stock_qty <= 0 ? 'muted' : ''}>{p.stock_qty} {p.unit}{p.track_serials ? <div><Link className="muted" style={{ fontSize: 12 }} to={`/seriales?producto=${p.id}`}>🔢 {p.serials_available} {t('seriales disp.')}</Link></div> : null}</td>
                     <td>
                       <div className="row-actions">
                         <button className="btn-row-action edit" onClick={() => openEdit(p)}>{t('Editar')}</button>
@@ -211,6 +212,10 @@ export default function ProductsList() {
                   <div className="field"><label>{t('Cantidad en stock')}</label><input type="number" step="0.01" value={form.stockQty} onChange={(e) => setForm({ ...form, stockQty: e.target.value })} /></div>
                   <div className="field"><label>{t('Unidad')}</label><input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></div>
                 </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginTop: 6 }}>
+                  <input type="checkbox" style={{ width: 'auto' }} checked={!!form.trackSerials} onChange={(e) => setForm({ ...form, trackSerials: e.target.checked })} />
+                  {t('Maneja números de serie (cada unidad con su serial: grúas, compresores, buckets…)')}
+                </label>
               </div>
             </div>
             <div className="modal-footer">

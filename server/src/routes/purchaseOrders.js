@@ -3,6 +3,7 @@ const { all, get, run } = require('../../db');
 const { nextPoNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 const { makeDocUploader } = require('../middleware/upload');
+const { receivePurchaseOrder } = require('../utils/receiving');
 
 const router = express.Router();
 router.use(requireModuleEdit('compras'));
@@ -10,8 +11,14 @@ const docUpload = makeDocUploader('purchase-order-docs');
 
 function withItems(po) {
   if (!po) return po;
-  po.items = all('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?', [po.id]);
+  po.items = all(`SELECT i.*, p.track_serials, p.name AS product_name FROM purchase_order_items i
+                  LEFT JOIN products p ON p.id = i.product_id WHERE i.purchase_order_id = ? ORDER BY i.id`, [po.id]);
   po.attachments = all('SELECT * FROM purchase_order_attachments WHERE purchase_order_id = ? ORDER BY id', [po.id]);
+  po.receipts = all(
+    `SELECT r.*, u.name AS created_by_name FROM goods_receipts r LEFT JOIN users u ON u.id = r.created_by
+     WHERE r.purchase_order_id = ? ORDER BY r.id`, [po.id]);
+  for (const r of po.receipts) r.items = all('SELECT * FROM goods_receipt_items WHERE goods_receipt_id = ?', [r.id]);
+  po.bills = all('SELECT id, bill_number, amount, status, due_date FROM supplier_bills WHERE purchase_order_id = ? ORDER BY id', [po.id]);
   return po;
 }
 
@@ -71,8 +78,22 @@ router.put('/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Orden de compra no encontrada' });
   // Una orden ya recibida queda bloqueada: no se pueden cambiar sus items (ya afectaron
   // el inventario), para que la orden siga reflejando con exactitud lo que realmente llegó.
-  if (Array.isArray(b.items) && existing.status === 'recibida') {
-    return res.status(400).json({ error: 'No se pueden editar los items de una orden ya recibida' });
+  if (Array.isArray(b.items) && ['recibida', 'parcial'].includes(existing.status)) {
+    return res.status(400).json({ error: 'No se pueden editar los items de una orden que ya tiene mercancía recibida' });
+  }
+  // Marcar "recibida" de una sola vez = recibir todo lo que falte de cada línea (con el
+  // mismo registro de recepción que la recepción parcial).
+  if (b.status === 'recibida' && existing.status !== 'recibida') {
+    const pending = all('SELECT id, quantity, received_qty FROM purchase_order_items WHERE purchase_order_id = ?', [req.params.id])
+      .map((i) => ({ itemId: i.id, quantity: Number(i.quantity) - Number(i.received_qty || 0) }))
+      .filter((l) => l.quantity > 0);
+    try {
+      if (pending.length) receivePurchaseOrder(req.params.id, { lines: pending, userId: req.user && req.user.id });
+      else run(`UPDATE purchase_orders SET status = 'recibida' WHERE id = ?`, [req.params.id]);
+    } catch (err) {
+      return res.status(err.status || 500).json({ error: err.message });
+    }
+    return res.json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id])));
   }
   run(
     `UPDATE purchase_orders SET status=?, order_date=?, notes=? WHERE id=?`,
@@ -88,21 +109,23 @@ router.put('/:id', (req, res) => {
       );
     }
   }
-  // Si la orden pasa a "recibida", aumentar stock de los productos asociados
-  if (b.status === 'recibida' && existing.status !== 'recibida') {
-    const items = all('SELECT * FROM purchase_order_items WHERE purchase_order_id = ?', [req.params.id]);
-    for (const item of items) {
-      if (item.product_id) {
-        run('UPDATE products SET stock_qty = stock_qty + ? WHERE id = ?', [item.quantity, item.product_id]);
-      }
-    }
-  }
   res.json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id])));
 });
 
 router.delete('/:id', (req, res) => {
   run('DELETE FROM purchase_orders WHERE id = ?', [req.params.id]);
   res.status(204).end();
+});
+
+// ---- Recepción de mercancía (parcial o total) ----
+router.post('/:id/receipts', (req, res) => {
+  try {
+    const b = req.body || {};
+    receivePurchaseOrder(req.params.id, { lines: b.lines, receiptDate: b.receiptDate, notes: b.notes, userId: req.user && req.user.id });
+    res.status(201).json(withItems(get(`SELECT po.*, s.name as supplier_name FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id WHERE po.id = ?`, [req.params.id])));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
 });
 
 // ---- Documentos adjuntos (cotización del proveedor, factura final, etc.) ----

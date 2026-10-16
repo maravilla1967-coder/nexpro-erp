@@ -15,7 +15,7 @@ const CLAIM_STATUSES = ['abierta', 'enviada', 'aprobada', 'rechazada', 'cerrada'
 const REG_STATUSES = ['registrada', 'cerrada'];
 
 const EMPTY = {
-  kind: 'reclamo', status: 'abierta', vehicleId: '', vehicleEquipmentId: '', purchaseOrderId: '',
+  kind: 'reclamo', status: 'abierta', productSerialId: '', vehicleId: '', vehicleEquipmentId: '', purchaseOrderId: '',
   supplierId: '', customerId: '', responsibleUserId: '', itemDescription: '', vin: '', serialNumber: '',
   manufacturer: '', model: '', year: '', purchaseDate: '', warrantyStart: '', warrantyEnd: '',
   claimDate: '', manufacturerClaimNumber: '', problemDescription: '', resolution: '',
@@ -24,7 +24,7 @@ const EMPTY = {
 
 function fromRow(w) {
   return {
-    kind: w.kind, status: w.status, vehicleId: w.vehicle_id || '', vehicleEquipmentId: w.vehicle_equipment_id || '',
+    kind: w.kind, status: w.status, productSerialId: w.product_serial_id || '', vehicleId: w.vehicle_id || '', vehicleEquipmentId: w.vehicle_equipment_id || '',
     purchaseOrderId: w.purchase_order_id || '', supplierId: w.supplier_id || '', customerId: w.customer_id || '',
     responsibleUserId: w.responsible_user_id || '', itemDescription: w.item_description || '', vin: w.vin || '',
     serialNumber: w.serial_number || '', manufacturer: w.manufacturer || '', model: w.model || '', year: w.year || '',
@@ -72,6 +72,7 @@ export default function WarrantiesList() {
   const [customers, setCustomers] = useState([]);
   const [pos, setPos] = useState([]);
   const [people, setPeople] = useState([]);
+  const [serials, setSerials] = useState([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -88,6 +89,7 @@ export default function WarrantiesList() {
     api.get('/customers').then(setCustomers).catch(() => {});
     api.get('/purchase-orders').then(setPos).catch(() => {});
     api.get('/warranties/responsibles').then(setPeople).catch(() => {});
+    api.get('/serials').then(setSerials).catch(() => {});
   }, []);
 
   // Abrir el formulario ya lleno cuando se llega desde un vehículo o una orden de compra.
@@ -100,6 +102,8 @@ export default function WarrantiesList() {
       if (kind === 'reclamo') f.claimDate = today();
       const vId = params.get('vehiculo');
       const poId = params.get('oc');
+      const snId = params.get('serial');
+      if (snId) f = await applySerial(f, snId);
       if (vId) f = await applyVehicle(f, vId);
       if (poId) f = await applyPo(f, poId);
       setEditing(null); setForm(f); setError(''); setModalOpen(true);
@@ -127,6 +131,25 @@ export default function WarrantiesList() {
       manufacturer: eq.manufacturer || f.manufacturer, model: eq.model || f.model,
       itemDescription: [eq.equipment_type_name || eq.custom_type_name, eq.manufacturer, eq.model].filter(Boolean).join(' '),
     };
+  }
+
+  // Elegir la unidad del inventario por su número de serie llena todo lo que se sabe de ella:
+  // producto, proveedor, orden de compra, fecha de recepción y, si ya se instaló, el camión.
+  async function applySerial(f, serialId) {
+    if (!serialId) return { ...f, productSerialId: '' };
+    const sn = await api.get(`/serials/${serialId}`);
+    let out = {
+      ...f, productSerialId: sn.id, serialNumber: sn.serial, itemDescription: sn.product_name,
+      model: f.model || sn.product_sku || '', manufacturer: sn.supplier_name || f.manufacturer,
+      supplierId: sn.supplier_id || f.supplierId, purchaseOrderId: sn.purchase_order_id || f.purchaseOrderId,
+      purchaseDate: sn.received_date || f.purchaseDate, warrantyStart: f.warrantyStart || sn.received_date || '',
+      customerId: sn.customer_id || f.customerId,
+    };
+    if (sn.vehicle_id) {
+      const keep = { serialNumber: out.serialNumber, itemDescription: out.itemDescription, manufacturer: out.manufacturer, model: out.model };
+      out = { ...(await applyVehicle(out, sn.vehicle_id)), ...keep };
+    }
+    return out;
   }
 
   async function applyPo(f, poId) {
@@ -260,6 +283,12 @@ export default function WarrantiesList() {
                 <select value={form.vehicleEquipmentId} disabled={!form.vehicleId || equipment.length === 0} onChange={(e) => setForm(applyEquipment(form, e.target.value))}>
                   <option value="">{form.vehicleId ? (equipment.length ? t('— El camión completo —') : t('Sin equipos registrados')) : t('Elige primero un vehículo')}</option>
                   {equipment.map((eq) => <option key={eq.id} value={eq.id}>{[eq.equipment_type_name || eq.custom_type_name, eq.manufacturer, eq.model].filter(Boolean).join(' ')}{eq.serial_number ? ` · S/N ${eq.serial_number}` : ''}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ gridColumn: '1 / -1' }}><label>{t('Unidad del inventario (número de serie)')}</label>
+                <select value={form.productSerialId} onChange={async (e) => setForm(await applySerial(form, e.target.value))}>
+                  <option value="">{t('— Ninguna —')}</option>
+                  {serials.filter((sn) => sn.status !== 'dado_de_baja').map((sn) => <option key={sn.id} value={sn.id}>{sn.serial} · {sn.product_name}{sn.customer_name ? ` · ${sn.customer_name}` : ''}{sn.vehicle_vin ? ` · VIN ${sn.vehicle_vin}` : ''}</option>)}
                 </select>
               </div>
               <div className="field"><label>{t('VIN')}</label><input className="mono" value={form.vin} onChange={set('vin')} /></div>

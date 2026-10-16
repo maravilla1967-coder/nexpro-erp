@@ -35,9 +35,17 @@ router.delete('/types/:id', (req, res) => {
 });
 
 // ---- Products ----
+// "Maneja seriales" llega desde un formulario multipart: 'true'/'false' como texto.
+function setTrackSerials(id, v) {
+  if (v === undefined || v === null || v === '') return;
+  const on = v === true || v === 'true' || v === '1' || v === 1;
+  run('UPDATE products SET track_serials = ? WHERE id = ?', [on ? 1 : 0, id]);
+}
+
 router.get('/', (req, res) => {
   const { q, typeId, active } = req.query;
-  let sql = `SELECT p.*, pt.name as product_type_name, s.name as supplier_name
+  let sql = `SELECT p.*, pt.name as product_type_name, s.name as supplier_name,
+                    (SELECT COUNT(*) FROM product_serials ps WHERE ps.product_id = p.id AND ps.status = 'disponible') AS serials_available
              FROM products p
              LEFT JOIN product_types pt ON pt.id = p.product_type_id
              LEFT JOIN suppliers s ON s.id = p.supplier_id
@@ -91,6 +99,7 @@ router.post('/', upload.single('photo'), (req, res) => {
      marginPercent, sellingPrice, parseFloat(b.stockQty || 0), b.unit || 'unidad', b.supplierId || null,
      b.active !== undefined ? (b.active === 'false' ? 0 : 1) : 1]
   );
+  setTrackSerials(result.lastInsertRowid, b.trackSerials);
   res.status(201).json(get('SELECT * FROM products WHERE id = ?', [result.lastInsertRowid]));
 });
 
@@ -117,6 +126,7 @@ router.put('/:id', upload.single('photo'), (req, res) => {
      b.supplierId ?? existing.supplier_id, b.active !== undefined ? (b.active === 'false' || b.active === false ? 0 : 1) : existing.active,
      nowIso(), req.params.id]
   );
+  setTrackSerials(req.params.id, b.trackSerials);
   res.json(get('SELECT * FROM products WHERE id = ?', [req.params.id]));
 });
 

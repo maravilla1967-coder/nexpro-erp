@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import LineItemsEditor from '../components/LineItemsEditor.jsx';
+import ReceiveModal from '../components/ReceiveModal.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
 const poDate = (r) => r.order_date || r.created_at;
@@ -99,6 +100,8 @@ export default function PurchaseOrdersList() {
     } catch (err) { setError(err.message); }
   }
 
+  const [receiving, setReceiving] = useState(null);
+  async function openReceive(po) { setReceiving(await api.get(`/purchase-orders/${po.id}`)); }
   async function markStatus(po, status) {
     await api.put(`/purchase-orders/${po.id}`, { status });
     load();
@@ -133,9 +136,9 @@ export default function PurchaseOrdersList() {
                     <td style={{ display: 'flex', gap: 10 }}>
                       <Link className="link-btn" to={`/compras/${po.id}/documento`}>{t('Imprimir')}</Link>
                       <Link className="link-btn" to={`/garantias?nuevo=registro&oc=${po.id}`}>{t('Garantía')}</Link>
-                      {po.status !== 'recibida' && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
+                      {!['recibida', 'parcial'].includes(po.status) && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
                       {po.status === 'borrador' && <button className="link-btn" onClick={() => markStatus(po, 'enviada')}>{t('Marcar enviada')}</button>}
-                      {po.status !== 'recibida' && <button className="link-btn" onClick={() => markStatus(po, 'recibida')}>{t('Marcar recibida')}</button>}
+                      {!['recibida', 'cancelado'].includes(po.status) && <button className="link-btn" onClick={() => openReceive(po)}>{po.status === 'parcial' ? t('Recibir resto') : t('Recibir')}</button>}
                     </td>
                   </tr>
                 ))}
@@ -189,23 +192,47 @@ export default function PurchaseOrdersList() {
         </Modal>
       )}
 
+      {receiving && <ReceiveModal po={receiving} onClose={() => setReceiving(null)} onDone={() => { setReceiving(null); load(); }} />}
+
       {viewing && (
         <Modal title={`${t('Orden de compra')} ${viewing.number}`} onClose={() => setViewing(null)} wide>
           <div style={{ marginBottom: 10 }}>
             <Link className="btn btn-sm" to={`/compras/${viewing.id}/documento`}>{t('🖨️ Imprimir / Guardar PDF')}</Link>{' '}
-            <Link className="btn btn-sm" to={`/garantias?nuevo=registro&oc=${viewing.id}`}>{t('🛡️ Registrar garantía')}</Link>
+            <Link className="btn btn-sm" to={`/garantias?nuevo=registro&oc=${viewing.id}`}>{t('🛡️ Registrar garantía')}</Link>{' '}
+            <Link className="btn btn-sm" to={`/cuentas-por-pagar?nuevo=1&oc=${viewing.id}`}>{t('🧾 Registrar factura del proveedor')}</Link>{' '}
+            {!['recibida', 'cancelado'].includes(viewing.status) && <button className="btn btn-sm btn-primary" onClick={() => { setReceiving(viewing); setViewing(null); }}>{t('📦 Recibir mercancía')}</button>}
           </div>
           <p><strong>{t('Proveedor:')}</strong> {viewing.supplier_id && suppliers.find((s) => s.id === viewing.supplier_id)?.name}</p>
           <p><strong>{t('Estado:')}</strong> <Pill value={viewing.status} /></p>
           <p><strong>{t('Fecha de la orden:')}</strong> {viewing.order_date || '—'}</p>
           <table>
-            <thead><tr><th>{t('Descripción')}</th><th>{t('Cant.')}</th><th>{t('Costo unit.')}</th><th>{t('Subtotal')}</th></tr></thead>
+            <thead><tr><th>{t('Descripción')}</th><th>{t('Cant.')}</th><th>{t('Recibido')}</th><th>{t('Costo unit.')}</th><th>{t('Subtotal')}</th></tr></thead>
             <tbody>
               {viewing.items.map((it) => (
-                <tr key={it.id}><td>{it.description}</td><td>{it.quantity}</td><td>${it.unit_cost}</td><td>${(it.quantity * it.unit_cost).toLocaleString()}</td></tr>
+                <tr key={it.id}><td>{it.description}</td><td>{it.quantity}</td><td className={Number(it.received_qty) >= Number(it.quantity) ? '' : 'muted'}>{it.received_qty || 0}</td><td>${it.unit_cost}</td><td>${(it.quantity * it.unit_cost).toLocaleString()}</td></tr>
               ))}
             </tbody>
           </table>
+          {viewing.receipts && viewing.receipts.length > 0 && (
+            <>
+              <p style={{ marginTop: 14, marginBottom: 4 }}><strong>{t('Recepciones:')}</strong></p>
+              {viewing.receipts.map((r) => (
+                <div key={r.id} className="muted" style={{ fontSize: 13 }}>
+                  <span className="mono">{r.number}</span> · {r.receipt_date}{r.created_by_name ? ` · ${r.created_by_name}` : ''} — {r.items.map((i) => `${i.quantity} × ${i.description}`).join('; ')}{r.notes ? ` (${r.notes})` : ''}
+                </div>
+              ))}
+            </>
+          )}
+          {viewing.bills && viewing.bills.length > 0 && (
+            <>
+              <p style={{ marginTop: 14, marginBottom: 4 }}><strong>{t('Facturas del proveedor:')}</strong></p>
+              {viewing.bills.map((b) => (
+                <div key={b.id} style={{ fontSize: 13 }}>
+                  <Link to={`/cuentas-por-pagar?ver=${b.id}`}>{b.bill_number || `#${b.id}`}</Link> · ${Number(b.amount).toLocaleString('en-US')} · <Pill value={b.status} />{b.due_date ? ` · ${t('vence')} ${b.due_date}` : ''}
+                </div>
+              ))}
+            </>
+          )}
           {viewing.attachments && viewing.attachments.length > 0 && (
             <>
               <p style={{ marginTop: 14, marginBottom: 4 }}><strong>{t('Archivos adjuntos:')}</strong></p>

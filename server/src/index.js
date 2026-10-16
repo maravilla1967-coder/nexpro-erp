@@ -35,6 +35,21 @@ try {
 } catch (err) {
   console.error('No se pudo importar las órdenes de compra históricas:', err.message);
 }
+try {
+  require('../db/import-maxxsuite').importMaxxsuite();
+} catch (err) {
+  console.error('No se pudo importar el catálogo de MaxxSuite:', err.message);
+}
+try {
+  require('./utils/receiving').backfillReceivedQty();
+} catch (err) {
+  console.error('No se pudo preparar la recepción por líneas:', err.message);
+}
+try {
+  require('./utils/payments').backfillLegacyPaidInvoices();
+} catch (err) {
+  console.error('No se pudo preparar el registro de cobros:', err.message);
+}
 // Devuelve a las órdenes de compra ya importadas su número original del Excel de control
 // (una sola vez; protegido por bandera).
 try {
@@ -68,6 +83,8 @@ app.use('/api/services', require('./routes/services'));
 app.use('/api/mechanics', require('./routes/mechanics'));
 app.use('/api/work-orders', require('./routes/workOrders'));
 app.use('/api/warranties', require('./routes/warranties'));
+app.use('/api/payables', require('./routes/payables'));
+app.use('/api/serials', require('./routes/serials'));
 
 // Servir el frontend compilado (producción)
 const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');

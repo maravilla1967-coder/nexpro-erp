@@ -22,9 +22,9 @@ const FIELDS = {
   purchaseDate: 'purchase_date', warrantyStart: 'warranty_start', warrantyEnd: 'warranty_end',
   claimDate: 'claim_date', manufacturerClaimNumber: 'manufacturer_claim_number',
   problemDescription: 'problem_description', resolution: 'resolution', claimAmount: 'claim_amount',
-  approvedAmount: 'approved_amount', notes: 'notes',
+  approvedAmount: 'approved_amount', notes: 'notes', productSerialId: 'product_serial_id',
 };
-const ID_FIELDS = new Set(['vehicle_id', 'vehicle_equipment_id', 'purchase_order_id', 'supplier_id', 'customer_id', 'responsible_user_id']);
+const ID_FIELDS = new Set(['product_serial_id', 'vehicle_id', 'vehicle_equipment_id', 'purchase_order_id', 'supplier_id', 'customer_id', 'responsible_user_id']);
 const NUM_FIELDS = new Set(['year', 'claim_amount', 'approved_amount']);
 
 function clean(col, v) {

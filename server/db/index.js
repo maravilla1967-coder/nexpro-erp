@@ -31,6 +31,9 @@ tryAlter('ALTER TABLE suppliers ADD COLUMN zip TEXT');
 tryAlter('ALTER TABLE work_orders ADD COLUMN invoice_id INTEGER REFERENCES invoices(id)');
 tryAlter('ALTER TABLE invoices ADD COLUMN include_wire_info INTEGER NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN order_date TEXT');
+tryAlter('ALTER TABLE purchase_order_items ADD COLUMN received_qty REAL NOT NULL DEFAULT 0');
+tryAlter('ALTER TABLE products ADD COLUMN track_serials INTEGER NOT NULL DEFAULT 0');
+tryAlter('ALTER TABLE warranties ADD COLUMN product_serial_id INTEGER REFERENCES product_serials(id)');
 
 function all(sql, params = []) {
   const stmt = db.prepare(sql);

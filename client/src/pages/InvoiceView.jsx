@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
 import DocumentBrand from '../components/DocumentBrand.jsx';
+import PaymentModal, { money } from '../components/PaymentModal.jsx';
+import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 
 // Datos de la cuenta de Nexpro para recibir transferencias (ACH/wire). Es información fija
@@ -23,8 +25,33 @@ export default function InvoiceView() {
   const [invoice, setInvoice] = useState(null);
   const [savingWireInfo, setSavingWireInfo] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [serials, setSerials] = useState([]);
+  const [available, setAvailable] = useState([]);
+  const [pickSerial, setPickSerial] = useState('');
+  function loadSerials(inv) {
+    api.get('/serials', { invoiceId: id }).then(setSerials).catch(() => {});
+    const pids = [...new Set((inv.items || []).map((i) => i.product_id).filter(Boolean))];
+    if (pids.length) api.get('/serials', { productIds: pids.join(','), status: 'disponible' }).then(setAvailable).catch(() => {});
+    else setAvailable([]);
+  }
+  async function attachSerial() {
+    if (!pickSerial) return;
+    try { await api.post(`/serials/${pickSerial}/status`, { status: 'vendido', invoiceId: id }); setPickSerial(''); loadSerials(invoice); }
+    catch (err) { alert(err.message); }
+  }
+  const { isAdmin } = useAuth();
 
-  useEffect(() => { api.get(`/invoices/${id}`).then(setInvoice).catch(console.error); }, [id]);
+  async function savePayment(payload) {
+    const updated = await api.post(`/invoices/${id}/payments`, payload);
+    setInvoice(updated); setPayOpen(false);
+  }
+  async function deletePayment(pid) {
+    if (!window.confirm(t('¿Borrar este pago?'))) return;
+    try { setInvoice(await api.del(`/invoices/${id}/payments/${pid}`)); } catch (err) { alert(err.message); }
+  }
+
+  useEffect(() => { api.get(`/invoices/${id}`).then((inv) => { setInvoice(inv); loadSerials(inv); }).catch(console.error); }, [id]);
 
   async function toggleWireInfo() {
     setSavingWireInfo(true);
@@ -98,6 +125,9 @@ export default function InvoiceView() {
           <button type="button" className="btn" disabled={savingWireInfo} onClick={toggleWireInfo}>
             {invoice.include_wire_info ? t('Quitar datos de transferencia') : t('+ Agregar datos de transferencia')}
           </button>
+          {invoice.balance > 0.004 && !['cancelado', 'anulada'].includes(invoice.status) && (
+            <button type="button" className="btn" onClick={() => setPayOpen(true)}>{t('💵 Registrar pago')}</button>
+          )}
           <button className="btn btn-primary" onClick={() => window.print()}>{t('Imprimir / Guardar PDF')}</button>
         </div>
       </div>
@@ -139,7 +169,47 @@ export default function InvoiceView() {
             <div><span>{t('Subtotal')}</span><span>${Number(invoice.subtotal).toLocaleString()}</span></div>
             <div><span>{t('Impuesto')} ({invoice.tax_rate}%)</span><span>${Number(invoice.tax_amount).toLocaleString()}</span></div>
             <div className="invoice-total-grand"><span>{t('Total')}</span><span>${Number(invoice.total).toLocaleString()}</span></div>
+            {invoice.paid > 0 && <div><span>{t('Pagado')}</span><span>−{money(invoice.paid)}</span></div>}
+            {invoice.paid > 0 && <div className="invoice-total-grand"><span>{t('Saldo')}</span><span>{money(invoice.balance)}</span></div>}
           </div>
+
+          {(serials.length > 0 || available.length > 0) && (
+            <div className="doc-box" style={{ marginTop: 20 }}>
+              <div className="doc-box-title">{t('Números de serie entregados')}</div>
+              {serials.length === 0 ? <div className="muted no-print">{t('Todavía no se han asignado seriales a esta factura.')}</div> : (
+                <div>{serials.map((sr) => <div key={sr.id}><span className="mono"><strong>{sr.serial}</strong></span> — {sr.product_name}{sr.vehicle_vin ? ` · VIN ${sr.vehicle_vin}` : ''}</div>)}</div>
+              )}
+              {available.length > 0 && (
+                <div className="no-print" style={{ display: 'flex', gap: 8, marginTop: 8, maxWidth: 520 }}>
+                  <select value={pickSerial} onChange={(e) => setPickSerial(e.target.value)}>
+                    <option value="">{t('— Asignar un serial disponible —')}</option>
+                    {available.map((sr) => <option key={sr.id} value={sr.id}>{sr.serial} · {sr.product_name}</option>)}
+                  </select>
+                  <button type="button" className="btn btn-sm" disabled={!pickSerial} onClick={attachSerial}>{t('Asignar')}</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {invoice.payments && invoice.payments.length > 0 && (
+            <div className="doc-box" style={{ marginTop: 20 }}>
+              <div className="doc-box-title">{t('Pagos recibidos')}</div>
+              <table>
+                <thead><tr><th>{t('Fecha')}</th><th>{t('Forma de pago')}</th><th>{t('Referencia')}</th><th className="text-right">{t('Monto')}</th><th className="no-print"></th></tr></thead>
+                <tbody>
+                  {invoice.payments.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.payment_date}</td>
+                      <td>{p.method ? t(p.method) : '—'}</td>
+                      <td>{p.reference || '—'}{p.notes ? <div className="muted" style={{ fontSize: 11 }}>{p.notes}</div> : null}</td>
+                      <td className="text-right">{money(p.amount)}</td>
+                      <td className="no-print">{isAdmin && <button className="link-btn" onClick={() => deletePayment(p.id)}>✕</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {invoice.include_wire_info ? (
             <div className="doc-box" style={{ marginTop: 20 }}>
@@ -162,6 +232,9 @@ export default function InvoiceView() {
           {invoice.notes && <div style={{ marginTop: 20 }}><strong>{t('Notas:')}</strong> {invoice.notes}</div>}
         </div>
       </div>
+      {payOpen && (
+        <PaymentModal title={`${t('Registrar pago')} · ${invoice.number}`} balance={invoice.balance} onSave={savePayment} onClose={() => setPayOpen(false)} />
+      )}
     </>
   );
 }

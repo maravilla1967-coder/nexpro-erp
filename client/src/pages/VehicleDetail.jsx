@@ -34,7 +34,11 @@ export default function VehicleDetail() {
   const [invoicing, setInvoicing] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
-  function load() { api.get(`/vehicles/${id}`).then(setVehicle).catch(console.error); }
+  const [installedSerials, setInstalledSerials] = useState([]);
+  function load() {
+    api.get(`/vehicles/${id}`).then(setVehicle).catch(console.error);
+    api.get('/serials', { vehicleId: id }).then(setInstalledSerials).catch(() => {});
+  }
   useEffect(() => { load(); }, [id]);
   useEffect(() => {
     api.get('/vehicles/equipment-types').then(setEquipTypes);
@@ -238,6 +242,12 @@ export default function VehicleDetail() {
               {t('Equipos instalados en el chasis')}
               <button className="btn btn-sm btn-primary" onClick={openEquipModal}>{t('+ Agregar equipo')}</button>
             </div>
+            {installedSerials.length > 0 && (
+              <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
+                🔢 {t('Unidades del inventario instaladas:')}{' '}
+                {installedSerials.map((sr, i) => <React.Fragment key={sr.id}>{i > 0 && ', '}<Link to={`/seriales?producto=${sr.product_id}`} className="mono">{sr.serial}</Link> ({sr.product_name})</React.Fragment>)}
+              </div>
+            )}
             {vehicle.equipment.length === 0 ? <div className="empty-state">{t('Sin equipos registrados aún.')}</div> : (
               <table>
                 <thead><tr><th>{t('Tipo')}</th><th>{t('Serie')}</th><th>{t('Fabricante')}</th><th>{t('Modelo')}</th><th></th></tr></thead>

@@ -2,6 +2,7 @@ const express = require('express');
 const { all, get, run } = require('../../db');
 const { nextDocNumber, asInvoiceNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
+const { round2, refreshInvoiceStatus } = require('../utils/payments');
 
 const router = express.Router();
 router.use(requireModuleEdit('facturas'));
@@ -28,6 +29,13 @@ function getFullInvoice(id) {
   if (!inv) return inv;
   withItems(inv);
   inv.workOrders = all('SELECT id, number, status FROM work_orders WHERE invoice_id = ?', [inv.id]);
+  inv.payments = all(
+    `SELECT p.*, u.name AS created_by_name FROM invoice_payments p
+     LEFT JOIN users u ON u.id = p.created_by WHERE p.invoice_id = ? ORDER BY p.payment_date, p.id`,
+    [inv.id]
+  );
+  inv.paid = round2(inv.payments.reduce((s, p) => s + Number(p.amount || 0), 0));
+  inv.balance = round2(Number(inv.total || 0) - inv.paid);
   return inv;
 }
 
@@ -64,6 +72,8 @@ function applyUpdate(id, b) {
     `UPDATE invoices SET status=?, due_date=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, notes=?, include_wire_info=? WHERE id=?`,
     [b.status ?? existing.status, b.dueDate ?? existing.due_date, subtotal, taxRate, taxAmount, total, b.notes ?? existing.notes, includeWireInfo, id]
   );
+  // El estado de cobro (pendiente/parcial/pagada) sale de los pagos registrados.
+  if (b.status === undefined || ['pendiente', 'parcial', 'pagada'].includes(b.status)) refreshInvoiceStatus(id);
   return get('SELECT * FROM invoices WHERE id = ?', [id]);
 }
 
@@ -71,12 +81,43 @@ function applyDelete(id) {
   run('DELETE FROM invoices WHERE id = ?', [id]);
 }
 
+const PAID_SQL = `(SELECT COALESCE(SUM(p.amount),0) FROM invoice_payments p WHERE p.invoice_id = i.id)`;
+
 router.get('/', (req, res) => {
   const list = all(
-    `SELECT i.*, c.name as customer_name FROM invoices i
+    `SELECT i.*, c.name as customer_name, ROUND(${PAID_SQL}, 2) AS paid, ROUND(i.total - ${PAID_SQL}, 2) AS balance
+     FROM invoices i
      LEFT JOIN customers c ON c.id = i.customer_id ORDER BY i.created_at DESC`
   );
   res.json(list);
+});
+
+// Cartera (cuentas por cobrar): facturas con saldo, con días vencidos y rango de antigüedad.
+// Si la factura no tiene fecha de vencimiento se toma la fecha de emisión + los días de
+// crédito indicados (por omisión 30, lo habitual con municipios: Net 30).
+router.get('/receivables', (req, res) => {
+  const termDays = Math.max(0, parseInt(req.query.termDays, 10) || 30);
+  const rows = all(
+    `SELECT i.id, i.number, i.customer_id, c.name AS customer_name, c.email AS customer_email, c.phone AS customer_phone,
+            date(i.issue_date) AS issue_date,
+            COALESCE(date(i.due_date), date(i.issue_date, '+' || ? || ' days')) AS due_date,
+            i.due_date IS NULL AS due_date_estimated,
+            i.total, i.status, ROUND(${PAID_SQL}, 2) AS paid, ROUND(i.total - ${PAID_SQL}, 2) AS balance,
+            (SELECT MAX(p.payment_date) FROM invoice_payments p WHERE p.invoice_id = i.id) AS last_payment
+     FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id
+     WHERE i.status NOT IN ('cancelado','anulada') AND ROUND(i.total - ${PAID_SQL}, 2) > 0.004
+     ORDER BY due_date`,
+    [termDays]
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  const dayMs = 86400000;
+  for (const r of rows) {
+    const days = Math.floor((Date.parse(today) - Date.parse(r.due_date)) / dayMs);
+    r.days_overdue = Number.isNaN(days) ? 0 : days;
+    r.bucket = r.days_overdue <= 0 ? 'corriente' : r.days_overdue <= 30 ? '1-30' : r.days_overdue <= 60 ? '31-60' : r.days_overdue <= 90 ? '61-90' : '+90';
+    r.due_date_estimated = !!r.due_date_estimated;
+  }
+  res.json({ today, termDays, rows });
 });
 
 router.get('/:id', (req, res) => {
@@ -337,6 +378,36 @@ router.delete('/:id', (req, res) => {
     [req.params.id, `Eliminar la factura ${existing.number}`, req.user.id]
   );
   res.status(202).json({ pending: true, approvalId: result.lastInsertRowid, message: 'La eliminación se envió para autorización del administrador.' });
+});
+
+// ---- Pagos de clientes (abonos) ----
+// Registrar un pago no modifica la factura en sí (sus líneas y total), por eso no pasa por
+// aprobación: basta el permiso de edición de Facturación. Borrar un pago sí es solo del admin.
+router.post('/:id/payments', (req, res) => {
+  const inv = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
+  if (!inv) return res.status(404).json({ error: 'Factura no encontrada' });
+  if (['cancelado', 'anulada'].includes(inv.status)) return res.status(400).json({ error: 'La factura está anulada' });
+  const b = req.body || {};
+  const amount = round2(b.amount);
+  if (!(amount > 0)) return res.status(400).json({ error: 'El monto del pago debe ser mayor que cero' });
+  const paid = round2(get('SELECT COALESCE(SUM(amount),0) AS s FROM invoice_payments WHERE invoice_id = ?', [inv.id]).s);
+  const balance = round2(inv.total - paid);
+  if (amount - balance > 0.004) {
+    return res.status(400).json({ error: `El pago ($${amount.toLocaleString('en-US')}) es mayor que el saldo de la factura ($${balance.toLocaleString('en-US')})` });
+  }
+  run(
+    `INSERT INTO invoice_payments (invoice_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
+    [inv.id, b.paymentDate || new Date().toISOString().slice(0, 10), amount, b.method || null, b.reference || null, b.notes || null, req.user ? req.user.id : null]
+  );
+  refreshInvoiceStatus(inv.id);
+  res.status(201).json(getFullInvoice(inv.id));
+});
+
+router.delete('/:id/payments/:paymentId', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede borrar un pago registrado.' });
+  run('DELETE FROM invoice_payments WHERE id = ? AND invoice_id = ?', [req.params.paymentId, req.params.id]);
+  refreshInvoiceStatus(req.params.id);
+  res.json(getFullInvoice(req.params.id));
 });
 
 router.service = { applyUpdate, applyDelete };

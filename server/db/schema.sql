@@ -364,3 +364,103 @@ CREATE TABLE IF NOT EXISTS warranty_attachments (
   original_name TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ===================== COBROS (pagos de clientes a facturas) =====================
+-- Una factura puede recibir varios abonos. El estado de la factura se recalcula solo:
+-- pendiente (sin pagos) → parcial (pagó una parte) → pagada (saldo en cero).
+CREATE TABLE IF NOT EXISTS invoice_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  payment_date TEXT NOT NULL,
+  amount REAL NOT NULL,
+  method TEXT, -- cheque, transferencia (ACH/wire), tarjeta, efectivo, otro
+  reference TEXT, -- no. de cheque, confirmación de la transferencia…
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ===================== RECEPCIÓN DE MERCANCÍA (contra orden de compra) =====================
+-- Cada recepción registra cuánto llegó de cada línea; la orden queda "parcial" hasta que
+-- se recibe todo. El inventario sube solo por lo que realmente llegó.
+CREATE TABLE IF NOT EXISTS goods_receipts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  receipt_date TEXT NOT NULL,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS goods_receipt_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  goods_receipt_id INTEGER NOT NULL REFERENCES goods_receipts(id) ON DELETE CASCADE,
+  purchase_order_item_id INTEGER REFERENCES purchase_order_items(id) ON DELETE SET NULL,
+  product_id INTEGER REFERENCES products(id),
+  description TEXT,
+  quantity REAL NOT NULL
+);
+
+-- ===================== CUENTAS POR PAGAR (facturas de proveedores) =====================
+CREATE TABLE IF NOT EXISTS supplier_bills (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+  purchase_order_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
+  bill_number TEXT, -- número de la factura del proveedor
+  bill_date TEXT,
+  due_date TEXT,
+  amount REAL NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pendiente', -- pendiente / parcial / pagada / anulada
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS supplier_bill_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bill_id INTEGER NOT NULL REFERENCES supplier_bills(id) ON DELETE CASCADE,
+  payment_date TEXT NOT NULL,
+  amount REAL NOT NULL,
+  method TEXT,
+  reference TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS supplier_bill_attachments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bill_id INTEGER NOT NULL REFERENCES supplier_bills(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ===================== NÚMEROS DE SERIE POR UNIDAD =====================
+-- Para productos con "Maneja seriales": cada unidad física (grúa, compresor, bucket…) es un
+-- registro con su número de serie, de qué compra vino y a dónde fue (factura/cliente o
+-- vehículo donde quedó instalada). serial_events guarda la historia completa.
+CREATE TABLE IF NOT EXISTS product_serials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  serial TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'disponible', -- disponible / vendido / instalado / dado_de_baja
+  purchase_order_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
+  goods_receipt_id INTEGER REFERENCES goods_receipts(id) ON DELETE SET NULL,
+  supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+  received_date TEXT,
+  unit_cost REAL,
+  invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL,
+  status_date TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (product_id, serial)
+);
+CREATE TABLE IF NOT EXISTS serial_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  serial_id INTEGER NOT NULL REFERENCES product_serials(id) ON DELETE CASCADE,
+  event TEXT NOT NULL, -- recibido / alta_manual / vendido / instalado / dado_de_baja / disponible
+  reference TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

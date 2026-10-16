@@ -23,6 +23,9 @@ import MechanicsList from './pages/MechanicsList.jsx';
 import WorkOrdersList from './pages/WorkOrdersList.jsx';
 import WorkOrderDocument from './pages/WorkOrderDocument.jsx';
 import WarrantiesList from './pages/WarrantiesList.jsx';
+import ReceivablesPage from './pages/ReceivablesPage.jsx';
+import PayablesPage from './pages/PayablesPage.jsx';
+import SerialsPage from './pages/SerialsPage.jsx';
 import WarrantyDocument from './pages/WarrantyDocument.jsx';
 import UsersList from './pages/UsersList.jsx';
 import ApprovalsList from './pages/ApprovalsList.jsx';
@@ -50,6 +53,7 @@ const NAV = [
     links: [
       { to: '/pedidos', text: 'Órdenes de Pedido', icon: '🧾' },
       { to: '/facturas', text: 'Facturación', icon: '💵' },
+      { to: '/cartera', text: 'Cartera', icon: '📒' },
     ],
   },
   {
@@ -58,6 +62,8 @@ const NAV = [
       { to: '/inventario', text: 'Inventario', icon: '📦' },
       { to: '/proveedores', text: 'Proveedores', icon: '🏭' },
       { to: '/compras', text: 'Órdenes de Compra', icon: '🛒' },
+      { to: '/cuentas-por-pagar', text: 'Cuentas por pagar', icon: '🧾' },
+      { to: '/seriales', text: 'Números de serie', icon: '🔢' },
     ],
   },
 ];
@@ -221,6 +227,9 @@ function MainShell() {
           <Route path="/ordenes-trabajo" element={<WorkOrdersList />} />
           <Route path="/ordenes-trabajo/:id/documento" element={<WorkOrderDocument />} />
           <Route path="/garantias" element={<WarrantiesList />} />
+          <Route path="/cartera" element={<ReceivablesPage />} />
+          <Route path="/cuentas-por-pagar" element={<PayablesPage />} />
+          <Route path="/seriales" element={<SerialsPage />} />
           <Route path="/garantias/:id/documento" element={<WarrantyDocument />} />
           <Route path="/aprobaciones" element={<ApprovalsList />} />
           {isAdmin && <Route path="/usuarios" element={<UsersList />} />}
