@@ -94,9 +94,19 @@ app.use('/api/serials', require('./routes/serials'));
 // Servir el frontend compilado (producción)
 const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
 if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+  // index.html nunca se guarda en el caché del navegador: así, después de cada publicación,
+  // Safari/Chrome cargan la versión nueva del ERP sin tener que forzar la recarga. Los
+  // archivos de /assets llevan un nombre único por versión y sí se pueden guardar.
+  const noCache = (res) => res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  app.use(express.static(clientDist, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html')) noCache(res);
+      else if (filePath.includes(`${path.sep}assets${path.sep}`)) res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    },
+  }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    noCache(res);
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
