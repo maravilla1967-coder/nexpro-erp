@@ -53,12 +53,12 @@ export default function CustomerDetail() {
   }
   async function submitOpportunity(e) {
     e.preventDefault();
-    try { await api.post(`/customers/${id}/opportunities`, form); setModal(null); load(); }
+    try { await api.post(`/customers/${id}/opportunities`, { stage: 'nuevo', ...form }); setModal(null); load(); }
     catch (err) { setError(err.message); }
   }
   async function submitActivity(e) {
     e.preventDefault();
-    try { await api.post(`/customers/${id}/activities`, form); setModal(null); load(); }
+    try { await api.post(`/customers/${id}/activities`, { type: 'llamada', ...form }); setModal(null); load(); }
     catch (err) { setError(err.message); }
   }
 
@@ -167,7 +167,7 @@ export default function CustomerDetail() {
 
         {tab === 'actividades' && (
           <div className="card">
-            <div className="card-title">{t('Actividades')} / {t('Tarea')} <button className="btn btn-sm btn-primary" onClick={() => openModal('activity')}>{t('+ Agregar')}</button></div>
+            <div className="card-title">{t('Actividades')} / {t('Tarea')} <button className="btn btn-sm btn-primary" onClick={() => openModal('activity', { type: 'llamada' })}>{t('+ Agregar')}</button></div>
             {customer.activities.length === 0 ? <div className="empty-state">{t('Sin actividades.')}</div> : (
               <table>
                 <thead><tr><th>✓</th><th>{t('Tipo')}</th><th>{t('Asunto')}</th><th>{t('Fecha')}</th><th>{t('Notas')}</th><th></th></tr></thead>
@@ -175,7 +175,7 @@ export default function CustomerDetail() {
                   {customer.activities.map((a) => (
                     <tr key={a.id} style={{ opacity: a.done ? 0.5 : 1 }}>
                       <td><input type="checkbox" checked={!!a.done} onChange={() => toggleActivityDone(a)} /></td>
-                      <td>{a.type}</td><td>{a.subject}</td><td>{a.due_date || '—'}</td><td className="muted">{a.notes || '—'}</td>
+                      <td>{t(({ llamada: 'Llamada', email: 'Email', reunion: 'Reunión', nota: 'Nota', tarea: 'Tarea' })[a.type] || a.type)}</td><td>{a.subject}</td><td>{a.due_date || '—'}</td><td className="muted">{a.notes || '—'}</td>
                       <td><button className="btn-row-action delete" onClick={() => deleteActivity(a.id)}>{t('Eliminar')}</button></td>
                     </tr>
                   ))}
@@ -301,7 +301,7 @@ export default function CustomerDetail() {
               <div className="field"><label>{t('Valor estimado ($)')}</label><input type="number" step="0.01" onChange={(e) => setForm({ ...form, value: e.target.value })} /></div>
               <div className="field"><label>{t('Probabilidad (%)')}</label><input type="number" min="0" max="100" onChange={(e) => setForm({ ...form, probability: e.target.value })} /></div>
               <div className="field"><label>{t('Etapa')}</label>
-                <select onChange={(e) => setForm({ ...form, stage: e.target.value })} defaultValue="nuevo">
+                <select value={form.stage || 'nuevo'} onChange={(e) => setForm({ ...form, stage: e.target.value })}>
                   {STAGES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
                 </select>
               </div>
@@ -322,7 +322,7 @@ export default function CustomerDetail() {
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
               <div className="field"><label>{t('Tipo *')}</label>
-                <select required onChange={(e) => setForm({ ...form, type: e.target.value })} defaultValue="llamada">
+                <select required value={form.type || 'llamada'} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                   <option value="llamada">{t('Llamada')}</option>
                   <option value="email">{t('Email')}</option>
                   <option value="reunion">{t('Reunión')}</option>
