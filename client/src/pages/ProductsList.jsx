@@ -2,6 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import { useI18n } from '../i18n.jsx';
+import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
+const PRODUCT_COLUMNS = [
+  { label: 'Nombre', value: (r) => r.name },
+  { label: 'SKU', value: (r) => r.sku, mono: true },
+  { label: 'Tipo', value: (r) => r.product_type_name },
+  { label: 'Proveedor', value: (r) => r.supplier_name },
+  { label: 'Costo', value: (r) => r.purchase_cost, type: 'money', noTotal: true },
+  { label: 'Flete', value: (r) => r.freight_cost, type: 'money', noTotal: true },
+  { label: 'Margen %', value: (r) => r.margin_percent, type: 'number' },
+  { label: 'Precio venta', value: (r) => r.selling_price, type: 'money', noTotal: true },
+  { label: 'Stock', value: (r) => r.stock_qty, type: 'number' },
+  { label: 'Unidad', value: (r) => r.unit },
+  { label: 'Valor inventario', value: (r) => ((Number(r.purchase_cost) || 0) + (Number(r.freight_cost) || 0)) * (Number(r.stock_qty) || 0), type: 'money' },
+];
 
 const EMPTY = {
   name: '', sku: '', description: '', productTypeId: '', purchaseCost: '', freightCost: '',
@@ -18,6 +32,7 @@ function computePrice(cost, freight, margin) {
 export default function ProductsList() {
   const { t } = useI18n();
   const [list, setList] = useState([]);
+  const ex = useListExport({ rows: list });
   const [types, setTypes] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [q, setQ] = useState('');
@@ -113,13 +128,15 @@ export default function ProductsList() {
           {list.length === 0 ? (
             <div className="empty-state">{t('No hay productos todavía. Crea el primero con "+ Nuevo producto".')}</div>
           ) : (
+            <><ListExportBar ex={ex} title={t('Inventario')} filename="inventario" columns={PRODUCT_COLUMNS} />
             <table>
               <thead>
-                <tr><th></th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Tipo')}</th><th>{t('Costo+Flete')}</th><th>{t('Margen')}</th><th>{t('Precio venta')}</th><th>{t('Stock')}</th><th></th></tr>
+                <tr><th><SelectAllBox ex={ex} /></th><th></th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Tipo')}</th><th>{t('Costo+Flete')}</th><th>{t('Margen')}</th><th>{t('Precio venta')}</th><th>{t('Stock')}</th><th></th></tr>
               </thead>
               <tbody>
-                {list.map((p) => (
+                {ex.visible.map((p) => (
                   <tr key={p.id}>
+                    <td><RowBox ex={ex} row={p} /></td>
                     <td>{p.photo_url ? <img className="thumb" src={p.photo_url} /> : <div className="thumb" />}</td>
                     <td onClick={() => openEdit(p)} className="clickable"><strong>{p.name}</strong></td>
                     <td className="mono muted">{p.sku || '—'}</td>
@@ -137,7 +154,7 @@ export default function ProductsList() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></>
           )}
         </div>
       </div>

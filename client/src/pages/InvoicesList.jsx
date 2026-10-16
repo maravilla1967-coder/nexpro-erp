@@ -5,10 +5,24 @@ import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import LineItemsEditor from '../components/LineItemsEditor.jsx';
 import { useI18n } from '../i18n.jsx';
+import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
+const invDate = (r) => r.issue_date;
+const invNumber = (r) => r.number;
+const INV_COLUMNS = [
+  { label: 'Número', value: (r) => r.number, mono: true },
+  { label: 'Fecha', value: (r) => (r.issue_date || '').slice(0, 10) },
+  { label: 'Vence', value: (r) => (r.due_date || '').slice(0, 10) },
+  { label: 'Cliente', value: (r) => r.customer_name },
+  { label: 'Estado', value: (r) => r.status },
+  { label: 'Subtotal', value: (r) => r.subtotal, type: 'money' },
+  { label: 'Impuesto', value: (r) => r.tax_amount, type: 'money' },
+  { label: 'Total', value: (r) => r.total, type: 'money' },
+];
 
 export default function InvoicesList() {
   const { t } = useI18n();
   const [list, setList] = useState([]);
+  const ex = useListExport({ rows: list, getDate: invDate, getNumber: invNumber });
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -49,11 +63,13 @@ export default function InvoicesList() {
       <div className="content">
         <div className="card">
           {list.length === 0 ? <div className="empty-state">{t('No hay facturas todavía.')}</div> : (
+            <><ListExportBar ex={ex} title={t('Facturas')} filename="facturas" columns={INV_COLUMNS} />
             <table>
-              <thead><tr><th>{t('Número')}</th><th>{t('Cliente')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th></tr></thead>
+              <thead><tr><th><SelectAllBox ex={ex} /></th><th>{t('Número')}</th><th>{t('Cliente')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th></tr></thead>
               <tbody>
-                {list.map((inv) => (
+                {ex.visible.map((inv) => (
                   <tr key={inv.id}>
+                    <td><RowBox ex={ex} row={inv} /></td>
                     <td className="mono"><Link to={`/facturas/${inv.id}`}>{inv.number}</Link></td>
                     <td>{inv.customer_name}</td>
                     <td><strong>${Number(inv.total).toLocaleString()}</strong></td>
@@ -66,7 +82,7 @@ export default function InvoicesList() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></>
           )}
         </div>
       </div>

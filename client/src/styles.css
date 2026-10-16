@@ -334,3 +334,16 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 }
 .account-dropdown .nav-link { color: var(--text); border-left: none; padding: 10px 14px; }
 .account-dropdown .nav-link:hover { background: #f4f6f9; }
+
+/* Barra de exportar / imprimir / filtrar listados (components/ListExport.jsx) */
+.list-export { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 0 0 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+.list-export-filters, .list-export-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.list-export .range { display: flex; align-items: center; gap: 6px; }
+.list-export .range span { font-size: 12px; font-weight: 600; color: var(--steel); }
+.list-export .range input { width: 120px; padding: 6px 8px; font-size: 13px; }
+.list-export .range input[type="date"] { width: 145px; }
+.list-export-actions .muted { font-size: 13px; }
+.row-check { width: 16px; height: 16px; cursor: pointer; accent-color: var(--orange); }
+th:has(> .row-check), td:has(> .row-check) { width: 28px; }
+@media (max-width: 700px) { .list-export .range input, .list-export .range input[type="date"] { width: 110px; } }
+@media print { .list-export, .row-check { display: none !important; } }

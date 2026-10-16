@@ -38,7 +38,9 @@ function applyDelete(id) {
 
 router.get('/', (req, res) => {
   const list = all(
-    `SELECT so.*, c.name as customer_name FROM sales_orders so
+    `SELECT so.*, c.name as customer_name,
+            (SELECT COALESCE(SUM(i.quantity * i.unit_price), 0) FROM sales_order_items i WHERE i.sales_order_id = so.id) AS total
+     FROM sales_orders so
      LEFT JOIN customers c ON c.id = so.customer_id ORDER BY so.created_at DESC`
   );
   res.json(list);

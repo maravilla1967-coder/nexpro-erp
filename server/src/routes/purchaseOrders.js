@@ -17,7 +17,10 @@ function withItems(po) {
 
 router.get('/', (req, res) => {
   const list = all(
-    `SELECT po.*, s.name as supplier_name FROM purchase_orders po
+    `SELECT po.*, s.name as supplier_name,
+            (SELECT COALESCE(SUM(i.quantity * i.unit_cost), 0) FROM purchase_order_items i WHERE i.purchase_order_id = po.id) AS total,
+            (SELECT GROUP_CONCAT(i.description, '; ') FROM purchase_order_items i WHERE i.purchase_order_id = po.id) AS items_summary
+     FROM purchase_orders po
      LEFT JOIN suppliers s ON s.id = po.supplier_id ORDER BY po.created_at DESC`
   );
   res.json(list);

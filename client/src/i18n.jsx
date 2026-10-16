@@ -4,6 +4,27 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  // Exportar / imprimir listados
+  desde: 'from',
+  hasta: 'to',
+  Limpiar: 'Clear',
+  seleccionados: 'selected',
+  de: 'of',
+  Todos: 'All',
+  registros: 'records',
+  Generado: 'Generated',
+  TOTAL: 'TOTAL',
+  '⬇ Excel': '⬇ Excel',
+  '⬇ CSV': '⬇ CSV',
+  '🖨️ Imprimir listado': '🖨️ Print list',
+  'Permite las ventanas emergentes para imprimir el listado.': 'Allow pop-ups to print the list.',
+  Vence: 'Due',
+  Flete: 'Freight',
+  'Margen %': 'Margin %',
+  'Valor inventario': 'Inventory value',
+  Costo: 'Cost',
+  Pedidos: 'Sales Orders',
+  Facturas: 'Invoices',
   // Navegación / shell
   Clientes: 'Customers',
   Taller: 'Shop',

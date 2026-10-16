@@ -5,12 +5,24 @@ import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import LineItemsEditor from '../components/LineItemsEditor.jsx';
 import { useI18n } from '../i18n.jsx';
+import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
+const poDate = (r) => r.order_date || r.created_at;
+const poNumber = (r) => r.number;
+const PO_COLUMNS = [
+  { label: 'Número', value: (r) => r.number, mono: true },
+  { label: 'Fecha', value: (r) => (r.order_date || r.created_at || '').slice(0, 10) },
+  { label: 'Proveedor', value: (r) => r.supplier_name },
+  { label: 'Descripción', value: (r) => r.items_summary },
+  { label: 'Estado', value: (r) => r.status },
+  { label: 'Total', value: (r) => r.total, type: 'money' },
+];
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 export default function PurchaseOrdersList() {
   const { t } = useI18n();
   const [list, setList] = useState([]);
+  const ex = useListExport({ rows: list, getDate: poDate, getNumber: poNumber });
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -106,15 +118,18 @@ export default function PurchaseOrdersList() {
       <div className="content">
         <div className="card">
           {list.length === 0 ? <div className="empty-state">{t('No hay órdenes de compra todavía.')}</div> : (
+            <><ListExportBar ex={ex} title={t('Órdenes de Compra')} filename="ordenes-de-compra" columns={PO_COLUMNS} />
             <table>
-              <thead><tr><th>{t('Número')}</th><th>{t('Proveedor')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th></tr></thead>
+              <thead><tr><th><SelectAllBox ex={ex} /></th><th>{t('Número')}</th><th>{t('Proveedor')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th style={{ textAlign: 'right' }}>{t('Total')}</th><th></th></tr></thead>
               <tbody>
-                {list.map((po) => (
+                {ex.visible.map((po) => (
                   <tr key={po.id}>
+                    <td><RowBox ex={ex} row={po} /></td>
                     <td className="mono clickable" onClick={() => openView(po.id)}>{po.number}</td>
                     <td>{po.supplier_name}</td>
                     <td><Pill value={po.status} /></td>
                     <td className="muted">{po.order_date || po.created_at}</td>
+                    <td style={{ textAlign: 'right' }}>${Number(po.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td style={{ display: 'flex', gap: 10 }}>
                       <Link className="link-btn" to={`/compras/${po.id}/documento`}>{t('Imprimir')}</Link>
                       {po.status !== 'recibida' && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
@@ -124,7 +139,7 @@ export default function PurchaseOrdersList() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></>
           )}
         </div>
       </div>

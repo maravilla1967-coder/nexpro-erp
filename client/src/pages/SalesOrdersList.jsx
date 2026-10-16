@@ -5,11 +5,22 @@ import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import LineItemsEditor from '../components/LineItemsEditor.jsx';
 import { useI18n } from '../i18n.jsx';
+import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
+const soDate = (r) => r.created_at;
+const soNumber = (r) => r.number;
+const SO_COLUMNS = [
+  { label: 'Número', value: (r) => r.number, mono: true },
+  { label: 'Fecha', value: (r) => (r.created_at || '').slice(0, 10) },
+  { label: 'Cliente', value: (r) => r.customer_name },
+  { label: 'Estado', value: (r) => r.status },
+  { label: 'Total', value: (r) => r.total, type: 'money' },
+];
 
 export default function SalesOrdersList() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [list, setList] = useState([]);
+  const ex = useListExport({ rows: list, getDate: soDate, getNumber: soNumber });
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -87,11 +98,13 @@ export default function SalesOrdersList() {
         {notice && <div className="error-banner" style={{ background: '#fef3c7', color: '#92400e' }}>{notice}</div>}
         <div className="card">
           {list.length === 0 ? <div className="empty-state">{t('No hay pedidos todavía.')}</div> : (
+            <><ListExportBar ex={ex} title={t('Pedidos')} filename="pedidos" columns={SO_COLUMNS} />
             <table>
-              <thead><tr><th>{t('Número')}</th><th>{t('Cliente')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th></tr></thead>
+              <thead><tr><th><SelectAllBox ex={ex} /></th><th>{t('Número')}</th><th>{t('Cliente')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th></tr></thead>
               <tbody>
-                {list.map((so) => (
+                {ex.visible.map((so) => (
                   <tr key={so.id}>
+                    <td><RowBox ex={ex} row={so} /></td>
                     <td className="mono clickable" onClick={() => openEdit(so.id)}>{so.number}</td>
                     <td>{so.customer_name}</td>
                     <td>
@@ -114,7 +127,7 @@ export default function SalesOrdersList() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></>
           )}
         </div>
       </div>

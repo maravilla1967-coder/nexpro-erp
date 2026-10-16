@@ -4,12 +4,26 @@ import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import { useI18n } from '../i18n.jsx';
+import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
+const CUSTOMER_COLUMNS = [
+  { label: 'Nombre', value: (r) => r.name },
+  { label: 'Tipo', value: (r) => r.type },
+  { label: 'NIT', value: (r) => r.tax_id },
+  { label: 'Industria', value: (r) => r.industry },
+  { label: 'Email', value: (r) => r.email },
+  { label: 'Teléfono', value: (r) => r.phone },
+  { label: 'Dirección', value: (r) => r.address },
+  { label: 'Ciudad', value: (r) => r.city },
+  { label: 'ZIP', value: (r) => r.zip },
+  { label: 'Estado', value: (r) => r.status },
+];
 
 const EMPTY = { type: 'empresa', name: '', taxId: '', email: '', phone: '', address: '', city: '', zip: '', industry: '', status: 'lead', source: '', notes: '' };
 
 export default function CustomersList() {
   const { t } = useI18n();
   const [list, setList] = useState([]);
+  const ex = useListExport({ rows: list });
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -56,13 +70,15 @@ export default function CustomersList() {
           {list.length === 0 ? (
             <div className="empty-state">{t('No hay clientes todavía. Crea el primero con "+ Nuevo cliente".')}</div>
           ) : (
+            <><ListExportBar ex={ex} title={t('Clientes')} filename="clientes" columns={CUSTOMER_COLUMNS} />
             <table>
               <thead>
-                <tr><th>{t('Nombre')}</th><th>{t('Industria')}</th><th>{t('Contacto')}</th><th>{t('Ciudad')}</th><th>{t('Estado')}</th></tr>
+                <tr><th><SelectAllBox ex={ex} /></th><th>{t('Nombre')}</th><th>{t('Industria')}</th><th>{t('Contacto')}</th><th>{t('Ciudad')}</th><th>{t('Estado')}</th></tr>
               </thead>
               <tbody>
-                {list.map((c) => (
+                {ex.visible.map((c) => (
                   <tr key={c.id} className="clickable" onClick={() => window.location.assign(`/clientes/${c.id}`)}>
+                    <td onClick={(e) => e.stopPropagation()}><RowBox ex={ex} row={c} /></td>
                     <td><Link to={`/clientes/${c.id}`}>{c.name}</Link></td>
                     <td className="muted">{c.industry || '—'}</td>
                     <td className="muted">{c.email || c.phone || '—'}</td>
@@ -71,7 +87,7 @@ export default function CustomersList() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></>
           )}
         </div>
       </div>

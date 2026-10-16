@@ -2,12 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import { useI18n } from '../i18n.jsx';
+import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
+const SUPPLIER_COLUMNS = [
+  { label: 'Nombre', value: (r) => r.name },
+  { label: 'Código', value: (r) => r.code, mono: true },
+  { label: 'NIT', value: (r) => r.tax_id },
+  { label: 'Email', value: (r) => r.email },
+  { label: 'Teléfono', value: (r) => r.phone },
+  { label: 'Dirección', value: (r) => r.address },
+  { label: 'Ciudad', value: (r) => r.city },
+  { label: 'ZIP', value: (r) => r.zip },
+];
 
 const EMPTY = { name: '', code: '', taxId: '', email: '', phone: '', address: '', city: '', zip: '', notes: '' };
 
 export default function SuppliersList() {
   const { t } = useI18n();
   const [list, setList] = useState([]);
+  const ex = useListExport({ rows: list });
   const [q, setQ] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -47,11 +59,13 @@ export default function SuppliersList() {
         <div className="toolbar"><input className="search-input" placeholder={t('Buscar…')} value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="card">
           {list.length === 0 ? <div className="empty-state">{t('No hay proveedores todavía.')}</div> : (
+            <><ListExportBar ex={ex} title={t('Proveedores')} filename="proveedores" columns={SUPPLIER_COLUMNS} />
             <table>
-              <thead><tr><th>{t('Nombre')}</th><th>{t('Código')}</th><th>{t('NIT')}</th><th>{t('Contacto')}</th><th></th></tr></thead>
+              <thead><tr><th><SelectAllBox ex={ex} /></th><th>{t('Nombre')}</th><th>{t('Código')}</th><th>{t('NIT')}</th><th>{t('Contacto')}</th><th></th></tr></thead>
               <tbody>
-                {list.map((s) => (
+                {ex.visible.map((s) => (
                   <tr key={s.id}>
+                    <td><RowBox ex={ex} row={s} /></td>
                     <td onClick={() => openEdit(s)} className="clickable"><strong>{s.name}</strong></td>
                     <td className="mono muted">{s.code || '—'}</td>
                     <td className="muted">{s.tax_id || '—'}</td>
@@ -65,7 +79,7 @@ export default function SuppliersList() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></>
           )}
         </div>
       </div>
