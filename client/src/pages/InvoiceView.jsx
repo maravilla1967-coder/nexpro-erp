@@ -232,7 +232,7 @@ export default function InvoiceView() {
                           {t('+ comprobante')}<input type="file" multiple hidden onChange={(e) => { addProof(p.id, e.target.files); e.target.value = ''; }} />
                         </label>
                       </td>
-                      <td className="text-right">{money(p.amount)}</td>
+                      <td className="text-right">{money(p.amount)}{p.surcharge > 0 && <div className="muted" style={{ fontSize: 11 }}>+ {money(p.surcharge)} {t('recargo')} = {money(Number(p.amount) + Number(p.surcharge))}</div>}</td>
                       <td className="no-print" style={{ whiteSpace: 'nowrap' }}>{isAdmin && <><button className="link-btn" onClick={() => setEditingPay(p)}>{t('Editar')}</button> <button className="link-btn" onClick={() => deletePayment(p.id)}>✕</button></>}</td>
                     </tr>
                   ))}
@@ -263,10 +263,10 @@ export default function InvoiceView() {
         </div>
       </div>
       {editingPay && (
-        <PaymentModal title={`${t('Corregir pago')} · ${invoice.number}`} initial={editingPay} balance={invoice.balance} submitLabel={t('Guardar cambios')} onSave={updatePayment} onClose={() => setEditingPay(null)} />
+        <PaymentModal showSurcharge title={`${t('Corregir pago')} · ${invoice.number}`} initial={editingPay} balance={invoice.balance} submitLabel={t('Guardar cambios')} onSave={updatePayment} onClose={() => setEditingPay(null)} />
       )}
       {payOpen && (
-        <PaymentModal title={`${t('Registrar pago')} · ${invoice.number}`} balance={invoice.balance} onSave={savePayment} onClose={() => setPayOpen(false)} />
+        <PaymentModal showSurcharge title={`${t('Registrar pago')} · ${invoice.number}`} balance={invoice.balance} onSave={savePayment} onClose={() => setPayOpen(false)} />
       )}
     </>
   );

@@ -37,6 +37,7 @@ function getFullInvoice(id) {
   );
   attachFiles(inv.payments, 'invoice');
   inv.paid = round2(inv.payments.reduce((s, p) => s + Number(p.amount || 0), 0));
+  inv.surcharges = round2(inv.payments.reduce((s, p) => s + Number(p.surcharge || 0), 0));
   inv.balance = round2(Number(inv.total || 0) - inv.paid);
   return inv;
 }
@@ -418,8 +419,8 @@ router.post('/:id/payments', (req, res) => {
     return res.status(400).json({ error: `El pago ($${amount.toLocaleString('en-US')}) es mayor que el saldo de la factura ($${balance.toLocaleString('en-US')})` });
   }
   const newId = run(
-    `INSERT INTO invoice_payments (invoice_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
-    [inv.id, b.paymentDate || new Date().toISOString().slice(0, 10), amount, b.method || null, b.reference || null, b.notes || null, req.user ? req.user.id : null]
+    `INSERT INTO invoice_payments (invoice_id, payment_date, amount, surcharge, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?,?)`,
+    [inv.id, b.paymentDate || new Date().toISOString().slice(0, 10), amount, Math.max(0, round2(b.surcharge)), b.method || null, b.reference || null, b.notes || null, req.user ? req.user.id : null]
   ).lastInsertRowid;
   refreshInvoiceStatus(inv.id);
   res.status(201).json({ ...getFullInvoice(inv.id), newPaymentId: newId });
@@ -438,8 +439,8 @@ router.put('/:id/payments/:paymentId', (req, res) => {
   if (!(amount > 0)) return res.status(400).json({ error: 'El monto del pago debe ser mayor que cero' });
   const others = round2(get('SELECT COALESCE(SUM(amount),0) AS s FROM invoice_payments WHERE invoice_id = ? AND id != ?', [req.params.id, pay.id]).s);
   if (amount + others - inv.total > 0.004) return res.status(400).json({ error: 'Con ese monto los pagos superan el total de la factura' });
-  run(`UPDATE invoice_payments SET payment_date = ?, amount = ?, method = ?, reference = ?, notes = ? WHERE id = ?`,
-    [b.paymentDate || pay.payment_date, amount, b.method ?? pay.method, b.reference ?? pay.reference, b.notes ?? null, pay.id]);
+  run(`UPDATE invoice_payments SET payment_date = ?, amount = ?, surcharge = ?, method = ?, reference = ?, notes = ? WHERE id = ?`,
+    [b.paymentDate || pay.payment_date, amount, b.surcharge !== undefined ? Math.max(0, round2(b.surcharge)) : pay.surcharge, b.method ?? pay.method, b.reference ?? pay.reference, b.notes ?? null, pay.id]);
   refreshInvoiceStatus(req.params.id);
   res.json(getFullInvoice(req.params.id));
 });

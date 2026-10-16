@@ -139,7 +139,7 @@ export default function ReceivablesPage() {
           )}
         </div>
       </div>
-      {paying && <PaymentModal title={`${t('Registrar pago')} · ${paying.number}`} balance={paying.balance} onSave={savePayment} onClose={() => setPaying(null)} />}
+      {paying && <PaymentModal showSurcharge title={`${t('Registrar pago')} · ${paying.number}`} balance={paying.balance} onSave={savePayment} onClose={() => setPaying(null)} />}
     </>
   );
 }

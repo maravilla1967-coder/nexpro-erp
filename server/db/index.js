@@ -33,6 +33,9 @@ tryAlter('ALTER TABLE invoices ADD COLUMN include_wire_info INTEGER NOT NULL DEF
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN order_date TEXT');
 tryAlter('ALTER TABLE purchase_order_items ADD COLUMN received_qty REAL NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE products ADD COLUMN track_serials INTEGER NOT NULL DEFAULT 0');
+// Recargo cobrado al cliente aparte del abono (p. ej. 3% por pagar con tarjeta en Square).
+// No reduce el saldo de la factura: el total cobrado = amount + surcharge.
+tryAlter('ALTER TABLE invoice_payments ADD COLUMN surcharge REAL NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE warranties ADD COLUMN product_serial_id INTEGER REFERENCES product_serials(id)');
 
 function all(sql, params = []) {

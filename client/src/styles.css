@@ -382,9 +382,8 @@ th:has(> .row-check), td:has(> .row-check) { width: 28px; }
 
 /* Ventanas: nunca más anchas que la pantalla; si el contenido es alto, la ventana tiene su
    propio scroll y la barra de botones (Guardar/Cancelar) queda siempre visible abajo. */
-.modal { max-height: calc(100vh - 80px); overflow-y: auto; overflow-x: hidden; min-width: 0; }
+.modal { overflow-x: hidden; min-width: 0; }
 .modal .grid > *, .modal .field { min-width: 0; }
-.modal-footer { position: sticky; bottom: -22px; background: #fff; margin-bottom: -22px; padding-bottom: 22px; z-index: 1; }
 input[type="file"] { width: 100%; max-width: 100%; font-size: 13px; padding: 6px; }
 /* Nombres de archivo largos (p. ej. recibos de Square o del banco): bajan de línea en vez de
    estirar la ventana o la factura. */
@@ -395,5 +394,5 @@ input[type="file"] { width: 100%; max-width: 100%; font-size: 13px; padding: 6px
    (Safari / pantallas angostas). En pantallas bajas la ventana usa casi todo el alto. */
 .modal-footer { flex-wrap: wrap; }
 .modal-footer .btn { flex-shrink: 0; }
-@media (max-height: 760px) { .modal-overlay { padding: 12px 12px; } .modal { max-height: calc(100vh - 24px); } }
+@media (max-height: 760px) { .modal-overlay { padding: 12px 12px; } }
 .modal input[type="file"]::-webkit-file-upload-button { max-width: 40%; }

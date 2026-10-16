@@ -4,6 +4,13 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Indica la fecha del pago.': 'Enter the payment date.',
+  'Escribe el monto del pago (por ejemplo 9070 o 9,070.00).': 'Enter the payment amount (e.g. 9070 or 9,070.00).',
+  'El recargo no es un número válido.': 'The surcharge is not a valid number.',
+  'Monto abonado a la factura *': 'Amount applied to the invoice *',
+  'Recargo cobrado al cliente (ej. 3% por tarjeta) — no reduce el saldo': 'Surcharge charged to the customer (e.g. 3% card fee) — does not reduce the balance',
+  'Total cobrado (debe coincidir con el recibo):': 'Total charged (should match the receipt):',
+  recargo: 'surcharge',
   'Comprobante del pago (tiquete de la tarjeta, transferencia, cheque…)': 'Payment proof (card receipt, transfer, check…)',
   'archivo(s) para adjuntar': 'file(s) to attach',
   '+ comprobante': '+ proof',
