@@ -209,6 +209,7 @@ export default function VehicleDetail() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/vehiculos" className="btn">{t('← Volver')}</Link>
+          <Link to={`/garantias?nuevo=reclamo&vehiculo=${id}`} className="btn">{t('🛡️ Reclamar garantía')}</Link>
           <Link to={`/vehiculos/${id}/documento`} className="btn btn-primary">{t('Imprimir recepción')}</Link>
           <button className="btn btn-danger" onClick={remove}>{t('Eliminar')}</button>
         </div>

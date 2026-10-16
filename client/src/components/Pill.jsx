@@ -9,6 +9,7 @@ const COLORS = {
   nuevo: 'gray', calificado: 'blue', propuesta: 'orange', negociacion: 'amber',
   ganado: 'green', perdido: 'red', activo: 'green',
   admin: 'blue', usuario: 'gray', invitado: 'amber', desactivado: 'red', rechazado: 'red',
+  abierta: 'amber', aprobada: 'green', rechazada: 'red', cerrada: 'gray', registrada: 'green',
 };
 
 export default function Pill({ value }) {

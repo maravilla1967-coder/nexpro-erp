@@ -67,6 +67,7 @@ app.use('/api/vehicles', require('./routes/vehicles'));
 app.use('/api/services', require('./routes/services'));
 app.use('/api/mechanics', require('./routes/mechanics'));
 app.use('/api/work-orders', require('./routes/workOrders'));
+app.use('/api/warranties', require('./routes/warranties'));
 
 // Servir el frontend compilado (producción)
 const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');

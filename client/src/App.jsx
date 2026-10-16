@@ -22,6 +22,8 @@ import ServicesList from './pages/ServicesList.jsx';
 import MechanicsList from './pages/MechanicsList.jsx';
 import WorkOrdersList from './pages/WorkOrdersList.jsx';
 import WorkOrderDocument from './pages/WorkOrderDocument.jsx';
+import WarrantiesList from './pages/WarrantiesList.jsx';
+import WarrantyDocument from './pages/WarrantyDocument.jsx';
 import UsersList from './pages/UsersList.jsx';
 import ApprovalsList from './pages/ApprovalsList.jsx';
 import Login from './pages/Login.jsx';
@@ -40,6 +42,7 @@ const NAV = [
       { to: '/ordenes-trabajo', text: 'Órdenes de Trabajo', icon: '🔧' },
       { to: '/servicios', text: 'Catálogo de Servicios', icon: '📋' },
       { to: '/mecanicos', text: 'Mecánicos', icon: '👷' },
+      { to: '/garantias', text: 'Garantías', icon: '🛡️' },
     ],
   },
   {
@@ -217,6 +220,8 @@ function MainShell() {
           <Route path="/mecanicos" element={<MechanicsList />} />
           <Route path="/ordenes-trabajo" element={<WorkOrdersList />} />
           <Route path="/ordenes-trabajo/:id/documento" element={<WorkOrderDocument />} />
+          <Route path="/garantias" element={<WarrantiesList />} />
+          <Route path="/garantias/:id/documento" element={<WarrantyDocument />} />
           <Route path="/aprobaciones" element={<ApprovalsList />} />
           {isAdmin && <Route path="/usuarios" element={<UsersList />} />}
         </Routes>

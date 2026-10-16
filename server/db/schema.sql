@@ -319,3 +319,48 @@ CREATE TABLE IF NOT EXISTS approval_requests (
   reject_reason TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ===================== GARANTÍAS =====================
+-- Un solo módulo para dos usos:
+--   kind = 'reclamo'  → reclamo de garantía al fabricante (equipo/camión que falló).
+--   kind = 'registro' → registro de la garantía de un equipo recién comprado (constancia).
+-- Ningún dato es obligatorio: VIN, modelo, año, fecha de compra, etc. se llenan si se tienen.
+CREATE TABLE IF NOT EXISTS warranties (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL DEFAULT 'reclamo', -- 'reclamo' | 'registro'
+  status TEXT NOT NULL DEFAULT 'abierta', -- reclamo: abierta/enviada/aprobada/rechazada/cerrada; registro: registrada
+  vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL,
+  vehicle_equipment_id INTEGER REFERENCES vehicle_equipment(id) ON DELETE SET NULL,
+  purchase_order_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
+  supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  responsible_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  item_description TEXT,
+  vin TEXT,
+  serial_number TEXT,
+  manufacturer TEXT,
+  model TEXT,
+  year INTEGER,
+  purchase_date TEXT,
+  warranty_start TEXT,
+  warranty_end TEXT,
+  claim_date TEXT,
+  manufacturer_claim_number TEXT,
+  problem_description TEXT,
+  resolution TEXT,
+  claim_amount REAL,
+  approved_amount REAL,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Archivos de constancia: registro de garantía del fabricante, fotos de la falla, facturas, etc.
+CREATE TABLE IF NOT EXISTS warranty_attachments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  warranty_id INTEGER NOT NULL REFERENCES warranties(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

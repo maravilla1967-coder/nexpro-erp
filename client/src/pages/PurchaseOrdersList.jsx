@@ -132,6 +132,7 @@ export default function PurchaseOrdersList() {
                     <td style={{ textAlign: 'right' }}>${Number(po.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td style={{ display: 'flex', gap: 10 }}>
                       <Link className="link-btn" to={`/compras/${po.id}/documento`}>{t('Imprimir')}</Link>
+                      <Link className="link-btn" to={`/garantias?nuevo=registro&oc=${po.id}`}>{t('Garantía')}</Link>
                       {po.status !== 'recibida' && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
                       {po.status === 'borrador' && <button className="link-btn" onClick={() => markStatus(po, 'enviada')}>{t('Marcar enviada')}</button>}
                       {po.status !== 'recibida' && <button className="link-btn" onClick={() => markStatus(po, 'recibida')}>{t('Marcar recibida')}</button>}
@@ -191,7 +192,8 @@ export default function PurchaseOrdersList() {
       {viewing && (
         <Modal title={`${t('Orden de compra')} ${viewing.number}`} onClose={() => setViewing(null)} wide>
           <div style={{ marginBottom: 10 }}>
-            <Link className="btn btn-sm" to={`/compras/${viewing.id}/documento`}>{t('🖨️ Imprimir / Guardar PDF')}</Link>
+            <Link className="btn btn-sm" to={`/compras/${viewing.id}/documento`}>{t('🖨️ Imprimir / Guardar PDF')}</Link>{' '}
+            <Link className="btn btn-sm" to={`/garantias?nuevo=registro&oc=${viewing.id}`}>{t('🛡️ Registrar garantía')}</Link>
           </div>
           <p><strong>{t('Proveedor:')}</strong> {viewing.supplier_id && suppliers.find((s) => s.id === viewing.supplier_id)?.name}</p>
           <p><strong>{t('Estado:')}</strong> <Pill value={viewing.status} /></p>

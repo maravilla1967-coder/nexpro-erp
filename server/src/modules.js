@@ -11,6 +11,7 @@ const MODULES = [
   { key: 'servicios', label: 'Catálogo de Servicios' },
   { key: 'mecanicos', label: 'Mecánicos' },
   { key: 'ordenes_trabajo', label: 'Órdenes de Trabajo' },
+  { key: 'garantias', label: 'Garantías' },
 ];
 
 const MODULE_KEYS = MODULES.map((m) => m.key);
