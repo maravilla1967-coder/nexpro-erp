@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
 import DocumentBrand from '../components/DocumentBrand.jsx';
-import PaymentModal, { money, methodLabel } from '../components/PaymentModal.jsx';
+import PaymentModal, { money, methodLabel, uploadPaymentFiles, PaymentFiles } from '../components/PaymentModal.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 
@@ -27,8 +27,10 @@ export default function InvoiceView() {
   const [syncing, setSyncing] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [editingPay, setEditingPay] = useState(null);
-  async function updatePayment(payload) {
-    setInvoice(await api.put(`/invoices/${id}/payments/${editingPay.id}`, payload)); setEditingPay(null);
+  async function updatePayment(payload, files) {
+    const updated = await api.put(`/invoices/${id}/payments/${editingPay.id}`, payload);
+    const withFiles = await uploadPaymentFiles(`/invoices/${id}`, editingPay.id, files);
+    setInvoice(withFiles || updated); setEditingPay(null);
   }
   const [serials, setSerials] = useState([]);
   const [available, setAvailable] = useState([]);
@@ -56,9 +58,17 @@ export default function InvoiceView() {
     } catch (err) { alert(err.message); }
   }
 
-  async function savePayment(payload) {
-    const updated = await api.post(`/invoices/${id}/payments`, payload);
-    setInvoice(updated); setPayOpen(false);
+  async function savePayment(payload, files) {
+    const created = await api.post(`/invoices/${id}/payments`, payload);
+    const withFiles = await uploadPaymentFiles(`/invoices/${id}`, created.newPaymentId, files);
+    setInvoice(withFiles || created); setPayOpen(false);
+  }
+  async function addProof(pid, files) {
+    try { const u = await uploadPaymentFiles(`/invoices/${id}`, pid, files); if (u) setInvoice(u); } catch (err) { alert(err.message); }
+  }
+  async function removeProof(pid, f) {
+    if (!window.confirm(t('¿Eliminar este archivo adjunto?'))) return;
+    setInvoice(await api.del(`/invoices/${id}/payments/${pid}/files/${f.id}`));
   }
   async function deletePayment(pid) {
     if (!window.confirm(t('¿Borrar este pago?'))) return;
@@ -216,7 +226,12 @@ export default function InvoiceView() {
                     <tr key={p.id}>
                       <td>{p.payment_date}</td>
                       <td>{methodLabel(t, p.method)}</td>
-                      <td>{p.reference || '—'}{p.notes ? <div className="muted" style={{ fontSize: 11 }}>{p.notes}</div> : null}</td>
+                      <td>{p.reference || '—'}{p.notes ? <div className="muted" style={{ fontSize: 11 }}>{p.notes}</div> : null}
+                        <PaymentFiles files={p.files} onRemove={isAdmin ? (f) => removeProof(p.id, f) : null} />
+                        <label className="link-btn no-print" style={{ fontSize: 12, cursor: 'pointer' }}>
+                          {t('+ comprobante')}<input type="file" multiple hidden onChange={(e) => { addProof(p.id, e.target.files); e.target.value = ''; }} />
+                        </label>
+                      </td>
                       <td className="text-right">{money(p.amount)}</td>
                       <td className="no-print" style={{ whiteSpace: 'nowrap' }}>{isAdmin && <><button className="link-btn" onClick={() => setEditingPay(p)}>{t('Editar')}</button> <button className="link-btn" onClick={() => deletePayment(p.id)}>✕</button></>}</td>
                     </tr>

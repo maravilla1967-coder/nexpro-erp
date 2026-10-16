@@ -2,6 +2,7 @@ const express = require('express');
 const { all, get, run } = require('../../db');
 const { requireModuleEdit } = require('../middleware/auth');
 const { makeDocUploader } = require('../middleware/upload');
+const { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment } = require('../utils/paymentFiles');
 
 // Cuentas por pagar: facturas de proveedores (con o sin orden de compra), sus pagos y la
 // antigüedad de lo que se debe. Usa el permiso del módulo de compras.
@@ -36,6 +37,7 @@ function getFull(id) {
   if (!b) return b;
   b.payments = all(`SELECT p.*, u.name AS created_by_name FROM supplier_bill_payments p LEFT JOIN users u ON u.id = p.created_by
                     WHERE p.bill_id = ? ORDER BY p.payment_date, p.id`, [id]);
+  attachFiles(b.payments, 'bill');
   b.attachments = all('SELECT * FROM supplier_bill_attachments WHERE bill_id = ? ORDER BY id', [id]);
   return b;
 }
@@ -108,15 +110,16 @@ router.post('/:id/payments', (req, res) => {
   const amount = round2(p.amount);
   if (!(amount > 0)) return res.status(400).json({ error: 'El monto del pago debe ser mayor que cero' });
   if (amount - bill.balance > 0.004) return res.status(400).json({ error: `El pago es mayor que el saldo ($${bill.balance.toLocaleString('en-US')})` });
-  run(`INSERT INTO supplier_bill_payments (bill_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
-    [bill.id, p.paymentDate || new Date().toISOString().slice(0, 10), amount, p.method || null, p.reference || null, p.notes || null, req.user ? req.user.id : null]);
+  const newId = run(`INSERT INTO supplier_bill_payments (bill_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
+    [bill.id, p.paymentDate || new Date().toISOString().slice(0, 10), amount, p.method || null, p.reference || null, p.notes || null, req.user ? req.user.id : null]).lastInsertRowid;
   refreshStatus(bill.id);
-  res.status(201).json(getFull(bill.id));
+  res.status(201).json({ ...getFull(bill.id), newPaymentId: newId });
 });
 
 router.delete('/:id/payments/:paymentId', (req, res) => {
   if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede borrar un pago registrado.' });
   run('DELETE FROM supplier_bill_payments WHERE id = ? AND bill_id = ?', [req.params.paymentId, req.params.id]);
+  deleteFilesOfPayment('bill', req.params.paymentId);
   refreshStatus(req.params.id);
   res.json(getFull(req.params.id));
 });
@@ -134,5 +137,7 @@ router.delete('/:id/attachments/:attId', (req, res) => {
   run('DELETE FROM supplier_bill_attachments WHERE id = ? AND bill_id = ?', [req.params.attId, req.params.id]);
   res.json(getFull(req.params.id));
 });
+
+mountPaymentFileRoutes(router, 'bill', getFull);
 
 module.exports = router;

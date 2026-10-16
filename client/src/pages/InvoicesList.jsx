@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import LineItemsEditor from '../components/LineItemsEditor.jsx';
-import PaymentModal, { money } from '../components/PaymentModal.jsx';
+import PaymentModal, { money, uploadPaymentFiles } from '../components/PaymentModal.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
 const invDate = (r) => r.issue_date;
@@ -56,7 +56,7 @@ export default function InvoicesList() {
   }
 
   const [paying, setPaying] = useState(null);
-  async function savePayment(payload) { await api.post(`/invoices/${paying.id}/payments`, payload); setPaying(null); load(); }
+  async function savePayment(payload, files) { const r = await api.post(`/invoices/${paying.id}/payments`, payload); await uploadPaymentFiles(`/invoices/${paying.id}`, r.newPaymentId, files); setPaying(null); load(); }
 
   return (
     <>

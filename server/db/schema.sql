@@ -464,3 +464,15 @@ CREATE TABLE IF NOT EXISTS serial_events (
   created_by INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Comprobantes de pago (tiquete de la tarjeta, confirmación de transferencia/ACH, foto del
+-- cheque…). Sirve tanto para cobros de facturas (kind='invoice') como para pagos a
+-- proveedores (kind='bill').
+CREATE TABLE IF NOT EXISTS payment_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL, -- 'invoice' | 'bill'
+  payment_id INTEGER NOT NULL,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

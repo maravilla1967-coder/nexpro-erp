@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
-import PaymentModal, { money, methodLabel } from '../components/PaymentModal.jsx';
+import PaymentModal, { money, methodLabel, uploadPaymentFiles, PaymentFiles } from '../components/PaymentModal.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
@@ -114,8 +114,17 @@ export default function PayablesPage() {
     finally { setUploading(false); }
   }
 
-  async function savePayment(payload) {
-    const updated = await api.post(`/payables/${paying.id}/payments`, payload);
+  async function addProof(pid, files) {
+    try { const u = await uploadPaymentFiles(`/payables/${editing.id}`, pid, files); if (u) setEditing(u); } catch (err) { setError(err.message); }
+  }
+  async function removeProof(pid, f) {
+    if (!window.confirm(t('¿Eliminar este archivo adjunto?'))) return;
+    setEditing(await api.del(`/payables/${editing.id}/payments/${pid}/files/${f.id}`));
+  }
+
+  async function savePayment(payload, files) {
+    const created = await api.post(`/payables/${paying.id}/payments`, payload);
+    const updated = (await uploadPaymentFiles(`/payables/${paying.id}`, created.newPaymentId, files)) || created;
     if (editing && editing.id === paying.id) setEditing(updated);
     setPaying(null); load();
   }
@@ -229,7 +238,10 @@ export default function PayablesPage() {
                     <thead><tr><th>{t('Fecha')}</th><th>{t('Forma de pago')}</th><th>{t('Referencia')}</th><th className="text-right">{t('Monto')}</th><th></th></tr></thead>
                     <tbody>
                       {editing.payments.map((p) => (
-                        <tr key={p.id}><td>{p.payment_date}</td><td>{methodLabel(t, p.method)}</td><td>{p.reference || '—'}</td><td className="text-right">{money(p.amount)}</td>
+                        <tr key={p.id}><td>{p.payment_date}</td><td>{methodLabel(t, p.method)}</td><td>{p.reference || '—'}
+                          <PaymentFiles files={p.files} onRemove={isAdmin ? (f) => removeProof(p.id, f) : null} />
+                          <label className="link-btn" style={{ fontSize: 12, cursor: 'pointer' }}>{t('+ comprobante')}<input type="file" multiple hidden onChange={(e) => { addProof(p.id, e.target.files); e.target.value = ''; }} /></label>
+                        </td><td className="text-right">{money(p.amount)}</td>
                           <td>{isAdmin && <button type="button" className="link-btn" onClick={() => deletePayment(p.id)}>✕</button>}</td></tr>
                       ))}
                     </tbody>

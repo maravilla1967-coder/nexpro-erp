@@ -4,6 +4,9 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Comprobante del pago (tiquete de la tarjeta, transferencia, cheque…)': 'Payment proof (card receipt, transfer, check…)',
+  'archivo(s) para adjuntar': 'file(s) to attach',
+  '+ comprobante': '+ proof',
   'Tarjeta de crédito / Square': 'Credit Card Payment / Square',
   'Corregir pago': 'Edit payment',
   'Incluir facturas pagadas (ver todas, como en Facturación)': 'Include paid invoices (see all, like in Invoicing)',
