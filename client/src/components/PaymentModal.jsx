@@ -22,9 +22,9 @@ export async function uploadPaymentFiles(basePath, paymentId, files) {
 export function PaymentFiles({ files, onRemove }) {
   if (!files || files.length === 0) return null;
   return (
-    <div style={{ fontSize: 12, marginTop: 2 }}>
+    <div className="payment-files">
       {files.map((f) => (
-        <span key={f.id} style={{ marginRight: 10, whiteSpace: 'nowrap' }}>
+        <span key={f.id} className="payment-file">
           📎 <a href={f.file_url} target="_blank" rel="noreferrer">{f.original_name || f.file_url.split('/').pop()}</a>
           {onRemove && <button type="button" className="link-btn no-print" style={{ marginLeft: 4 }} onClick={() => onRemove(f)}>✕</button>}
         </span>
