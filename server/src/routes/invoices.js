@@ -423,6 +423,25 @@ router.post('/:id/payments', (req, res) => {
   res.status(201).json(getFullInvoice(inv.id));
 });
 
+// Corregir los datos de un pago ya registrado (fecha, monto, forma de pago, referencia).
+// Útil sobre todo para los pagos que se crearon solos al activar el módulo de cobros
+// ("Marcada como pagada antes del registro de cobros"). Solo administrador.
+router.put('/:id/payments/:paymentId', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede corregir un pago registrado.' });
+  const pay = get('SELECT * FROM invoice_payments WHERE id = ? AND invoice_id = ?', [req.params.paymentId, req.params.id]);
+  if (!pay) return res.status(404).json({ error: 'Pago no encontrado' });
+  const inv = get('SELECT total FROM invoices WHERE id = ?', [req.params.id]);
+  const b = req.body || {};
+  const amount = b.amount !== undefined ? round2(b.amount) : pay.amount;
+  if (!(amount > 0)) return res.status(400).json({ error: 'El monto del pago debe ser mayor que cero' });
+  const others = round2(get('SELECT COALESCE(SUM(amount),0) AS s FROM invoice_payments WHERE invoice_id = ? AND id != ?', [req.params.id, pay.id]).s);
+  if (amount + others - inv.total > 0.004) return res.status(400).json({ error: 'Con ese monto los pagos superan el total de la factura' });
+  run(`UPDATE invoice_payments SET payment_date = ?, amount = ?, method = ?, reference = ?, notes = ? WHERE id = ?`,
+    [b.paymentDate || pay.payment_date, amount, b.method ?? pay.method, b.reference ?? pay.reference, b.notes ?? null, pay.id]);
+  refreshInvoiceStatus(req.params.id);
+  res.json(getFullInvoice(req.params.id));
+});
+
 router.delete('/:id/payments/:paymentId', (req, res) => {
   if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede borrar un pago registrado.' });
   run('DELETE FROM invoice_payments WHERE id = ? AND invoice_id = ?', [req.params.paymentId, req.params.id]);

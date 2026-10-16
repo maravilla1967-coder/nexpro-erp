@@ -10,9 +10,12 @@ export function money(v) {
   return '$' + (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function PaymentModal({ title, balance, onSave, onClose }) {
+export default function PaymentModal({ title, balance, onSave, onClose, initial, submitLabel }) {
   const { t } = useI18n();
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(initial ? {
+    paymentDate: initial.payment_date, amount: Number(initial.amount).toFixed(2),
+    method: initial.method || 'cheque', reference: initial.reference || '', notes: initial.notes || '',
+  } : {
     paymentDate: new Date().toISOString().slice(0, 10),
     amount: balance > 0 ? Number(balance).toFixed(2) : '',
     method: 'cheque', reference: '', notes: '',
@@ -32,7 +35,7 @@ export default function PaymentModal({ title, balance, onSave, onClose }) {
     <Modal title={title} onClose={onClose}>
       <form onSubmit={submit}>
         {error && <div className="error-banner">{error}</div>}
-        <div className="muted" style={{ marginBottom: 10 }}>{t('Saldo pendiente:')} <strong>{money(balance)}</strong></div>
+        {!initial && <div className="muted" style={{ marginBottom: 10 }}>{t('Saldo pendiente:')} <strong>{money(balance)}</strong></div>}
         <div className="grid grid-2">
           <div className="field"><label>{t('Fecha del pago')}</label><input type="date" required value={form.paymentDate} onChange={set('paymentDate')} /></div>
           <div className="field"><label>{t('Monto *')}</label><input type="number" step="0.01" min="0.01" required value={form.amount} onChange={set('amount')} /></div>
@@ -46,7 +49,7 @@ export default function PaymentModal({ title, balance, onSave, onClose }) {
         <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={form.notes} onChange={set('notes')} /></div>
         <div className="modal-footer">
           <button type="button" className="btn" onClick={onClose}>{t('Cancelar')}</button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? '…' : t('Registrar pago')}</button>
+          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? '…' : (submitLabel || t('Registrar pago'))}</button>
         </div>
       </form>
     </Modal>

@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Corregir pago': 'Edit payment',
   'Incluir facturas pagadas (ver todas, como en Facturación)': 'Include paid invoices (see all, like in Invoicing)',
   'No hay facturas.': 'No invoices.',
   'Pagada': 'Paid',

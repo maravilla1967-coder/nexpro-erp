@@ -26,6 +26,10 @@ export default function InvoiceView() {
   const [savingWireInfo, setSavingWireInfo] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [editingPay, setEditingPay] = useState(null);
+  async function updatePayment(payload) {
+    setInvoice(await api.put(`/invoices/${id}/payments/${editingPay.id}`, payload)); setEditingPay(null);
+  }
   const [serials, setSerials] = useState([]);
   const [available, setAvailable] = useState([]);
   const [pickSerial, setPickSerial] = useState('');
@@ -214,7 +218,7 @@ export default function InvoiceView() {
                       <td>{p.method ? t(p.method) : '—'}</td>
                       <td>{p.reference || '—'}{p.notes ? <div className="muted" style={{ fontSize: 11 }}>{p.notes}</div> : null}</td>
                       <td className="text-right">{money(p.amount)}</td>
-                      <td className="no-print">{isAdmin && <button className="link-btn" onClick={() => deletePayment(p.id)}>✕</button>}</td>
+                      <td className="no-print" style={{ whiteSpace: 'nowrap' }}>{isAdmin && <><button className="link-btn" onClick={() => setEditingPay(p)}>{t('Editar')}</button> <button className="link-btn" onClick={() => deletePayment(p.id)}>✕</button></>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -243,6 +247,9 @@ export default function InvoiceView() {
           {invoice.notes && <div style={{ marginTop: 20 }}><strong>{t('Notas:')}</strong> {invoice.notes}</div>}
         </div>
       </div>
+      {editingPay && (
+        <PaymentModal title={`${t('Corregir pago')} · ${invoice.number}`} initial={editingPay} balance={invoice.balance} submitLabel={t('Guardar cambios')} onSave={updatePayment} onClose={() => setEditingPay(null)} />
+      )}
       {payOpen && (
         <PaymentModal title={`${t('Registrar pago')} · ${invoice.number}`} balance={invoice.balance} onSave={savePayment} onClose={() => setPayOpen(false)} />
       )}
