@@ -391,3 +391,9 @@ input[type="file"] { width: 100%; max-width: 100%; font-size: 13px; padding: 6px
 .payment-files { font-size: 12px; margin-top: 2px; }
 .payment-file { display: inline-block; max-width: 100%; margin-right: 10px; overflow-wrap: anywhere; word-break: break-word; }
 .file-list-item a, .file-list a { overflow-wrap: anywhere; word-break: break-word; }
+/* Barra de botones de las ventanas: si no caben en una línea, bajan en vez de cortarse
+   (Safari / pantallas angostas). En pantallas bajas la ventana usa casi todo el alto. */
+.modal-footer { flex-wrap: wrap; }
+.modal-footer .btn { flex-shrink: 0; }
+@media (max-height: 760px) { .modal-overlay { padding: 12px 12px; } .modal { max-height: calc(100vh - 24px); } }
+.modal input[type="file"]::-webkit-file-upload-button { max-width: 40%; }
