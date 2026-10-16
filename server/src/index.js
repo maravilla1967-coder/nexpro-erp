@@ -35,6 +35,13 @@ try {
 } catch (err) {
   console.error('No se pudo importar las órdenes de compra históricas:', err.message);
 }
+// Devuelve a las órdenes de compra ya importadas su número original del Excel de control
+// (una sola vez; protegido por bandera).
+try {
+  require('../db/import-historical-pos').restoreOriginalPoNumbers();
+} catch (err) {
+  console.error('No se pudo restaurar la numeración original de las órdenes de compra:', err.message);
+}
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

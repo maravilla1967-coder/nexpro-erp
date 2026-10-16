@@ -79,7 +79,7 @@ export default function SuppliersList() {
               <div className="field">
                 <label>{t('Código (2 letras)')}</label>
                 <input maxLength={2} style={{ textTransform: 'uppercase' }} placeholder={t('Auto')} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} />
-                <div className="hint">{t('Se usa en el número de las órdenes de compra: NX-XX-001. Si se deja vacío, se toma de las primeras letras del nombre.')}</div>
+                <div className="hint">{t('Código corto del proveedor (opcional). Las órdenes de compra usan un consecutivo único de la empresa.')}</div>
               </div>
             </div>
             <div className="grid grid-2">

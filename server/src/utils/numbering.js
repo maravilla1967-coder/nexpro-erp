@@ -75,21 +75,24 @@ function asInvoiceNumber(quoteNumber) {
   return withStageSuffix(s, 2);
 }
 
-// Órdenes de compra: NX-<2 letras del proveedor>-<consecutivo de 3 dígitos>, consecutivo
-// propio por proveedor.
-function nextPoNumber(vendorCode) {
-  const code = String(vendorCode || 'XX').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2).padEnd(2, 'X');
-  const row = get(
-    `SELECT number FROM purchase_orders WHERE number LIKE ? ORDER BY id DESC LIMIT 1`,
-    [`NX-${code}-%`]
-  );
-  let next = 1;
-  if (row && row.number) {
-    const parts = row.number.split('-');
-    const n = parseInt(parts[parts.length - 1], 10);
-    if (!Number.isNaN(n)) next = n + 1;
+// Órdenes de compra: consecutivo único para toda la empresa (no por proveedor), que continúa
+// la numeración que Jorge llevaba en su Excel de control (…, 270, 271 → 272, 273, …).
+// Se toma el número entero más alto ya usado (ignorando sufijos como "228-1" o "241-0", que
+// cuentan como 228 y 241) y se le suma 1. El parámetro vendorCode se conserva solo por
+// compatibilidad con quien lo llama; ya no forma parte del número.
+function maxPoBaseNumber() {
+  const rows = all('SELECT number FROM purchase_orders');
+  let max = 0;
+  for (const r of rows) {
+    const m = String(r.number || '').match(/^(\d+)(?:-\d+)?$/);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
   }
-  return `NX-${code}-${String(next).padStart(3, '0')}`;
+  return max;
 }
 
-module.exports = { nextNumber, nextDocNumber, withStageSuffix, stripStageSuffix, asInvoiceNumber, nextPoNumber, todayStamp };
+// eslint-disable-next-line no-unused-vars
+function nextPoNumber(vendorCode) {
+  return String(maxPoBaseNumber() + 1);
+}
+
+module.exports = { nextNumber, nextDocNumber, withStageSuffix, stripStageSuffix, asInvoiceNumber, nextPoNumber, maxPoBaseNumber, todayStamp };

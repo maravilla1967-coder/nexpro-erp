@@ -199,8 +199,8 @@ const DICT = {
   Código: 'Code',
   'Código (2 letras)': 'Code (2 letters)',
   Auto: 'Auto',
-  'Se usa en el número de las órdenes de compra: NX-XX-001. Si se deja vacío, se toma de las primeras letras del nombre.':
-    'Used in purchase order numbers: NX-XX-001. If left blank, it is taken from the first letters of the name.',
+  'Código corto del proveedor (opcional). Las órdenes de compra usan un consecutivo único de la empresa.':
+    'Short supplier code (optional). Purchase orders use a single company-wide consecutive number.',
 
   // Facturas
   Factura: 'Invoice',
