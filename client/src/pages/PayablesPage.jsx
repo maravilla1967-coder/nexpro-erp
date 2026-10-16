@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
-import PaymentModal, { money } from '../components/PaymentModal.jsx';
+import PaymentModal, { money, methodLabel } from '../components/PaymentModal.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
@@ -229,7 +229,7 @@ export default function PayablesPage() {
                     <thead><tr><th>{t('Fecha')}</th><th>{t('Forma de pago')}</th><th>{t('Referencia')}</th><th className="text-right">{t('Monto')}</th><th></th></tr></thead>
                     <tbody>
                       {editing.payments.map((p) => (
-                        <tr key={p.id}><td>{p.payment_date}</td><td>{p.method ? t(p.method) : '—'}</td><td>{p.reference || '—'}</td><td className="text-right">{money(p.amount)}</td>
+                        <tr key={p.id}><td>{p.payment_date}</td><td>{methodLabel(t, p.method)}</td><td>{p.reference || '—'}</td><td className="text-right">{money(p.amount)}</td>
                           <td>{isAdmin && <button type="button" className="link-btn" onClick={() => deletePayment(p.id)}>✕</button>}</td></tr>
                       ))}
                     </tbody>

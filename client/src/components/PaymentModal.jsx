@@ -4,7 +4,9 @@ import { useI18n } from '../i18n.jsx';
 
 // Formulario común para registrar un pago (abono) — se usa para cobros de clientes
 // (facturas) y para pagos a proveedores (cuentas por pagar).
-export const PAYMENT_METHODS = ['cheque', 'transferencia', 'ach', 'tarjeta', 'efectivo', 'otro'];
+export const PAYMENT_METHODS = ['cheque', 'transferencia', 'ach', 'square', 'tarjeta', 'efectivo', 'otro'];
+const METHOD_LABELS = { square: 'Tarjeta de crédito / Square' };
+export function methodLabel(t, m) { return m ? t(METHOD_LABELS[m] || m) : '—'; }
 
 export function money(v) {
   return '$' + (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -41,7 +43,7 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
           <div className="field"><label>{t('Monto *')}</label><input type="number" step="0.01" min="0.01" required value={form.amount} onChange={set('amount')} /></div>
           <div className="field"><label>{t('Forma de pago')}</label>
             <select value={form.method} onChange={set('method')}>
-              {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{t(m)}</option>)}
+              {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{methodLabel(t, m)}</option>)}
             </select>
           </div>
           <div className="field"><label>{t('Referencia (no. de cheque, confirmación…)')}</label><input value={form.reference} onChange={set('reference')} /></div>

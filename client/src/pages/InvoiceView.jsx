@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
 import DocumentBrand from '../components/DocumentBrand.jsx';
-import PaymentModal, { money } from '../components/PaymentModal.jsx';
+import PaymentModal, { money, methodLabel } from '../components/PaymentModal.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 
@@ -215,7 +215,7 @@ export default function InvoiceView() {
                   {invoice.payments.map((p) => (
                     <tr key={p.id}>
                       <td>{p.payment_date}</td>
-                      <td>{p.method ? t(p.method) : '—'}</td>
+                      <td>{methodLabel(t, p.method)}</td>
                       <td>{p.reference || '—'}{p.notes ? <div className="muted" style={{ fontSize: 11 }}>{p.notes}</div> : null}</td>
                       <td className="text-right">{money(p.amount)}</td>
                       <td className="no-print" style={{ whiteSpace: 'nowrap' }}>{isAdmin && <><button className="link-btn" onClick={() => setEditingPay(p)}>{t('Editar')}</button> <button className="link-btn" onClick={() => deletePayment(p.id)}>✕</button></>}</td>
