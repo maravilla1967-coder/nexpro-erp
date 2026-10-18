@@ -31,7 +31,7 @@ export default function ReceivablesPage() {
   const [customer, setCustomer] = useState('');
   const [bucket, setBucket] = useState('');
   const [paying, setPaying] = useState(null);
-  const [includePaid, setIncludePaid] = useState(false);
+  const [includePaid, setIncludePaid] = useState(true);
 
   function load() { api.get('/invoices/receivables', { termDays, includePaid: includePaid ? '1' : '' }).then(setData).catch(console.error); }
   useEffect(load, [termDays, includePaid]);
