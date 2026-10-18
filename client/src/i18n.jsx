@@ -4,6 +4,21 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  '✏️ Editar recepción': '✏️ Edit intake',
+  'Editar recepción': 'Edit intake',
+  'Completa o corrige los datos que faltaban al recibir el vehículo.': 'Complete or correct the details that were missing when the vehicle was received.',
+  'Cambiar foto del vehículo': 'Change vehicle photo',
+  'Lista de equipos': 'Equipment list',
+  'Editar equipo instalado': 'Edit installed equipment',
+  'Escribe o elige: Grúa, Compresor, Bucket lift…': 'Type or pick: Crane, Compressor, Bucket lift…',
+  'Tipo nuevo: se agregará a la lista de equipos al guardar.': 'New type: it will be added to the equipment list when you save.',
+  'Escribe o elige el tipo de equipo': 'Type or pick the equipment type',
+  'El VIN no puede quedar vacío': 'VIN cannot be empty',
+  'Esta lista aparece al agregar un equipo a cualquier vehículo. Los tipos nuevos que escribas al agregar un equipo se suman aquí solos.': 'This list appears when adding equipment to any vehicle. New types you type when adding equipment are added here automatically.',
+  'Nuevo tipo de equipo': 'New equipment type',
+  'en uso': 'in use',
+  'Renombrar': 'Rename',
+  '¿Eliminar de la lista el tipo': 'Remove from the list the type',
   'Comisión que nos cobra el procesador (Square)': 'Fee charged to us by the processor (Square)',
   'La comisión no es un número válida.': 'The fee is not a valid number.',
   'Abono a la factura': 'Applied to invoice',

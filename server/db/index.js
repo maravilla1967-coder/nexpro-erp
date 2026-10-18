@@ -61,3 +61,19 @@ function nowIso() {
 }
 
 module.exports = { db, all, get, run, nowIso };
+
+// Migración única: los equipos instalados con un tipo "nuevo" escrito a mano pasan a usar la
+// lista maestra de tipos (se crea el tipo si no existía).
+try {
+  const flag = get("SELECT value FROM app_settings WHERE key = 'equipment_types_master_v1'");
+  if (!flag) {
+    const rows = all("SELECT id, custom_type_name FROM vehicle_equipment WHERE equipment_type_id IS NULL AND custom_type_name IS NOT NULL AND trim(custom_type_name) != ''");
+    for (const r of rows) {
+      const name = r.custom_type_name.trim();
+      let t = get('SELECT id FROM equipment_types WHERE lower(name) = lower(?)', [name]);
+      const tid = t ? t.id : run('INSERT INTO equipment_types (name) VALUES (?)', [name]).lastInsertRowid;
+      run('UPDATE vehicle_equipment SET equipment_type_id = ?, custom_type_name = NULL WHERE id = ?', [tid, r.id]);
+    }
+    run("INSERT INTO app_settings (key, value) VALUES ('equipment_types_master_v1', ?)", [String(rows.length)]);
+  }
+} catch (e) { console.error('Migración de tipos de equipo:', e.message); }

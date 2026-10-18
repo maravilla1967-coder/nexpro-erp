@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api.js';
+import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
-const EQUIP_EMPTY = { equipmentTypeId: '', customTypeName: '', serialNumber: '', manufacturer: '', model: '', notes: '' };
+const EQUIP_EMPTY = { typeName: '', serialNumber: '', manufacturer: '', model: '', notes: '' };
+const VEHICLE_STATUSES = ['recibido', 'en_servicio', 'completado', 'entregado'];
 
 export default function VehicleDetail() {
   const { t, lang } = useI18n();
@@ -18,8 +19,17 @@ export default function VehicleDetail() {
 
   const [equipModalOpen, setEquipModalOpen] = useState(false);
   const [equipForm, setEquipForm] = useState(EQUIP_EMPTY);
-  const [useNewType, setUseNewType] = useState(false);
+  const [editingEquip, setEditingEquip] = useState(null);
   const [error, setError] = useState('');
+  // Editar la recepción del vehículo
+  const [editOpen, setEditOpen] = useState(false);
+  const [vForm, setVForm] = useState({});
+  const [vPhoto, setVPhoto] = useState(null);
+  const [customers, setCustomers] = useState([]);
+  // Lista maestra de tipos de equipo
+  const [typesOpen, setTypesOpen] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+  const [renaming, setRenaming] = useState(null);
 
   const [woModalOpen, setWoModalOpen] = useState(false);
   const [editingWo, setEditingWo] = useState(null); // null = nueva orden; si no, se está editando esta orden existente
@@ -42,6 +52,7 @@ export default function VehicleDetail() {
   useEffect(() => { load(); }, [id]);
   useEffect(() => {
     api.get('/vehicles/equipment-types').then(setEquipTypes);
+    api.get('/customers').then(setCustomers).catch(() => {});
     api.get('/mechanics', { active: 'true' }).then(setMechanics);
     api.get('/services', { active: 'true' }).then(setServices);
   }, []);
@@ -52,13 +63,55 @@ export default function VehicleDetail() {
     navigate('/vehiculos');
   }
 
-  function openEquipModal() { setEquipForm(EQUIP_EMPTY); setUseNewType(false); setError(''); setEquipModalOpen(true); }
+  function openEquipModal() { setEditingEquip(null); setEquipForm(EQUIP_EMPTY); setError(''); setEquipModalOpen(true); }
+  function openEditEquip(eq) {
+    setEditingEquip(eq);
+    setEquipForm({ typeName: eq.equipment_type_name || eq.custom_type_name || '', serialNumber: eq.serial_number || '', manufacturer: eq.manufacturer || '', model: eq.model || '', notes: eq.notes || '' });
+    setError(''); setEquipModalOpen(true);
+  }
+
+  function openEditVehicle() {
+    setVForm({
+      vin: vehicle.vin || '', make: vehicle.make || '', model: vehicle.model || '', year: vehicle.year || '',
+      chassisType: vehicle.chassis_type || '', plate: vehicle.plate || '', customerId: vehicle.customer_id || '',
+      status: vehicle.status || 'recibido', notes: vehicle.notes || '', receivedAt: String(vehicle.received_at || '').slice(0, 10),
+    });
+    setVPhoto(null); setError(''); setEditOpen(true);
+  }
+  async function saveVehicle(e) {
+    e.preventDefault();
+    if (!String(vForm.vin || '').trim()) { setError(t('El VIN no puede quedar vacío')); return; }
+    try {
+      const fd = toFormData(vForm);
+      if (vPhoto) fd.append('photo', vPhoto);
+      setVehicle(await api.putForm(`/vehicles/${id}`, fd));
+      setEditOpen(false);
+    } catch (err) { setError(err.message); }
+  }
+
+  async function addType(e) {
+    e.preventDefault();
+    if (!newTypeName.trim()) return;
+    try { await api.post('/vehicles/equipment-types', { name: newTypeName.trim() }); setNewTypeName(''); setEquipTypes(await api.get('/vehicles/equipment-types')); }
+    catch (err) { setError(err.message); }
+  }
+  async function renameType() {
+    try { await api.put(`/vehicles/equipment-types/${renaming.id}`, { name: renaming.name }); setRenaming(null); setEquipTypes(await api.get('/vehicles/equipment-types')); load(); }
+    catch (err) { setError(err.message); }
+  }
+  async function deleteType(tp) {
+    if (!window.confirm(`${t('¿Eliminar de la lista el tipo')} "${tp.name}"?`)) return;
+    try { await api.del(`/vehicles/equipment-types/${tp.id}`); setEquipTypes(await api.get('/vehicles/equipment-types')); }
+    catch (err) { setError(err.message); }
+  }
 
   async function saveEquip(e) {
     e.preventDefault();
+    if (!equipForm.typeName.trim()) { setError(t('Escribe o elige el tipo de equipo')); return; }
     try {
-      await api.post(`/vehicles/${id}/equipment`, equipForm);
-      setEquipModalOpen(false);
+      if (editingEquip) await api.put(`/vehicles/equipment/${editingEquip.id}`, equipForm);
+      else await api.post(`/vehicles/${id}/equipment`, equipForm);
+      setEquipModalOpen(false); setEditingEquip(null);
       api.get('/vehicles/equipment-types').then(setEquipTypes);
       load();
     } catch (err) { setError(err.message); }
@@ -214,6 +267,7 @@ export default function VehicleDetail() {
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/vehiculos" className="btn">{t('← Volver')}</Link>
           <Link to={`/garantias?nuevo=reclamo&vehiculo=${id}`} className="btn">{t('🛡️ Reclamar garantía')}</Link>
+          <button className="btn" onClick={openEditVehicle}>{t('✏️ Editar recepción')}</button>
           <Link to={`/vehiculos/${id}/documento`} className="btn btn-primary">{t('Imprimir recepción')}</Link>
           <button className="btn btn-danger" onClick={remove}>{t('Eliminar')}</button>
         </div>
@@ -240,7 +294,10 @@ export default function VehicleDetail() {
           <div className="card">
             <div className="card-title">
               {t('Equipos instalados en el chasis')}
-              <button className="btn btn-sm btn-primary" onClick={openEquipModal}>{t('+ Agregar equipo')}</button>
+              <span style={{ display: 'flex', gap: 6 }}>
+                <button className="btn btn-sm" onClick={() => { setError(''); setTypesOpen(true); }}>{t('Lista de equipos')}</button>
+                <button className="btn btn-sm btn-primary" onClick={openEquipModal}>{t('+ Agregar equipo')}</button>
+              </span>
             </div>
             {installedSerials.length > 0 && (
               <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
@@ -254,11 +311,14 @@ export default function VehicleDetail() {
                 <tbody>
                   {vehicle.equipment.map((e) => (
                     <tr key={e.id}>
-                      <td>{e.equipment_type_name || e.custom_type_name} {!e.equipment_type_name && <span className="pill amber" style={{ marginLeft: 6 }}>{t('nuevo')}</span>}</td>
+                      <td>{e.equipment_type_name || e.custom_type_name}</td>
                       <td className="mono">{e.serial_number || '—'}</td>
                       <td>{e.manufacturer || '—'}</td>
                       <td>{e.model || '—'}</td>
-                      <td><button className="btn-row-action delete" onClick={() => deleteEquip(e.id)}>{t('Eliminar')}</button></td>
+                      <td><div className="row-actions">
+                        <button className="btn-row-action edit" onClick={() => openEditEquip(e)}>{t('Editar')}</button>
+                        <button className="btn-row-action delete" onClick={() => deleteEquip(e.id)}>{t('Eliminar')}</button>
+                      </div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -315,28 +375,18 @@ export default function VehicleDetail() {
       </div>
 
       {equipModalOpen && (
-        <Modal title={t('Agregar equipo instalado')} onClose={() => setEquipModalOpen(false)}>
-          <form onSubmit={saveEquip}>
+        <Modal title={editingEquip ? t('Editar equipo instalado') : t('Agregar equipo instalado')} onClose={() => setEquipModalOpen(false)}>
+          <form onSubmit={saveEquip} noValidate>
             {error && <div className="error-banner">{error}</div>}
             <div className="field">
               <label>{t('Tipo de equipo *')}</label>
-              {!useNewType ? (
-                <>
-                  <select value={equipForm.equipmentTypeId} onChange={(e) => setEquipForm({ ...equipForm, equipmentTypeId: e.target.value })}>
-                    <option value="">{t('— Seleccionar de la lista —')}</option>
-                    {equipTypes.map((t2) => <option key={t2.id} value={t2.id}>{t2.name}</option>)}
-                  </select>
-                  <button type="button" className="link-btn" style={{ marginTop: 6 }} onClick={() => { setUseNewType(true); setEquipForm({ ...equipForm, equipmentTypeId: '' }); }}>
-                    {t('No está en la lista, crear uno nuevo')}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <input placeholder={t('Nombre del nuevo tipo de equipo')} value={equipForm.customTypeName} onChange={(e) => setEquipForm({ ...equipForm, customTypeName: e.target.value })} />
-                  <button type="button" className="link-btn" style={{ marginTop: 6 }} onClick={() => { setUseNewType(false); setEquipForm({ ...equipForm, customTypeName: '' }); }}>
-                    {t('Usar la lista existente')}
-                  </button>
-                </>
+              <input list="equipment-types-list" placeholder={t('Escribe o elige: Grúa, Compresor, Bucket lift…')} value={equipForm.typeName}
+                onChange={(e) => setEquipForm({ ...equipForm, typeName: e.target.value })} />
+              <datalist id="equipment-types-list">
+                {equipTypes.map((t2) => <option key={t2.id} value={t2.name} />)}
+              </datalist>
+              {equipForm.typeName.trim() && !equipTypes.some((t2) => t2.name.toLowerCase() === equipForm.typeName.trim().toLowerCase()) && (
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>✚ {t('Tipo nuevo: se agregará a la lista de equipos al guardar.')}</div>
               )}
             </div>
             <div className="grid grid-2">
@@ -350,6 +400,68 @@ export default function VehicleDetail() {
               <button type="submit" className="btn btn-primary">{t('Guardar equipo')}</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {editOpen && (
+        <Modal title={`${t('Editar recepción')} · ${vehicle.vin}`} onClose={() => setEditOpen(false)} wide>
+          <form onSubmit={saveVehicle} noValidate>
+            <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{t('Completa o corrige los datos que faltaban al recibir el vehículo.')}</div>
+            <div className="field"><label>{t('VIN *')}</label><input className="mono" value={vForm.vin} onChange={(e) => setVForm({ ...vForm, vin: e.target.value.toUpperCase() })} /></div>
+            <div className="grid grid-2">
+              <div className="field"><label>{t('Marca')}</label><input value={vForm.make} onChange={(e) => setVForm({ ...vForm, make: e.target.value })} /></div>
+              <div className="field"><label>{t('Modelo')}</label><input value={vForm.model} onChange={(e) => setVForm({ ...vForm, model: e.target.value })} /></div>
+              <div className="field"><label>{t('Año')}</label><input inputMode="numeric" value={vForm.year} onChange={(e) => setVForm({ ...vForm, year: e.target.value })} /></div>
+              <div className="field"><label>{t('Tipo de chasis')}</label><input placeholder="CA, DRW, SRW..." value={vForm.chassisType} onChange={(e) => setVForm({ ...vForm, chassisType: e.target.value })} /></div>
+              <div className="field"><label>{t('Placa')}</label><input value={vForm.plate} onChange={(e) => setVForm({ ...vForm, plate: e.target.value })} /></div>
+              <div className="field"><label>{t('Cliente')}</label>
+                <select value={vForm.customerId} onChange={(e) => setVForm({ ...vForm, customerId: e.target.value })}>
+                  <option value="">{t('— Sin asignar —')}</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>{t('Estado')}</label>
+                <select value={vForm.status} onChange={(e) => setVForm({ ...vForm, status: e.target.value })}>
+                  {VEHICLE_STATUSES.map((st) => <option key={st} value={st}>{t(st.replace(/_/g, ' '))}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>{t('Fecha de recepción')}</label><input type="date" value={vForm.receivedAt} onChange={(e) => setVForm({ ...vForm, receivedAt: e.target.value })} /></div>
+            </div>
+            <div className="field"><label>{t('Cambiar foto del vehículo')}</label><input type="file" accept="image/*" onChange={(e) => setVPhoto(e.target.files[0] || null)} /></div>
+            <div className="field"><label>{t('Notas')}</label><textarea rows={3} value={vForm.notes} onChange={(e) => setVForm({ ...vForm, notes: e.target.value })} /></div>
+            {error && <div className="error-banner">{error}</div>}
+            <div className="modal-footer">
+              <button type="button" className="btn" onClick={() => setEditOpen(false)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Guardar cambios')}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {typesOpen && (
+        <Modal title={t('Lista de equipos')} onClose={() => { setTypesOpen(false); setRenaming(null); }}>
+          <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{t('Esta lista aparece al agregar un equipo a cualquier vehículo. Los tipos nuevos que escribas al agregar un equipo se suman aquí solos.')}</div>
+          <form onSubmit={addType} style={{ display: 'flex', gap: 8, marginBottom: 12 }} noValidate>
+            <input placeholder={t('Nuevo tipo de equipo')} value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} />
+            <button type="submit" className="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}>{t('+ Agregar')}</button>
+          </form>
+          {error && <div className="error-banner">{error}</div>}
+          <table>
+            <tbody>
+              {equipTypes.map((tp) => (
+                <tr key={tp.id}>
+                  <td>{renaming && renaming.id === tp.id
+                    ? <input autoFocus value={renaming.name} onChange={(e) => setRenaming({ ...renaming, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') renameType(); }} />
+                    : <>{tp.name} {tp.uses ? <span className="muted" style={{ fontSize: 12 }}>· {tp.uses} {t('en uso')}</span> : null}</>}</td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {renaming && renaming.id === tp.id
+                      ? <><button className="btn-row-action edit" onClick={renameType}>{t('Guardar')}</button> <button className="btn-row-action" onClick={() => setRenaming(null)}>{t('Cancelar')}</button></>
+                      : <><button className="btn-row-action edit" onClick={() => { setError(''); setRenaming({ id: tp.id, name: tp.name }); }}>{t('Renombrar')}</button> {!tp.uses && <button className="btn-row-action delete" onClick={() => deleteType(tp)}>{t('Eliminar')}</button>}</>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </Modal>
       )}
 
