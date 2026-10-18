@@ -4,6 +4,8 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'archivo(s) se quitarán al guardar': 'file(s) will be removed when you save',
+  'Deshacer': 'Undo',
   'Quitar archivo': 'Remove file',
   '¿Quitar?': 'Remove?',
   'Sí, quitar': 'Yes, remove',

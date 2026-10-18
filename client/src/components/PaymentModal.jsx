@@ -115,6 +115,7 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
   const [saving, setSaving] = useState(false);
   const [files, setFiles] = useState([]);
   const [reading, setReading] = useState(false);
+  const [removedIds, setRemovedIds] = useState([]);
   const busy = React.useRef(false);
   const fileInput = React.useRef(null);
   async function pickFiles(e) {
@@ -154,7 +155,7 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
     if (Number.isNaN(surchargeN) || surchargeN < 0) { setError(t('El recargo no es un número válido.')); return; }
     if (Number.isNaN(feeN) || feeN < 0) { setError(t('La comisión no es un número válida.')); return; }
     setSaving(true); busy.current = true;
-    try { await onSave({ ...form, amount: amountN, surcharge: surchargeN, processorFee: feeN }, toSend); }
+    try { await onSave({ ...form, amount: amountN, surcharge: surchargeN, processorFee: feeN, ...(removedIds.length ? { removeFileIds: removedIds.join(',') } : {}) }, toSend); }
     catch (err) { setError(err.message || String(err)); setSaving(false); busy.current = false; }
   }
 
@@ -204,7 +205,8 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
         <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={form.notes} onChange={set('notes')} /></div>
         <div className="field">
           <label>{t('Comprobante del pago (tiquete de la tarjeta, transferencia, cheque…)')}</label>
-          {initial && <PaymentFiles files={initial.files} />}
+          {initial && <PaymentFiles files={(initial.files || []).filter((f) => !removedIds.includes(f.id))} onRemove={(f) => setRemovedIds([...removedIds, f.id])} />}
+          {removedIds.length > 0 && <div className="muted" style={{ fontSize: 12 }}>{removedIds.length} {t('archivo(s) se quitarán al guardar')} · <button type="button" className="link-btn" onClick={() => setRemovedIds([])}>{t('Deshacer')}</button></div>}
           <input ref={fileInput} type="file" multiple onChange={pickFiles} onInput={pickFiles} />
           {reading && <div className="muted" style={{ fontSize: 12 }}>{t('Leyendo archivo…')}</div>}
           {!reading && files.length > 0 && <div className="muted" style={{ fontSize: 12 }}>✓ {files.length} {t('archivo(s) listo(s) para adjuntar')}</div>}

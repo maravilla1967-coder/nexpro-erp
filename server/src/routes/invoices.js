@@ -443,6 +443,9 @@ router.put('/:id/payments/:paymentId', paymentUpload, (req, res) => {
   run(`UPDATE invoice_payments SET payment_date = ?, amount = ?, surcharge = ?, processor_fee = ?, method = ?, reference = ?, notes = ? WHERE id = ?`,
     [b.paymentDate || pay.payment_date, amount, b.surcharge !== undefined ? Math.max(0, round2(b.surcharge)) : pay.surcharge,
      b.processorFee !== undefined ? Math.max(0, round2(b.processorFee)) : pay.processor_fee, b.method ?? pay.method, b.reference ?? pay.reference, b.notes ?? null, pay.id]);
+  for (const fid of String(b.removeFileIds || '').split(',').map((x) => parseInt(x, 10)).filter(Boolean)) {
+    run(`DELETE FROM payment_files WHERE id = ? AND kind = 'invoice' AND payment_id = ?`, [fid, pay.id]);
+  }
   saveFilesForPayment('invoice', pay.id, req.files);
   refreshInvoiceStatus(req.params.id);
   res.json(getFullInvoice(req.params.id));
