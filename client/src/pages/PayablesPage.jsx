@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
-import PaymentModal, { money, methodLabel, uploadPaymentFiles, PaymentFiles } from '../components/PaymentModal.jsx';
+import PaymentModal, { money, methodLabel, uploadPaymentFiles, PaymentFiles, sendPayment } from '../components/PaymentModal.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
@@ -123,8 +123,7 @@ export default function PayablesPage() {
   }
 
   async function savePayment(payload, files) {
-    const created = await api.post(`/payables/${paying.id}/payments`, payload);
-    const updated = (await uploadPaymentFiles(`/payables/${paying.id}`, created.newPaymentId, files)) || created;
+    const updated = await sendPayment('post', `/payables/${paying.id}/payments`, payload, files);
     if (editing && editing.id === paying.id) setEditing(updated);
     setPaying(null); load();
   }

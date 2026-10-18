@@ -9,6 +9,14 @@ export const PAYMENT_METHODS = ['cheque', 'transferencia', 'ach', 'square', 'tar
 const METHOD_LABELS = { square: 'Tarjeta de crédito / Square' };
 export function methodLabel(t, m) { return m ? t(METHOD_LABELS[m] || m) : '—'; }
 
+// Guarda el pago y sus comprobantes en una sola petición (multipart). method: 'post' | 'put'.
+export function sendPayment(method, path, payload, files) {
+  const fd = new FormData();
+  Object.entries(payload).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, v); });
+  Array.from(files || []).forEach((f) => fd.append('files', f));
+  return method === 'put' ? api.putForm(path, fd) : api.postForm(path, fd);
+}
+
 // Sube los comprobantes de un pago (basePath: '/invoices/12' o '/payables/3'). Devuelve el
 // documento actualizado, o null si no había archivos.
 export async function uploadPaymentFiles(basePath, paymentId, files) {

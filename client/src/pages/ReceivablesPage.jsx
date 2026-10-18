@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
-import PaymentModal, { money, uploadPaymentFiles } from '../components/PaymentModal.jsx';
+import PaymentModal, { money, sendPayment } from '../components/PaymentModal.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
 
@@ -58,8 +58,7 @@ export default function ReceivablesPage() {
   const ex = useListExport({ rows, getDate: rDate, getNumber: rNumber });
 
   async function savePayment(payload, files) {
-    const r = await api.post(`/invoices/${paying.id}/payments`, payload);
-    await uploadPaymentFiles(`/invoices/${paying.id}`, r.newPaymentId, files);
+    await sendPayment('post', `/invoices/${paying.id}/payments`, payload, files);
     setPaying(null); load();
   }
 

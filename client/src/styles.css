@@ -401,3 +401,11 @@ input[type="file"] { width: 100%; max-width: 100%; font-size: 13px; padding: 6px
 .pay-breakdown { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin: 4px 0 12px; font-size: 13px; }
 .pay-breakdown > div { display: flex; justify-content: space-between; padding: 2px 0; }
 .pay-breakdown > div.strong { font-weight: 700; border-top: 1px solid var(--border); margin-top: 3px; padding-top: 5px; }
+
+/* La ventana nunca es más alta que la pantalla: el contenido se desplaza por dentro y la barra
+   de botones (Guardar / Cancelar) queda siempre visible abajo, también en Safari. */
+.modal-overlay { align-items: center; padding: 16px; }
+.modal { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 0; }
+.modal > form, .modal > div:not(.modal-header) { padding-bottom: 0; }
+.modal .modal-footer { position: -webkit-sticky; position: sticky; bottom: 0; background: #fff; z-index: 5; margin-top: 18px; padding: 12px 0 16px; }
+.modal > *:last-child:not(form):not(.modal-footer) { margin-bottom: 18px; }

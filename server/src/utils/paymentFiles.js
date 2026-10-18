@@ -32,8 +32,18 @@ function mountPaymentFileRoutes(router, kind, getFull) {
   });
 }
 
+// Para recibir el pago y sus comprobantes en UNA sola petición (multipart): así Safari no se
+// queda a mitad de camino entre guardar el pago y subir el archivo.
+const paymentUpload = upload.array('files', 10);
+function saveFilesForPayment(kind, paymentId, files) {
+  for (const f of files || []) {
+    run('INSERT INTO payment_files (kind, payment_id, file_url, original_name) VALUES (?,?,?,?)',
+      [kind, paymentId, `/uploads/payment-docs/${f.filename}`, f.originalname]);
+  }
+}
+
 function deleteFilesOfPayment(kind, paymentId) {
   run('DELETE FROM payment_files WHERE kind = ? AND payment_id = ?', [kind, paymentId]);
 }
 
-module.exports = { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment };
+module.exports = { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment, paymentUpload, saveFilesForPayment };

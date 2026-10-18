@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
 import DocumentBrand from '../components/DocumentBrand.jsx';
-import PaymentModal, { money, methodLabel, uploadPaymentFiles, PaymentFiles } from '../components/PaymentModal.jsx';
+import PaymentModal, { money, methodLabel, uploadPaymentFiles, PaymentFiles, sendPayment } from '../components/PaymentModal.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 
@@ -28,9 +28,7 @@ export default function InvoiceView() {
   const [payOpen, setPayOpen] = useState(false);
   const [editingPay, setEditingPay] = useState(null);
   async function updatePayment(payload, files) {
-    const updated = await api.put(`/invoices/${id}/payments/${editingPay.id}`, payload);
-    const withFiles = await uploadPaymentFiles(`/invoices/${id}`, editingPay.id, files);
-    setInvoice(withFiles || updated); setEditingPay(null);
+    setInvoice(await sendPayment('put', `/invoices/${id}/payments/${editingPay.id}`, payload, files)); setEditingPay(null);
   }
   const [serials, setSerials] = useState([]);
   const [available, setAvailable] = useState([]);
@@ -59,9 +57,7 @@ export default function InvoiceView() {
   }
 
   async function savePayment(payload, files) {
-    const created = await api.post(`/invoices/${id}/payments`, payload);
-    const withFiles = await uploadPaymentFiles(`/invoices/${id}`, created.newPaymentId, files);
-    setInvoice(withFiles || created); setPayOpen(false);
+    setInvoice(await sendPayment('post', `/invoices/${id}/payments`, payload, files)); setPayOpen(false);
   }
   async function addProof(pid, files) {
     try { const u = await uploadPaymentFiles(`/invoices/${id}`, pid, files); if (u) setInvoice(u); } catch (err) { alert(err.message); }

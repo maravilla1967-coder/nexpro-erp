@@ -2,7 +2,7 @@ const express = require('express');
 const { all, get, run } = require('../../db');
 const { requireModuleEdit } = require('../middleware/auth');
 const { makeDocUploader } = require('../middleware/upload');
-const { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment } = require('../utils/paymentFiles');
+const { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment, paymentUpload, saveFilesForPayment } = require('../utils/paymentFiles');
 
 // Cuentas por pagar: facturas de proveedores (con o sin orden de compra), sus pagos y la
 // antigüedad de lo que se debe. Usa el permiso del módulo de compras.
@@ -102,7 +102,7 @@ router.delete('/:id', (req, res) => {
   res.status(204).end();
 });
 
-router.post('/:id/payments', (req, res) => {
+router.post('/:id/payments', paymentUpload, (req, res) => {
   const bill = get(`${SELECT} WHERE b.id = ?`, [req.params.id]);
   if (!bill) return res.status(404).json({ error: 'Factura de proveedor no encontrada' });
   if (bill.status === 'anulada') return res.status(400).json({ error: 'La factura está anulada' });
@@ -112,6 +112,7 @@ router.post('/:id/payments', (req, res) => {
   if (amount - bill.balance > 0.004) return res.status(400).json({ error: `El pago es mayor que el saldo ($${bill.balance.toLocaleString('en-US')})` });
   const newId = run(`INSERT INTO supplier_bill_payments (bill_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
     [bill.id, p.paymentDate || new Date().toISOString().slice(0, 10), amount, p.method || null, p.reference || null, p.notes || null, req.user ? req.user.id : null]).lastInsertRowid;
+  saveFilesForPayment('bill', newId, req.files);
   refreshStatus(bill.id);
   res.status(201).json({ ...getFull(bill.id), newPaymentId: newId });
 });

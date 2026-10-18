@@ -3,7 +3,7 @@ const { db, all, get, run } = require('../../db');
 const { nextDocNumber, asInvoiceNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 const { round2, refreshInvoiceStatus } = require('../utils/payments');
-const { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment } = require('../utils/paymentFiles');
+const { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment, paymentUpload, saveFilesForPayment } = require('../utils/paymentFiles');
 
 const router = express.Router();
 router.use(requireModuleEdit('facturas'));
@@ -406,7 +406,7 @@ router.delete('/:id', (req, res) => {
 // ---- Pagos de clientes (abonos) ----
 // Registrar un pago no modifica la factura en sí (sus líneas y total), por eso no pasa por
 // aprobación: basta el permiso de edición de Facturación. Borrar un pago sí es solo del admin.
-router.post('/:id/payments', (req, res) => {
+router.post('/:id/payments', paymentUpload, (req, res) => {
   const inv = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
   if (!inv) return res.status(404).json({ error: 'Factura no encontrada' });
   if (['cancelado', 'anulada'].includes(inv.status)) return res.status(400).json({ error: 'La factura está anulada' });
@@ -422,6 +422,7 @@ router.post('/:id/payments', (req, res) => {
     `INSERT INTO invoice_payments (invoice_id, payment_date, amount, surcharge, processor_fee, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?,?,?)`,
     [inv.id, b.paymentDate || new Date().toISOString().slice(0, 10), amount, Math.max(0, round2(b.surcharge)), Math.max(0, round2(b.processorFee)), b.method || null, b.reference || null, b.notes || null, req.user ? req.user.id : null]
   ).lastInsertRowid;
+  saveFilesForPayment('invoice', newId, req.files);
   refreshInvoiceStatus(inv.id);
   res.status(201).json({ ...getFullInvoice(inv.id), newPaymentId: newId });
 });
@@ -429,7 +430,7 @@ router.post('/:id/payments', (req, res) => {
 // Corregir los datos de un pago ya registrado (fecha, monto, forma de pago, referencia).
 // Útil sobre todo para los pagos que se crearon solos al activar el módulo de cobros
 // ("Marcada como pagada antes del registro de cobros"). Solo administrador.
-router.put('/:id/payments/:paymentId', (req, res) => {
+router.put('/:id/payments/:paymentId', paymentUpload, (req, res) => {
   if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede corregir un pago registrado.' });
   const pay = get('SELECT * FROM invoice_payments WHERE id = ? AND invoice_id = ?', [req.params.paymentId, req.params.id]);
   if (!pay) return res.status(404).json({ error: 'Pago no encontrado' });
@@ -442,6 +443,7 @@ router.put('/:id/payments/:paymentId', (req, res) => {
   run(`UPDATE invoice_payments SET payment_date = ?, amount = ?, surcharge = ?, processor_fee = ?, method = ?, reference = ?, notes = ? WHERE id = ?`,
     [b.paymentDate || pay.payment_date, amount, b.surcharge !== undefined ? Math.max(0, round2(b.surcharge)) : pay.surcharge,
      b.processorFee !== undefined ? Math.max(0, round2(b.processorFee)) : pay.processor_fee, b.method ?? pay.method, b.reference ?? pay.reference, b.notes ?? null, pay.id]);
+  saveFilesForPayment('invoice', pay.id, req.files);
   refreshInvoiceStatus(req.params.id);
   res.json(getFullInvoice(req.params.id));
 });
