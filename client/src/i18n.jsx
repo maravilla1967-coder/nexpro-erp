@@ -4,6 +4,9 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'No se pudo leer el archivo. Guárdalo primero en el Escritorio (o descárgalo de iCloud) y vuelve a elegirlo.': 'The file could not be read. Save it to your Desktop first (or download it from iCloud) and pick it again.',
+  'Leyendo archivo…': 'Reading file…',
+  'archivo(s) listo(s) para adjuntar': 'file(s) ready to attach',
   'Cliente / empresa': 'Customer / company',
   'Escribe o elige el cliente': 'Type or pick the customer',
   'Cliente nuevo: se creará en Clientes al guardar y quedará enlazado al vehículo.': 'New customer: it will be created in Customers when you save and linked to the vehicle.',

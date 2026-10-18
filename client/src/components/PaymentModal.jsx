@@ -9,12 +9,47 @@ export const PAYMENT_METHODS = ['cheque', 'transferencia', 'ach', 'square', 'tar
 const METHOD_LABELS = { square: 'Tarjeta de crédito / Square' };
 export function methodLabel(t, m) { return m ? t(METHOD_LABELS[m] || m) : '—'; }
 
+// Deja constancia en el servidor de lo que pasa en el navegador al guardar (sin datos sensibles).
+export function logClient(event, data) {
+  try {
+    fetch('/api/client-log', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, ...data, at: new Date().toISOString() }) }).catch(() => {});
+  } catch (_) { /* nada */ }
+}
+
 // Guarda el pago y sus comprobantes en una sola petición (multipart). method: 'post' | 'put'.
-export function sendPayment(method, path, payload, files) {
+// Si el navegador no logra enviar el archivo (Safari: "Load failed"), guarda el pago sin el
+// archivo para no perderlo y avisa; el comprobante se puede volver a adjuntar con "+ comprobante".
+export async function sendPayment(method, path, payload, files) {
+  const list = Array.from(files || []);
   const fd = new FormData();
-  Object.entries(payload).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, v); });
-  Array.from(files || []).forEach((f) => fd.append('files', f));
-  return method === 'put' ? api.putForm(path, fd) : api.postForm(path, fd);
+  Object.entries(payload).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, String(v)); });
+  list.forEach((f) => fd.append('files', f, f.name));
+  logClient('payment-send', { method, path, files: list.map((f) => ({ size: f.size, type: f.type })) });
+  try {
+    const r = method === 'put' ? await api.putForm(path, fd) : await api.postForm(path, fd);
+    logClient('payment-ok', { path });
+    return r;
+  } catch (err) {
+    logClient('payment-error', { path, message: String(err && err.message), name: err && err.name });
+    if (list.length === 0 || (err && err.status)) throw err;
+    // Falla de red con archivo: guardar al menos el pago.
+    const r = method === 'put' ? await api.put(path, payload) : await api.post(path, payload);
+    logClient('payment-ok-without-files', { path });
+    window.alert('El pago se guardó, pero el navegador no pudo enviar el archivo adjunto. Usa "+ comprobante" en el pago para subirlo de nuevo (si es posible, guarda primero el archivo en el Escritorio).');
+    return r;
+  }
+}
+
+// Lee el archivo en memoria apenas se elige: si el navegador no puede leerlo (archivo en iCloud
+// sin descargar, foto en un formato raro…) se avisa en ese momento y no al guardar.
+export async function readFilesNow(fileList) {
+  const out = [];
+  for (const f of Array.from(fileList || [])) {
+    const buf = await f.arrayBuffer();
+    out.push(new File([buf], f.name || 'comprobante', { type: f.type || 'application/octet-stream' }));
+  }
+  return out;
 }
 
 // Sube los comprobantes de un pago (basePath: '/invoices/12' o '/payables/3'). Devuelve el
@@ -70,6 +105,20 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [files, setFiles] = useState([]);
+  const [reading, setReading] = useState(false);
+  const busy = React.useRef(false);
+  async function pickFiles(e) {
+    const chosen = e.target.files;
+    setError('');
+    if (!chosen || chosen.length === 0) { setFiles([]); return; }
+    setReading(true);
+    try { setFiles(await readFilesNow(chosen)); }
+    catch (err) {
+      logClient('file-read-error', { message: String(err && err.message) });
+      setFiles([]);
+      setError(t('No se pudo leer el archivo. Guárdalo primero en el Escritorio (o descárgalo de iCloud) y vuelve a elegirlo.'));
+    } finally { setReading(false); }
+  }
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const amountN = parseAmount(form.amount);
@@ -79,15 +128,17 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
   const isCard = ['square', 'tarjeta'].includes(form.method);
 
   async function submit(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    if (busy.current || reading) return;
     setError('');
+    logClient('payment-submit-click', { files: files.length });
     if (!form.paymentDate) { setError(t('Indica la fecha del pago.')); return; }
     if (!(amountN > 0)) { setError(t('Escribe el monto del pago (por ejemplo 9070 o 9,070.00).')); return; }
     if (Number.isNaN(surchargeN) || surchargeN < 0) { setError(t('El recargo no es un número válido.')); return; }
     if (Number.isNaN(feeN) || feeN < 0) { setError(t('La comisión no es un número válida.')); return; }
-    setSaving(true);
+    setSaving(true); busy.current = true;
     try { await onSave({ ...form, amount: amountN, surcharge: surchargeN, processorFee: feeN }, files); }
-    catch (err) { setError(err.message); setSaving(false); }
+    catch (err) { setError(err.message || String(err)); setSaving(false); busy.current = false; }
   }
 
   return (
@@ -137,13 +188,14 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
         <div className="field">
           <label>{t('Comprobante del pago (tiquete de la tarjeta, transferencia, cheque…)')}</label>
           {initial && <PaymentFiles files={initial.files} />}
-          <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-          {files.length > 0 && <div className="muted" style={{ fontSize: 12 }}>{files.length} {t('archivo(s) para adjuntar')}</div>}
+          <input type="file" multiple onChange={pickFiles} />
+          {reading && <div className="muted" style={{ fontSize: 12 }}>{t('Leyendo archivo…')}</div>}
+          {!reading && files.length > 0 && <div className="muted" style={{ fontSize: 12 }}>✓ {files.length} {t('archivo(s) listo(s) para adjuntar')}</div>}
         </div>
-        {error && <div className="error-banner" style={{ marginTop: 10 }}>{error}</div>}
         <div className="modal-footer">
+          {error && <div className="error-banner" style={{ margin: 0, flexBasis: '100%' }}>{error}</div>}
           <button type="button" className="btn" onClick={onClose}>{t('Cancelar')}</button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? '…' : (submitLabel || t('Registrar pago'))}</button>
+          <button type="button" className="btn btn-primary" disabled={saving || reading} onClick={submit}>{saving ? t('Guardando…') : (submitLabel || t('Registrar pago'))}</button>
         </div>
       </form>
     </Modal>
