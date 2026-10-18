@@ -118,7 +118,6 @@ export default function PayablesPage() {
     try { const u = await uploadPaymentFiles(`/payables/${editing.id}`, pid, files); if (u) setEditing(u); } catch (err) { setError(err.message); }
   }
   async function removeProof(pid, f) {
-    if (!window.confirm(t('¿Eliminar este archivo adjunto?'))) return;
     setEditing(await api.del(`/payables/${editing.id}/payments/${pid}/files/${f.id}`));
   }
 
@@ -239,7 +238,7 @@ export default function PayablesPage() {
                       {editing.payments.map((p) => (
                         <tr key={p.id}><td>{p.payment_date}</td><td>{methodLabel(t, p.method)}</td><td>{p.reference || '—'}
                           <PaymentFiles files={p.files} onRemove={isAdmin ? (f) => removeProof(p.id, f) : null} />
-                          <label className="link-btn" style={{ fontSize: 12, cursor: 'pointer' }}>{t('+ comprobante')}<input type="file" multiple hidden onChange={(e) => { addProof(p.id, e.target.files); e.target.value = ''; }} /></label>
+                          <label className="link-btn" style={{ fontSize: 12, cursor: 'pointer' }}>{t('+ comprobante')}<input type="file" multiple style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden" }} onChange={(e) => { const fl = Array.from(e.target.files || []); addProof(p.id, fl); e.target.value = ''; }} /></label>
                         </td><td className="text-right">{money(p.amount)}</td>
                           <td>{isAdmin && <button type="button" className="link-btn" onClick={() => deletePayment(p.id)}>✕</button>}</td></tr>
                       ))}

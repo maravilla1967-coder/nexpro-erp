@@ -63,7 +63,6 @@ export default function InvoiceView() {
     try { const u = await uploadPaymentFiles(`/invoices/${id}`, pid, files); if (u) setInvoice(u); } catch (err) { alert(err.message); }
   }
   async function removeProof(pid, f) {
-    if (!window.confirm(t('¿Eliminar este archivo adjunto?'))) return;
     setInvoice(await api.del(`/invoices/${id}/payments/${pid}/files/${f.id}`));
   }
   async function deletePayment(pid) {
@@ -225,7 +224,7 @@ export default function InvoiceView() {
                       <td>{p.reference || '—'}{p.notes ? <div className="muted" style={{ fontSize: 11 }}>{p.notes}</div> : null}
                         <PaymentFiles files={p.files} onRemove={isAdmin ? (f) => removeProof(p.id, f) : null} />
                         <label className="link-btn no-print" style={{ fontSize: 12, cursor: 'pointer' }}>
-                          {t('+ comprobante')}<input type="file" multiple hidden onChange={(e) => { addProof(p.id, e.target.files); e.target.value = ''; }} />
+                          {t('+ comprobante')}<input type="file" multiple style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden" }} onChange={(e) => { const fl = Array.from(e.target.files || []); addProof(p.id, fl); e.target.value = ''; }} />
                         </label>
                       </td>
                       <td className="text-right">{money(p.amount)}{p.surcharge > 0 && <div className="muted" style={{ fontSize: 11 }}>+ {money(p.surcharge)} {t('recargo')} = {money(Number(p.amount) + Number(p.surcharge))}</div>}

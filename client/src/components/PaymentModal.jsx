@@ -36,7 +36,7 @@ export async function sendPayment(method, path, payload, files) {
     // Falla de red con archivo: guardar al menos el pago.
     const r = method === 'put' ? await api.put(path, payload) : await api.post(path, payload);
     logClient('payment-ok-without-files', { path });
-    window.alert('El pago se guardó, pero el navegador no pudo enviar el archivo adjunto. Usa "+ comprobante" en el pago para subirlo de nuevo (si es posible, guarda primero el archivo en el Escritorio).');
+    try { window.alert('El pago se guardó, pero el navegador no pudo enviar el archivo adjunto. Usa "+ comprobante" en el pago para subirlo de nuevo.'); } catch (_) {}
     return r;
   }
 }
@@ -55,9 +55,11 @@ export async function readFilesNow(fileList) {
 // Sube los comprobantes de un pago (basePath: '/invoices/12' o '/payables/3'). Devuelve el
 // documento actualizado, o null si no había archivos.
 export async function uploadPaymentFiles(basePath, paymentId, files) {
-  if (!files || files.length === 0 || !paymentId) return null;
+  const list = Array.from(files || []);
+  logClient('proof-add', { count: list.length, paymentId });
+  if (list.length === 0 || !paymentId) return null;
   const fd = new FormData();
-  Array.from(files).forEach((f) => fd.append('files', f));
+  list.forEach((f) => fd.append('files', f, f.name));
   return api.postForm(`${basePath}/payments/${paymentId}/files`, fd);
 }
 
@@ -66,13 +68,20 @@ export async function uploadPaymentFiles(basePath, paymentId, files) {
 // larguísimo (recibos de Square, del banco); el nombre original aparece al pasar el mouse.
 export function PaymentFiles({ files, onRemove }) {
   const { t } = useI18n();
+  const [asking, setAsking] = useState(null);
   if (!files || files.length === 0) return null;
   return (
     <div className="payment-files">
       {files.map((f, i) => (
         <span key={f.id} className="payment-file">
           📎 <a href={f.file_url} target="_blank" rel="noreferrer" title={f.original_name || ''}>{t('Comprobante de pago')}{files.length > 1 ? ` ${i + 1}` : ''}</a>
-          {onRemove && <button type="button" className="link-btn no-print" style={{ marginLeft: 4 }} onClick={() => onRemove(f)}>✕</button>}
+          {onRemove && asking !== f.id && <button type="button" className="link-btn no-print" style={{ marginLeft: 4 }} title={t('Quitar archivo')} onClick={() => setAsking(f.id)}>✕</button>}
+          {onRemove && asking === f.id && (
+            <span className="no-print" style={{ marginLeft: 6 }}>
+              {t('¿Quitar?')} <button type="button" className="btn btn-sm btn-danger" style={{ padding: '1px 8px' }} onClick={() => { setAsking(null); onRemove(f); }}>{t('Sí, quitar')}</button>{' '}
+              <button type="button" className="btn btn-sm" style={{ padding: '1px 8px' }} onClick={() => setAsking(null)}>{t('No')}</button>
+            </span>
+          )}
         </span>
       ))}
     </div>
@@ -107,8 +116,10 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
   const [files, setFiles] = useState([]);
   const [reading, setReading] = useState(false);
   const busy = React.useRef(false);
+  const fileInput = React.useRef(null);
   async function pickFiles(e) {
-    const chosen = e.target.files;
+    const chosen = Array.from((e.target && e.target.files) || []);
+    logClient('file-picked', { count: chosen.length, sizes: chosen.map((f) => f.size), types: chosen.map((f) => f.type) });
     setError('');
     if (!chosen || chosen.length === 0) { setFiles([]); return; }
     setReading(true);
@@ -131,13 +142,19 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
     if (e) e.preventDefault();
     if (busy.current || reading) return;
     setError('');
-    logClient('payment-submit-click', { files: files.length });
+    // Si el estado no recibió el archivo (Safari), se toma directo del campo al guardar.
+    let toSend = files;
+    const inField = Array.from((fileInput.current && fileInput.current.files) || []);
+    if (toSend.length === 0 && inField.length > 0) {
+      try { toSend = await readFilesNow(inField); } catch (err) { toSend = inField; }
+    }
+    logClient('payment-submit-click', { files: files.length, inField: inField.length, sending: toSend.length });
     if (!form.paymentDate) { setError(t('Indica la fecha del pago.')); return; }
     if (!(amountN > 0)) { setError(t('Escribe el monto del pago (por ejemplo 9070 o 9,070.00).')); return; }
     if (Number.isNaN(surchargeN) || surchargeN < 0) { setError(t('El recargo no es un número válido.')); return; }
     if (Number.isNaN(feeN) || feeN < 0) { setError(t('La comisión no es un número válida.')); return; }
     setSaving(true); busy.current = true;
-    try { await onSave({ ...form, amount: amountN, surcharge: surchargeN, processorFee: feeN }, files); }
+    try { await onSave({ ...form, amount: amountN, surcharge: surchargeN, processorFee: feeN }, toSend); }
     catch (err) { setError(err.message || String(err)); setSaving(false); busy.current = false; }
   }
 
@@ -188,7 +205,7 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
         <div className="field">
           <label>{t('Comprobante del pago (tiquete de la tarjeta, transferencia, cheque…)')}</label>
           {initial && <PaymentFiles files={initial.files} />}
-          <input type="file" multiple onChange={pickFiles} />
+          <input ref={fileInput} type="file" multiple onChange={pickFiles} onInput={pickFiles} />
           {reading && <div className="muted" style={{ fontSize: 12 }}>{t('Leyendo archivo…')}</div>}
           {!reading && files.length > 0 && <div className="muted" style={{ fontSize: 12 }}>✓ {files.length} {t('archivo(s) listo(s) para adjuntar')}</div>}
         </div>
