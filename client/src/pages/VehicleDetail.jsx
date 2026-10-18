@@ -73,7 +73,7 @@ export default function VehicleDetail() {
   function openEditVehicle() {
     setVForm({
       vin: vehicle.vin || '', make: vehicle.make || '', model: vehicle.model || '', year: vehicle.year || '',
-      chassisType: vehicle.chassis_type || '', plate: vehicle.plate || '', customerId: vehicle.customer_id || '',
+      chassisType: vehicle.chassis_type || '', plate: vehicle.plate || '', customerName: vehicle.customer_name || '',
       status: vehicle.status || 'recibido', notes: vehicle.notes || '', receivedAt: String(vehicle.received_at || '').slice(0, 10),
     });
     setVPhoto(null); setError(''); setEditOpen(true);
@@ -85,6 +85,7 @@ export default function VehicleDetail() {
       const fd = toFormData(vForm);
       if (vPhoto) fd.append('photo', vPhoto);
       setVehicle(await api.putForm(`/vehicles/${id}`, fd));
+      api.get('/customers').then(setCustomers).catch(() => {});
       setEditOpen(false);
     } catch (err) { setError(err.message); }
   }
@@ -414,11 +415,12 @@ export default function VehicleDetail() {
               <div className="field"><label>{t('Año')}</label><input inputMode="numeric" value={vForm.year} onChange={(e) => setVForm({ ...vForm, year: e.target.value })} /></div>
               <div className="field"><label>{t('Tipo de chasis')}</label><input placeholder="CA, DRW, SRW..." value={vForm.chassisType} onChange={(e) => setVForm({ ...vForm, chassisType: e.target.value })} /></div>
               <div className="field"><label>{t('Placa')}</label><input value={vForm.plate} onChange={(e) => setVForm({ ...vForm, plate: e.target.value })} /></div>
-              <div className="field"><label>{t('Cliente')}</label>
-                <select value={vForm.customerId} onChange={(e) => setVForm({ ...vForm, customerId: e.target.value })}>
-                  <option value="">{t('— Sin asignar —')}</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+              <div className="field"><label>{t('Cliente / empresa')}</label>
+                <input list="customers-list" placeholder={t('Escribe o elige el cliente')} value={vForm.customerName} onChange={(e) => setVForm({ ...vForm, customerName: e.target.value })} />
+                <datalist id="customers-list">{customers.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+                {vForm.customerName.trim() && !customers.some((c) => c.name.trim().toLowerCase() === vForm.customerName.trim().toLowerCase()) && (
+                  <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>✚ {t('Cliente nuevo: se creará en Clientes al guardar y quedará enlazado al vehículo.')}</div>
+                )}
               </div>
               <div className="field"><label>{t('Estado')}</label>
                 <select value={vForm.status} onChange={(e) => setVForm({ ...vForm, status: e.target.value })}>

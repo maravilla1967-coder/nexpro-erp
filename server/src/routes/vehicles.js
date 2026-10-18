@@ -87,6 +87,14 @@ router.get('/', (req, res) => {
   res.json(all(sql, params));
 });
 
+function getVehicleFull(id) {
+  return get(
+    `SELECT v.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone,
+            c.tax_id as customer_tax_id, c.address as customer_address, c.city as customer_city, c.zip as customer_zip
+     FROM vehicles v
+     LEFT JOIN customers c ON c.id = v.customer_id WHERE v.id = ?`, [id]);
+}
+
 router.get('/:id', (req, res) => {
   const vehicle = get(
     `SELECT v.*, c.name as customer_name, c.email as customer_email, c.phone as customer_phone,
@@ -111,6 +119,21 @@ router.get('/by-vin/:vin', (req, res) => {
   res.json(withDetails(vehicle));
 });
 
+// Cliente de la recepción: se puede mandar customerId o customerName (escrito a mano). Si el
+// nombre no existe en clientes, se crea el cliente nuevo para que quede enlazado al vehículo.
+// Devuelve undefined si no se mandó nada (no cambiar), null para dejarlo sin cliente.
+function resolveCustomer(b) {
+  if (b.customerName !== undefined) {
+    const name = String(b.customerName).trim();
+    if (!name) return null;
+    const found = get('SELECT id FROM customers WHERE lower(trim(name)) = lower(?)', [name]);
+    if (found) return found.id;
+    return run(`INSERT INTO customers (type, name, status, source) VALUES ('empresa', ?, 'cliente', 'Recepción de vehículo')`, [name]).lastInsertRowid;
+  }
+  if (b.customerId !== undefined) { const c = parseInt(b.customerId, 10); return Number.isNaN(c) ? null : c; }
+  return undefined;
+}
+
 // Recibir vehículo por VIN
 router.post('/', upload.single('photo'), (req, res) => {
   const b = req.body;
@@ -123,9 +146,9 @@ router.post('/', upload.single('photo'), (req, res) => {
     `INSERT INTO vehicles (vin, make, model, year, chassis_type, plate, customer_id, photo_url, status, notes)
      VALUES (?,?,?,?,?,?,?,?,?,?)`,
     [b.vin, b.make || null, b.model || null, b.year ? parseInt(b.year, 10) : null, b.chassisType || null,
-     b.plate || null, b.customerId || null, photoUrl, b.status || 'recibido', b.notes || null]
+     b.plate || null, resolveCustomer(b) || null, photoUrl, b.status || 'recibido', b.notes || null]
   );
-  res.status(201).json(withDetails(get('SELECT * FROM vehicles WHERE id = ?', [result.lastInsertRowid])));
+  res.status(201).json(withDetails(getVehicleFull(result.lastInsertRowid)));
 });
 
 // Editar la recepción: se puede completar o corregir cualquier dato después (incluido el VIN,
@@ -144,8 +167,8 @@ router.put('/:id', upload.single('photo'), (req, res) => {
   }
   let year = existing.year;
   if (b.year !== undefined) { const y = parseInt(b.year, 10); year = Number.isNaN(y) ? null : y; }
-  let customerId = existing.customer_id;
-  if (b.customerId !== undefined) { const c = parseInt(b.customerId, 10); customerId = Number.isNaN(c) ? null : c; }
+  const rc = resolveCustomer(b);
+  const customerId = rc === undefined ? existing.customer_id : rc;
   const photoUrl = req.file ? `/uploads/vehicles/${req.file.filename}` : (b.photoUrl ?? existing.photo_url);
   const receivedAt = b.receivedAt ? `${String(b.receivedAt).slice(0, 10)}${String(existing.received_at || '').slice(10) || ' 00:00:00'}` : existing.received_at;
   run(
@@ -153,7 +176,7 @@ router.put('/:id', upload.single('photo'), (req, res) => {
     [vin, val(b.make, existing.make), val(b.model, existing.model), year, val(b.chassisType, existing.chassis_type),
      val(b.plate, existing.plate), customerId, photoUrl, b.status || existing.status, val(b.notes, existing.notes), receivedAt, req.params.id]
   );
-  res.json(withDetails(get('SELECT * FROM vehicles WHERE id = ?', [req.params.id])));
+  res.json(withDetails(getVehicleFull(req.params.id)));
 });
 
 router.delete('/:id', (req, res) => {

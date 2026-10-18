@@ -4,6 +4,9 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Cliente / empresa': 'Customer / company',
+  'Escribe o elige el cliente': 'Type or pick the customer',
+  'Cliente nuevo: se creará en Clientes al guardar y quedará enlazado al vehículo.': 'New customer: it will be created in Customers when you save and linked to the vehicle.',
   '✏️ Editar recepción': '✏️ Edit intake',
   'Editar recepción': 'Edit intake',
   'Completa o corrige los datos que faltaban al recibir el vehículo.': 'Complete or correct the details that were missing when the vehicle was received.',
