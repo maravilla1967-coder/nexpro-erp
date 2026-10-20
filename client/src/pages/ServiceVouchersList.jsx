@@ -15,7 +15,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const EMPTY = {
   supplierMode: 'existente', supplierId: '', providerName: '', providerTaxId: '', providerPhone: '', providerAddress: '', providerEmail: '',
   serviceDate: today(), serviceType: '', description: '', amount: '', vehicleId: '', workOrderId: '',
-  payNow: '1', method: 'efectivo', reference: '', paymentDate: today(), dueDate: '', receivedBy: '', notes: '',
+  payNow: '0', method: 'efectivo', reference: '', paymentDate: today(), dueDate: '', receivedBy: '', notes: '',
 };
 const money = (v) => '$' + (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const COLUMNS = [
@@ -68,9 +68,8 @@ export default function ServiceVouchersList() {
     setError('');
     if (form.supplierMode === 'existente' && !form.supplierId) { setError(t('Elige el proveedor o escribe su nombre.')); return; }
     if (form.supplierMode === 'nuevo' && !form.providerName.trim()) { setError(t('Escribe el nombre de quien hizo el trabajo.')); return; }
-    if (!form.description.trim()) { setError(t('Describe el trabajo o servicio que se hizo.')); return; }
-    const amt = parseFloat(String(form.amount).replace(/[$,\s]/g, ''));
-    if (!(amt > 0)) { setError(t('Escribe el monto pagado.')); return; }
+    const amt = parseFloat(String(form.amount).replace(/[$,\s]/g, '')) || 0;
+    if (form.payNow === '1' && !(amt > 0)) { setError(t('Para registrar el pago escribe el monto.')); return; }
     const fd = new FormData();
     const payload = { ...form, amount: amt };
     if (form.supplierMode === 'existente') { ['providerName', 'providerTaxId', 'providerPhone', 'providerAddress', 'providerEmail'].forEach((k) => delete payload[k]); }
@@ -117,8 +116,8 @@ export default function ServiceVouchersList() {
                         {r.vehicle_id ? <Link className="mono" to={`/vehiculos/${r.vehicle_id}`}>{r.vehicle_vin}</Link> : <span className="muted">—</span>}
                         {r.work_order_number ? <div className="mono muted">{r.work_order_number}</div> : null}
                       </td>
-                      <td className="text-right">{money(r.amount)}</td>
-                      <td><Pill value={r.bill_status || 'pendiente'} /></td>
+                      <td className="text-right">{r.amount > 0 ? money(r.amount) : <span className="muted">—</span>}</td>
+                      <td><Pill value={r.status || r.bill_status || 'pendiente'} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -170,16 +169,16 @@ export default function ServiceVouchersList() {
                   {woOfVehicle.map((w) => <option key={w.id} value={w.id}>{w.number} · {w.vin}</option>)}
                 </select></div>
             </div>
-            <div className="field"><label>{t('Descripción del trabajo realizado *')}</label>
+            <div className="field"><label>{t('Descripción del trabajo realizado')}</label>
               <textarea rows={5} style={{ resize: 'vertical' }} placeholder={t('Explica qué se hizo, materiales usados, horas trabajadas, resultado…')} value={form.description} onChange={set('description')} /></div>
 
             <div className="form-section-title" style={{ fontWeight: 700, margin: '14px 0 6px' }}>{t('3. Pago')}</div>
             <div className="grid grid-2">
-              <div className="field"><label>{t('Monto pagado *')}</label><input inputMode="decimal" placeholder="0.00" value={form.amount} onChange={set('amount')} /></div>
+              <div className="field"><label>{t('Monto del servicio')}</label><input inputMode="decimal" placeholder="0.00" value={form.amount} onChange={set('amount')} /></div>
               <div className="field"><label>{t('¿Ya se pagó?')}</label>
                 <select value={form.payNow} onChange={set('payNow')}>
-                  <option value="1">{t('Sí, pagado')}</option>
-                  <option value="0">{t('No, queda por pagar')}</option>
+                  <option value="0">{t('No todavía — guardar y pagar después')}</option>
+                  <option value="1">{t('Sí, ya se pagó')}</option>
                 </select></div>
               {form.payNow === '1' ? <>
                 <div className="field"><label>{t('Forma de pago')}</label>
@@ -190,13 +189,14 @@ export default function ServiceVouchersList() {
               <div className="field"><label>{t('Recibido / aprobado por (Nexpro)')}</label><input value={form.receivedBy} onChange={set('receivedBy')} /></div>
             </div>
             <div className="field"><label>{t('Notas')}</label><input value={form.notes} onChange={set('notes')} /></div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>💾 {t('Puedes guardarlo incompleto (sin monto, descripción o pago) y completarlo después con "Editar" y "Registrar pago" en el comprobante.')}</div>
             <div className="field"><label>{t('Fotos o documentos (trabajo terminado, recibo firmado, captura del pago…)')}</label>
               <input type="file" multiple onChange={async (e) => { const l = Array.from(e.target.files || []); try { setFiles(await readFilesNow(l)); } catch { setFiles(l); } }} />
               {files.length > 0 && <div className="muted" style={{ fontSize: 12 }}>✓ {files.length} {t('archivo(s) listo(s) para adjuntar')}</div>}</div>
             <div className="modal-footer">
               {error && <div className="error-banner" style={{ margin: 0, flexBasis: '100%' }}>{error}</div>}
               <button type="button" className="btn" onClick={() => setOpen(false)}>{t('Cancelar')}</button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? t('Guardando…') : t('Guardar y ver comprobante')}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? t('Guardando…') : form.payNow === '1' ? t('Guardar y ver comprobante') : t('Guardar (pagar después)')}</button>
             </div>
           </form>
         </Modal>

@@ -4,6 +4,19 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'No está enlazado a ningún vehículo ni orden de trabajo (puedes enlazarlo con "Editar").': 'Not linked to any vehicle or work order (link it with "Edit").',
+  'Para registrar el pago escribe el monto.': 'To record the payment, enter the amount.',
+  'No todavía — guardar y pagar después': 'Not yet — save and pay later',
+  'Sí, ya se pagó': 'Yes, already paid',
+  'Puedes guardarlo incompleto (sin monto, descripción o pago) y completarlo después con "Editar" y "Registrar pago" en el comprobante.': 'You can save it incomplete (no amount, description or payment) and complete it later with "Edit" and "Record payment" on the voucher.',
+  'Guardar (pagar después)': 'Save (pay later)',
+  'Borrador — falta:': 'Draft — missing:',
+  'Complétalo con "Editar".': 'Complete it with "Edit".',
+  '(pendiente de describir)': '(description pending)',
+  'monto': 'amount',
+  'descripción': 'description',
+  'vehículo u orden': 'vehicle or order',
+  'borrador': 'draft',
   'Pagos sin factura': 'Payments without invoice',
   'Comprobantes de pago a proveedores de servicios que no expiden factura': 'Payment vouchers for service providers who do not issue invoices',
   '+ Nuevo comprobante': '+ New voucher',

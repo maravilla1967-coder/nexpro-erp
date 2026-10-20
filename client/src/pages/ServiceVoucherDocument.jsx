@@ -6,7 +6,7 @@ import DocumentBrand from '../components/DocumentBrand.jsx';
 import Modal from '../components/Modal.jsx';
 import { useI18n } from '../i18n.jsx';
 import { useAuth } from '../auth.jsx';
-import { methodLabel, readFilesNow } from '../components/PaymentModal.jsx';
+import PaymentModal, { methodLabel, readFilesNow, sendPayment, PaymentFiles } from '../components/PaymentModal.jsx';
 
 const money = (v) => '$' + (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -18,6 +18,7 @@ export default function ServiceVoucherDocument() {
   const { isAdmin } = useAuth();
   const [v, setV] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
   const [vehicles, setVehicles] = useState([]);
   const [workOrders, setWorkOrders] = useState([]);
@@ -51,17 +52,23 @@ export default function ServiceVoucherDocument() {
   return (
     <>
       <div className="topbar no-print">
-        <div><h1>{t('Comprobante de pago')} {v.number}</h1><div className="sub"><Pill value={v.bill_status || 'pendiente'} /></div></div>
+        <div><h1>{t('Comprobante de pago')} {v.number}</h1><div className="sub"><Pill value={v.status} /></div></div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link to="/pagos-sin-factura" className="btn">{t('← Volver')}</Link>
           <button className="btn" onClick={openEdit}>{t('✏️ Editar')}</button>
-          {v.bill_id && v.balance > 0.004 && <Link className="btn" to={`/cuentas-por-pagar?ver=${v.bill_id}`}>{t('Registrar pago')}</Link>}
+          {v.amount > 0 && v.balance > 0.004 && <button className="btn btn-primary" onClick={() => setPaying(true)}>{t('💵 Registrar pago')}</button>}
           {isAdmin && <button className="btn btn-danger" onClick={del}>{t('Eliminar')}</button>}
           <button className="btn btn-primary" onClick={() => window.print()}>{t('Imprimir / Guardar PDF')}</button>
         </div>
       </div>
       <div className="content">
         {error && <div className="error-banner no-print">{error}</div>}
+        {v.missing && v.missing.length > 0 && (
+          <div className="error-banner no-print" style={{ background: '#fff7ed', color: '#9a3412' }}>
+            📝 {t('Borrador — falta:')} <strong>{v.missing.map((m) => t(m)).join(', ')}</strong>. {t('Complétalo con "Editar".')}
+          </div>
+        )}
+        {!v.vehicle_id && !v.work_order_id && <div className="muted no-print" style={{ fontSize: 13, marginBottom: 10 }}>ℹ️ {t('No está enlazado a ningún vehículo ni orden de trabajo (puedes enlazarlo con "Editar").')}</div>}
         <div className="card invoice-sheet">
           <div className="invoice-header">
             <DocumentBrand />
@@ -96,7 +103,7 @@ export default function ServiceVoucherDocument() {
 
           <div style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px' }}>
             <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('Descripción del trabajo')}{v.service_type ? ` — ${v.service_type}` : ''}</div>
-            <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.45 }}>{v.description}</div>
+            <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.45 }}>{v.description || <span className="muted">{t('(pendiente de describir)')}</span>}</div>
           </div>
 
           <table style={{ marginTop: 18 }}>
@@ -104,7 +111,7 @@ export default function ServiceVoucherDocument() {
             <tbody>
               {v.payments.length === 0
                 ? <tr><td colSpan={4} className="muted">{t('Pendiente de pago')}{v.bill_due_date ? ` · ${t('vence')} ${v.bill_due_date}` : ''}</td></tr>
-                : v.payments.map((p) => <tr key={p.id}><td>{p.payment_date}</td><td>{methodLabel(t, p.method)}</td><td>{p.reference || '—'}</td><td className="text-right">{money(p.amount)}</td></tr>)}
+                : v.payments.map((p) => <tr key={p.id}><td>{p.payment_date}</td><td>{methodLabel(t, p.method)}</td><td>{p.reference || '—'}{p.notes ? <div className="muted" style={{ fontSize: 12 }}>{p.notes}</div> : null}<PaymentFiles files={p.files} /></td><td className="text-right">{money(p.amount)}</td></tr>)}
             </tbody>
           </table>
           <div className="invoice-totals">
@@ -133,6 +140,11 @@ export default function ServiceVoucherDocument() {
         </div>
       </div>
 
+      {paying && (
+        <PaymentModal title={`${t('Registrar pago')} · ${v.number}`} balance={v.balance} onClose={() => setPaying(false)}
+          onSave={async (payload, files) => { setV(await sendPayment('post', `/service-vouchers/${id}/payments`, payload, files)); setPaying(false); }} />
+      )}
+
       {editing && (
         <Modal title={`${t('Editar comprobante')} ${v.number}`} onClose={() => setEditing(null)} wide>
           <form onSubmit={saveEdit} noValidate>
@@ -152,7 +164,7 @@ export default function ServiceVoucherDocument() {
               <div className="field"><label>{t('Monto del servicio')}</label><input inputMode="decimal" value={editing.amount} onChange={set('amount')} /></div>
               <div className="field"><label>{t('Recibido / aprobado por (Nexpro)')}</label><input value={editing.receivedBy} onChange={set('receivedBy')} /></div>
             </div>
-            <div className="field"><label>{t('Descripción del trabajo realizado *')}</label><textarea rows={5} value={editing.description} onChange={set('description')} /></div>
+            <div className="field"><label>{t('Descripción del trabajo realizado')}</label><textarea rows={5} value={editing.description} onChange={set('description')} /></div>
             <div className="field"><label>{t('Notas')}</label><input value={editing.notes} onChange={set('notes')} /></div>
             <div className="field"><label>{t('Agregar fotos o documentos')}</label>
               <input type="file" multiple onChange={async (e) => { const l = Array.from(e.target.files || []); let r = l; try { r = await readFilesNow(l); } catch (_) {} setEditing((cur) => ({ ...cur, files: r })); }} /></div>
