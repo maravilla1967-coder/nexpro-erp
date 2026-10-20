@@ -86,11 +86,12 @@ export default function PurchaseOrdersList() {
     setEditingPo(updated);
   }
 
+  const linesLocked = !!(editingPo && ['recibida', 'parcial', 'cerrada'].includes(editingPo.status));
   async function save(e) {
     e.preventDefault();
     const payload = {
       supplierId, orderDate, notes,
-      items: items.filter((i) => i.description).map((i) => ({ productId: i.productId || null, description: i.description, quantity: parseFloat(i.quantity) || 0, unitCost: parseFloat(i.unitPrice) || 0 })),
+      items: linesLocked ? undefined : items.filter((i) => i.description).map((i) => ({ productId: i.productId || null, description: i.description, quantity: parseFloat(i.quantity) || 0, unitCost: parseFloat(i.unitPrice) || 0 })),
     };
     try {
       if (editingPo) {
@@ -111,7 +112,18 @@ export default function PurchaseOrdersList() {
   }
   async function openView(id) {
     const po = await api.get(`/purchase-orders/${id}`);
-    setViewing(po);
+    setViewing(po); setShortForm(null); setViewErr('');
+  }
+  const [shortForm, setShortForm] = useState(null);
+  const [viewErr, setViewErr] = useState('');
+  const fmt$ = (v) => '$' + (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  async function doCloseShort() {
+    try { await api.post(`/purchase-orders/${viewing.id}/close-short`, { note: shortForm }); await openView(viewing.id); load(); }
+    catch (err) { setViewErr(err.message); }
+  }
+  async function doReopenShort() {
+    try { await api.post(`/purchase-orders/${viewing.id}/reopen-short`, {}); await openView(viewing.id); load(); }
+    catch (err) { setViewErr(err.message); }
   }
 
   return (
@@ -138,9 +150,9 @@ export default function PurchaseOrdersList() {
                     <td style={{ display: 'flex', gap: 10 }}>
                       <Link className="link-btn" to={`/compras/${po.id}/documento`}>{t('Imprimir')}</Link>
                       <Link className="link-btn" to={`/garantias?nuevo=registro&oc=${po.id}`}>{t('Garantía')}</Link>
-                      {!['recibida', 'parcial'].includes(po.status) && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
+                      {po.status !== 'cancelado' && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
                       {po.status === 'borrador' && <button className="link-btn" onClick={() => markStatus(po, 'enviada')}>{t('Marcar enviada')}</button>}
-                      {!['recibida', 'cancelado'].includes(po.status) && <button className="link-btn" onClick={() => openReceive(po)}>{po.status === 'parcial' ? t('Recibir resto') : t('Recibir')}</button>}
+                      {!['recibida', 'cancelado', 'cerrada'].includes(po.status) && <button className="link-btn" onClick={() => openReceive(po)}>{po.status === 'parcial' ? t('Recibir resto') : t('Recibir')}</button>}
                     </td>
                   </tr>
                 ))}
@@ -165,8 +177,20 @@ export default function PurchaseOrdersList() {
                 <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
               </div>
             </div>
-            <LineItemsEditor items={items} setItems={setItems} products={products} priceLabel="Costo unit." priceSourceField="purchase_cost" />
-            {editingPo && <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{t('Puedes ajustar cantidades y líneas mientras la orden no esté marcada como recibida.')}</div>}
+            {linesLocked ? (
+              <>
+                <table>
+                  <thead><tr><th>{t('Descripción')}</th><th className="text-right">{t('Pedido')}</th><th className="text-right">{t('Recibido')}</th><th className="text-right">{t('Costo unit.')}</th></tr></thead>
+                  <tbody>{editingPo.items.map((it) => <tr key={it.id}><td>{it.description}</td><td className="text-right">{it.quantity}</td><td className="text-right">{it.received_qty || 0}</td><td className="text-right">${Number(it.unit_cost).toLocaleString('en-US')}</td></tr>)}</tbody>
+                </table>
+                <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>🔒 {t('Las líneas no se pueden cambiar porque ya hay mercancía recibida (ya entró al inventario). Sí puedes cambiar la fecha, los comentarios y los adjuntos.')}</div>
+              </>
+            ) : (
+              <>
+                <LineItemsEditor items={items} setItems={setItems} products={products} priceLabel="Costo unit." priceSourceField="purchase_cost" />
+                {editingPo && <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{t('Puedes ajustar cantidades y líneas mientras la orden no esté marcada como recibida.')}</div>}
+              </>
+            )}
 
             <div className="field" style={{ marginTop: 16 }}>
               <label>{t('Comentarios e instrucciones para el proveedor')}</label>
@@ -209,37 +233,87 @@ export default function PurchaseOrdersList() {
             <Link className="btn btn-sm" to={`/compras/${viewing.id}/documento`}>{t('🖨️ Imprimir / Guardar PDF')}</Link>{' '}
             <Link className="btn btn-sm" to={`/garantias?nuevo=registro&oc=${viewing.id}`}>{t('🛡️ Registrar garantía')}</Link>{' '}
             <Link className="btn btn-sm" to={`/cuentas-por-pagar?nuevo=1&oc=${viewing.id}`}>{t('🧾 Registrar factura del proveedor')}</Link>{' '}
-            {!['recibida', 'cancelado'].includes(viewing.status) && <button className="btn btn-sm btn-primary" onClick={() => { setReceiving(viewing); setViewing(null); }}>{t('📦 Recibir mercancía')}</button>}
+            {!['recibida', 'cancelado', 'cerrada'].includes(viewing.status) && <button className="btn btn-sm btn-primary" onClick={() => { setReceiving(viewing); setViewing(null); }}>{t('📦 Recibir mercancía')}</button>}
           </div>
           <p><strong>{t('Proveedor:')}</strong> {viewing.supplier_id && suppliers.find((s) => s.id === viewing.supplier_id)?.name}</p>
           <p><strong>{t('Estado:')}</strong> <Pill value={viewing.status} /></p>
           <p><strong>{t('Fecha de la orden:')}</strong> {viewing.order_date || '—'}</p>
-          <table>
-            <thead><tr><th>{t('Descripción')}</th><th>{t('Cant.')}</th><th>{t('Recibido')}</th><th>{t('Costo unit.')}</th><th>{t('Subtotal')}</th></tr></thead>
-            <tbody>
-              {viewing.items.map((it) => (
-                <tr key={it.id}><td>{it.description}</td><td>{it.quantity}</td><td className={Number(it.received_qty) >= Number(it.quantity) ? '' : 'muted'}>{it.received_qty || 0}</td><td>${it.unit_cost}</td><td>${(it.quantity * it.unit_cost).toLocaleString()}</td></tr>
+          {viewing.summary && (
+            <div className="chain-summary">
+              {[['Pedido', viewing.summary.ordered], ['Recibido', viewing.summary.received], ['Pendiente', viewing.summary.pending], ['Faltante cerrado', viewing.summary.short], ['Facturado (por pagar)', viewing.summary.billed], ['Pagado', viewing.summary.paid]].map(([k, v]) => (
+                <div key={k} className={`chain-box ${k === 'Faltante cerrado' && v > 0 ? 'warn' : ''}`}><span>{t(k)}</span><strong>{fmt$(v)}</strong></div>
               ))}
+            </div>
+          )}
+          {viewing.summary && viewing.summary.unbilled > 0.004 && (
+            <div className="error-banner" style={{ background: '#fff7ed', color: '#9a3412' }}>
+              {t('Recibido sin factura del proveedor:')} <strong>{fmt$(viewing.summary.unbilled)}</strong>. <Link to={`/cuentas-por-pagar?nuevo=1&oc=${viewing.id}`}>{t('Registrar la factura')}</Link>
+            </div>
+          )}
+          <table>
+            <thead><tr><th>{t('Descripción')}</th><th className="text-right">{t('Pedido')}</th><th className="text-right">{t('Recibido')}</th><th className="text-right">{t('Pendiente')}</th><th className="text-right">{t('Faltante')}</th><th className="text-right">{t('Costo unit.')}</th><th className="text-right">{t('Subtotal')}</th></tr></thead>
+            <tbody>
+              {viewing.items.map((it) => {
+                const pend = Math.max(0, it.quantity - (it.received_qty || 0) - (it.short_qty || 0));
+                return (
+                  <tr key={it.id}>
+                    <td>{it.description}</td><td className="text-right">{it.quantity}</td>
+                    <td className="text-right">{it.received_qty || 0}</td>
+                    <td className={`text-right ${pend > 0 ? '' : 'muted'}`}>{pend > 0 ? <strong>{pend}</strong> : '—'}</td>
+                    <td className="text-right" style={{ color: it.short_qty > 0 ? 'var(--red)' : undefined }}>{it.short_qty > 0 ? it.short_qty : '—'}</td>
+                    <td className="text-right">{fmt$(it.unit_cost)}</td><td className="text-right">{fmt$(it.quantity * it.unit_cost)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+          {viewing.short_note && <div style={{ fontSize: 13, marginTop: 8, whiteSpace: 'pre-wrap' }}><strong style={{ color: 'var(--red)' }}>{t('Faltante:')}</strong> {viewing.short_note}</div>}
+          {viewing.summary && viewing.summary.pending > 0 && ['parcial', 'enviada', 'borrador'].includes(viewing.status) && viewing.receipts.length > 0 && (
+            shortForm === null
+              ? <button className="btn btn-sm" style={{ marginTop: 8 }} onClick={() => setShortForm('')}>{t('Cerrar faltante (lo pendiente ya no llegará)')}</button>
+              : <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <input autoFocus placeholder={t('Motivo del faltante *')} value={shortForm} onChange={(e) => setShortForm(e.target.value)} />
+                  <button className="btn btn-sm btn-primary" onClick={doCloseShort}>{t('Cerrar faltante')}</button>
+                  <button className="btn btn-sm" onClick={() => setShortForm(null)}>{t('Cancelar')}</button>
+                </div>
+          )}
+          {viewing.status === 'cerrada' && <button className="btn btn-sm" style={{ marginTop: 8 }} onClick={doReopenShort}>{t('Reabrir faltante (sí va a llegar)')}</button>}
+          {viewErr && <div className="error-banner" style={{ marginTop: 8 }}>{viewErr}</div>}
+
           {viewing.receipts && viewing.receipts.length > 0 && (
             <>
-              <p style={{ marginTop: 14, marginBottom: 4 }}><strong>{t('Recepciones:')}</strong></p>
-              {viewing.receipts.map((r) => (
-                <div key={r.id} className="muted" style={{ fontSize: 13 }}>
-                  <span className="mono">{r.number}</span> · {r.receipt_date}{r.created_by_name ? ` · ${r.created_by_name}` : ''} — {r.items.map((i) => `${i.quantity} × ${i.description}`).join('; ')}{r.notes ? ` (${r.notes})` : ''}
-                </div>
-              ))}
+              <p style={{ marginTop: 14, marginBottom: 4 }}><strong>{t('Recepciones (entradas a inventario):')}</strong></p>
+              <table>
+                <thead><tr><th>{t('Recepción')}</th><th>{t('Fecha')}</th><th>{t('Qué llegó')}</th><th>{t('Cuenta por pagar')}</th></tr></thead>
+                <tbody>
+                  {viewing.receipts.map((r) => (
+                    <tr key={r.id}>
+                      <td className="mono">{r.number}</td>
+                      <td className="muted">{r.receipt_date}{r.created_by_name ? ` · ${r.created_by_name}` : ''}</td>
+                      <td style={{ fontSize: 13 }}>{r.items.map((i) => `${i.quantity} × ${i.description}`).join('; ')}{r.notes ? <div className="muted">{r.notes}</div> : null}</td>
+                      <td style={{ fontSize: 13 }}>{r.bill ? <><Link to={`/cuentas-por-pagar?ver=${r.bill.id}`}>{r.bill.bill_number || `#${r.bill.id}`}</Link> · {fmt$(r.bill.amount)} <Pill value={r.bill.status} /></> : <span className="muted">{t('sin factura')}</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </>
           )}
           {viewing.bills && viewing.bills.length > 0 && (
             <>
-              <p style={{ marginTop: 14, marginBottom: 4 }}><strong>{t('Facturas del proveedor:')}</strong></p>
-              {viewing.bills.map((b) => (
-                <div key={b.id} style={{ fontSize: 13 }}>
-                  <Link to={`/cuentas-por-pagar?ver=${b.id}`}>{b.bill_number || `#${b.id}`}</Link> · ${Number(b.amount).toLocaleString('en-US')} · <Pill value={b.status} />{b.due_date ? ` · ${t('vence')} ${b.due_date}` : ''}
-                </div>
-              ))}
+              <p style={{ marginTop: 14, marginBottom: 4 }}><strong>{t('Cuentas por pagar de esta orden:')}</strong></p>
+              <table>
+                <thead><tr><th>{t('Factura')}</th><th>{t('Vence')}</th><th className="text-right">{t('Monto')}</th><th className="text-right">{t('Pagado')}</th><th className="text-right">{t('Saldo')}</th><th>{t('Estado')}</th></tr></thead>
+                <tbody>
+                  {viewing.bills.map((b) => (
+                    <tr key={b.id}>
+                      <td><Link to={`/cuentas-por-pagar?ver=${b.id}`}>{b.bill_number || `#${b.id}`}</Link></td>
+                      <td className="muted">{b.due_date || '—'}</td>
+                      <td className="text-right">{fmt$(b.amount)}</td><td className="text-right muted">{fmt$(b.paid)}</td><td className="text-right"><strong>{fmt$(b.balance)}</strong></td>
+                      <td><Pill value={b.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </>
           )}
           {viewing.attachments && viewing.attachments.length > 0 && (

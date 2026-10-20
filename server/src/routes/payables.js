@@ -14,6 +14,7 @@ const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const PAID = `(SELECT COALESCE(SUM(p.amount),0) FROM supplier_bill_payments p WHERE p.bill_id = b.id)`;
 const SELECT = `
   SELECT b.*, s.name AS supplier_name, po.number AS purchase_order_number,
+         (SELECT gr.number FROM goods_receipts gr WHERE gr.id = b.goods_receipt_id) AS goods_receipt_number,
          ROUND(${PAID}, 2) AS paid, ROUND(b.amount - ${PAID}, 2) AS balance,
          (SELECT MAX(p.payment_date) FROM supplier_bill_payments p WHERE p.bill_id = b.id) AS last_payment
   FROM supplier_bills b

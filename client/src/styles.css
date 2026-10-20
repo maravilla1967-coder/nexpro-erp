@@ -409,3 +409,10 @@ input[type="file"] { width: 100%; max-width: 100%; font-size: 13px; padding: 6px
 .modal > form, .modal > div:not(.modal-header) { padding-bottom: 0; }
 .modal .modal-footer { position: -webkit-sticky; position: sticky; bottom: 0; background: #fff; z-index: 5; margin-top: 18px; padding: 12px 0 16px; }
 .modal > *:last-child:not(form):not(.modal-footer) { margin-bottom: 18px; }
+
+/* Resumen de la cadena de una orden de compra: pedido → recibido → facturado → pagado */
+.chain-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 10px 0 12px; }
+.chain-box { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: #f8fafc; }
+.chain-box span { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+.chain-box strong { font-size: 15px; }
+.chain-box.warn { border-color: #fecaca; background: #fef2f2; }

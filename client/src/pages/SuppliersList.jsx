@@ -14,7 +14,7 @@ const SUPPLIER_COLUMNS = [
   { label: 'ZIP', value: (r) => r.zip },
 ];
 
-const EMPTY = { name: '', code: '', taxId: '', email: '', phone: '', address: '', city: '', zip: '', notes: '' };
+const EMPTY = { name: '', code: '', taxId: '', email: '', phone: '', address: '', city: '', zip: '', notes: '', paymentTermsDays: '' };
 
 export default function SuppliersList() {
   const { t } = useI18n();
@@ -32,7 +32,7 @@ export default function SuppliersList() {
   function openNew() { setEditing(null); setForm(EMPTY); setError(''); setModalOpen(true); }
   function openEdit(s) {
     setEditing(s);
-    setForm({ name: s.name, code: s.code || '', taxId: s.tax_id || '', email: s.email || '', phone: s.phone || '', address: s.address || '', city: s.city || '', zip: s.zip || '', notes: s.notes || '' });
+    setForm({ name: s.name, code: s.code || '', taxId: s.tax_id || '', email: s.email || '', phone: s.phone || '', address: s.address || '', city: s.city || '', zip: s.zip || '', notes: s.notes || '', paymentTermsDays: s.payment_terms_days == null ? '' : String(s.payment_terms_days) });
     setError(''); setModalOpen(true);
   }
 
@@ -103,6 +103,14 @@ export default function SuppliersList() {
               <div className="field"><label>{t('Dirección')}</label><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
               <div className="field"><label>{t('Ciudad')}</label><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
               <div className="field"><label>{t('Código postal')}</label><input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} /></div>
+            </div>
+            <div className="field"><label>{t('Condiciones de pago')}</label>
+              <select value={form.paymentTermsDays} onChange={(e) => setForm({ ...form, paymentTermsDays: e.target.value })}>
+                <option value="">{t('— Sin definir (30 días por defecto) —')}</option>
+                <option value="0">{t('Contado / prepago')}</option>
+                {[15, 30, 45, 60, 90].map((d) => <option key={d} value={String(d)}>{t('Crédito')} {d} {t('días')}</option>)}
+              </select>
+              <div className="hint">{t('Al recibir mercancía se crea la cuenta por pagar con este vencimiento.')}</div>
             </div>
             <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
             <div className="modal-footer">

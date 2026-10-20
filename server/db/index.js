@@ -39,6 +39,12 @@ tryAlter('ALTER TABLE invoice_payments ADD COLUMN surcharge REAL NOT NULL DEFAUL
 // Comisión que cobra el procesador (Square: 3.5% + $0.15). Neto recibido = amount + surcharge - processor_fee.
 tryAlter('ALTER TABLE invoice_payments ADD COLUMN processor_fee REAL NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE warranties ADD COLUMN product_serial_id INTEGER REFERENCES product_serials(id)');
+// Cadena de compras enlazada: condiciones de pago del proveedor, cuenta por pagar creada desde
+// la recepción, y faltantes cerrados (lo que ya no va a llegar de una línea).
+tryAlter('ALTER TABLE suppliers ADD COLUMN payment_terms_days INTEGER');
+tryAlter('ALTER TABLE supplier_bills ADD COLUMN goods_receipt_id INTEGER REFERENCES goods_receipts(id) ON DELETE SET NULL');
+tryAlter('ALTER TABLE purchase_order_items ADD COLUMN short_qty REAL NOT NULL DEFAULT 0');
+tryAlter('ALTER TABLE purchase_orders ADD COLUMN short_note TEXT');
 
 function all(sql, params = []) {
   const stmt = db.prepare(sql);

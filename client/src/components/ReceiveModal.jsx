@@ -8,24 +8,41 @@ import { useI18n } from '../i18n.jsx';
 // por unidad (uno por línea, o separados por coma; sirve un lector de código de barras).
 export default function ReceiveModal({ po, onDone, onClose }) {
   const { t } = useI18n();
-  const pendingOf = (it) => Math.max(0, Number(it.quantity) - Number(it.received_qty || 0));
+  const pendingOf = (it) => Math.max(0, Number(it.quantity) - Number(it.received_qty || 0) - Number(it.short_qty || 0));
   const [lines, setLines] = useState(
     po.items.filter((it) => pendingOf(it) > 0).map((it) => ({ item: it, quantity: pendingOf(it), serialsText: '' }))
   );
   const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+  const terms = po.supplier_terms_days; // null = sin definir, 0 = contado
+  const [billMode, setBillMode] = useState(terms === 0 ? 'pagada' : 'credito');
+  const [billNumber, setBillNumber] = useState('');
+  const [billAmount, setBillAmount] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [payMethod, setPayMethod] = useState('transferencia');
+  const [payRef, setPayRef] = useState('');
+  const [closeShort, setCloseShort] = useState(false);
+  const [shortNote, setShortNote] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const parseSerials = (txt) => txt.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
   const upd = (i, patch) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const money = (v) => '$' + (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const receivedValue = Math.round(lines.reduce((s, l) => s + (parseFloat(l.quantity) || 0) * Number(l.item.unit_cost || 0), 0) * 100) / 100;
+  const leftAfter = lines.reduce((s, l) => s + Math.max(0, pendingOf(l.item) - (parseFloat(l.quantity) || 0)), 0);
+  const addDays = (d, n) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const autoDue = receiptDate ? addDays(receiptDate, terms == null ? 30 : terms) : '';
 
   async function submit(e) {
     e.preventDefault();
     setSaving(true); setError('');
     try {
+      if (closeShort && leftAfter > 0 && !shortNote.trim()) { setError(t('Escribe el motivo del faltante.')); setSaving(false); return; }
       const updated = await api.post(`/purchase-orders/${po.id}/receipts`, {
         receiptDate, notes,
+        bill: { mode: billMode, billNumber, amount: billAmount === '' ? undefined : billAmount, dueDate: billMode === 'credito' ? (dueDate || autoDue) : undefined, method: payMethod, reference: payRef },
+        closeShort: closeShort && leftAfter > 0 ? { note: shortNote } : undefined,
         lines: lines.map((l) => ({ itemId: l.item.id, quantity: parseFloat(l.quantity) || 0, serials: parseSerials(l.serialsText) })),
       });
       onDone(updated);
@@ -74,6 +91,43 @@ export default function ReceiveModal({ po, onDone, onClose }) {
           <div className="field"><label>{t('Notas (guía, transportista…)')}</label><input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
         </div>
         <div className="muted" style={{ fontSize: 13 }}>{t('El inventario sube solo por lo que llegó. Si falta algo, la orden queda "parcial" y se recibe el resto después.')}</div>
+
+        {lines.length > 0 && leftAfter > 0 && (
+          <div className="form-section" style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}>
+              <input type="checkbox" style={{ width: 'auto' }} checked={closeShort} onChange={(e) => setCloseShort(e.target.checked)} />
+              {t('Lo que falta ya no va a llegar (cerrar faltante)')}
+            </label>
+            <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{t('Quedan')} {leftAfter} {t('unidad(es) pendientes después de esta recepción. Si no marcas esto, la orden queda "parcial" esperando el resto.')}</div>
+            {closeShort && <div className="field" style={{ marginTop: 8 }}><label>{t('Motivo del faltante *')}</label><input value={shortNote} placeholder={t('Ej.: el proveedor no tiene la pieza; llegó dañado y se devolvió…')} onChange={(e) => setShortNote(e.target.value)} /></div>}
+          </div>
+        )}
+
+        {lines.length > 0 && (
+          <div style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>{t('Cuenta por pagar al proveedor')} <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>· {terms == null ? t('condiciones sin definir en el proveedor (se usan 30 días)') : terms === 0 ? t('proveedor de contado') : `${t('crédito')} ${terms} ${t('días')}`}</span></div>
+            <div className="seg" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {[['credito', t('A crédito: crear cuenta por pagar')], ['pagada', t('Ya está pagada (contado / prepago)')], ['ninguna', t('No crear ahora')]].map(([k, label]) => (
+                <button key={k} type="button" className={`btn btn-sm ${billMode === k ? 'btn-primary' : ''}`} onClick={() => setBillMode(k)}>{label}</button>
+              ))}
+            </div>
+            {billMode !== 'ninguna' && (
+              <div className="grid grid-2">
+                <div className="field"><label>{t('No. de factura del proveedor')}</label><input value={billNumber} placeholder={t('Opcional')} onChange={(e) => setBillNumber(e.target.value)} /></div>
+                <div className="field"><label>{t('Monto')} <span className="muted" style={{ fontWeight: 400 }}>({t('valor de lo recibido')}: {money(receivedValue)})</span></label><input inputMode="decimal" placeholder={receivedValue.toFixed(2)} value={billAmount} onChange={(e) => setBillAmount(e.target.value)} /></div>
+                {billMode === 'credito' && <div className="field"><label>{t('Vence')}</label><input type="date" value={dueDate || autoDue} onChange={(e) => setDueDate(e.target.value)} /></div>}
+                {billMode === 'pagada' && <>
+                  <div className="field"><label>{t('Forma de pago')}</label>
+                    <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
+                      {['transferencia', 'ach', 'cheque', 'tarjeta', 'efectivo', 'otro'].map((m) => <option key={m} value={m}>{t(m)}</option>)}
+                    </select></div>
+                  <div className="field"><label>{t('Referencia del pago')}</label><input value={payRef} onChange={(e) => setPayRef(e.target.value)} /></div>
+                </>}
+              </div>
+            )}
+            {billMode === 'ninguna' && <div className="muted" style={{ fontSize: 12 }}>{t('Podrás registrar la factura del proveedor después desde la orden; quedará marcado como "recibido sin facturar".')}</div>}
+          </div>
+        )}
         <div className="modal-footer">
           <button type="button" className="btn" onClick={onClose}>{t('Cancelar')}</button>
           {lines.length > 0 && <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? '…' : t('Registrar recepción')}</button>}
