@@ -25,6 +25,8 @@ import WorkOrderDocument from './pages/WorkOrderDocument.jsx';
 import WarrantiesList from './pages/WarrantiesList.jsx';
 import ReceivablesPage from './pages/ReceivablesPage.jsx';
 import PayablesPage from './pages/PayablesPage.jsx';
+import HelpPage from './pages/HelpPage.jsx';
+import HelpButton from './components/HelpButton.jsx';
 import ServiceVouchersList from './pages/ServiceVouchersList.jsx';
 import ServiceVoucherDocument from './pages/ServiceVoucherDocument.jsx';
 import SerialsPage from './pages/SerialsPage.jsx';
@@ -205,12 +207,20 @@ function MainShell() {
             </NavLink>
           )}
         </div>
+        <div className="nav-group">
+          <div className="nav-label">{t('Ayuda')}</div>
+          <NavLink to="/ayuda" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <span>📘</span><span>{t('Manual de usuario')}</span>
+          </NavLink>
+        </div>
         <div style={{ marginTop: 'auto', padding: '10px 14px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <AccountMenu />
         </div>
       </aside>
       <div className="main">
+        <HelpButton />
         <Routes>
+          <Route path="/ayuda" element={<HelpPage />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/clientes" element={<CustomersList />} />
           <Route path="/clientes/:id" element={<CustomerDetail />} />

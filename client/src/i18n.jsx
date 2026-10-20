@@ -4,6 +4,18 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  '📘 Manual de usuario': '📘 User manual',
+  'Manual de usuario': 'User manual',
+  'Ayuda': 'Help',
+  'Cómo funciona cada módulo del ERP, paso a paso, y qué hacer si algo no sale': 'How each ERP module works, step by step, and what to do if something does not work',
+  'Abrir todo': 'Expand all',
+  '🔎 ¿Qué necesitas hacer? Ej.: registrar pago, recibir orden, serial, faltante…': '🔎 What do you need to do? E.g. record payment, receive order, serial, shortage…',
+  'No encontré nada con esas palabras. Prueba con otras (ej. "pago", "recibir", "factura").': 'Nothing found with those words. Try others (e.g. "payment", "receive", "invoice").',
+  'Ir a': 'Go to',
+  'Consejos': 'Tips',
+  'Problemas frecuentes': 'Common problems',
+  '¿No encuentras la respuesta? Escríbele al administrador del ERP describiendo qué estabas haciendo y, si puedes, con una captura de pantalla.': 'Cannot find the answer? Write to the ERP administrator describing what you were doing and, if possible, with a screenshot.',
+  'Ver cómo funciona esta pantalla': 'See how this screen works',
   '🔎 Buscar por número, proveedor, producto, SKU, serial, comentario, factura, monto…': '🔎 Search by number, supplier, product, SKU, serial, comment, invoice, amount…',
   'Limpiar': 'Clear',
   'de': 'of',
