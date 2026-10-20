@@ -4,6 +4,11 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Comentarios e instrucciones para el proveedor': 'Comments and instructions for the supplier',
+  'Ej.: condiciones de entrega, especificaciones del equipo, datos de facturación, contacto en sitio…': 'E.g. delivery terms, equipment specs, billing details, on-site contact…',
+  'Aparece en la orden de compra impresa.': 'Shown on the printed purchase order.',
+  'caracteres': 'characters',
+  'Comentarios e instrucciones': 'Comments and instructions',
   'archivo(s) se quitarán al guardar': 'file(s) will be removed when you save',
   'Deshacer': 'Undo',
   'Quitar archivo': 'Remove file',

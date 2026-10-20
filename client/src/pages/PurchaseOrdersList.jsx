@@ -32,6 +32,7 @@ export default function PurchaseOrdersList() {
   const [supplierId, setSupplierId] = useState('');
   const [orderDate, setOrderDate] = useState(todayStr());
   const [items, setItems] = useState([{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
+  const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [uploadingDocs, setUploadingDocs] = useState(false);
 
@@ -44,7 +45,7 @@ export default function PurchaseOrdersList() {
 
   function openNew() {
     setEditingPo(null);
-    setSupplierId(''); setOrderDate(todayStr());
+    setSupplierId(''); setOrderDate(todayStr()); setNotes('');
     setItems([{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
     setError(''); setModalOpen(true);
   }
@@ -54,6 +55,7 @@ export default function PurchaseOrdersList() {
     setEditingPo(full);
     setSupplierId(full.supplier_id);
     setOrderDate(full.order_date || todayStr());
+    setNotes(full.notes || '');
     setItems(
       full.items.length > 0
         ? full.items.map((it) => ({ productId: it.product_id || '', description: it.description, quantity: it.quantity, unitPrice: it.unit_cost }))
@@ -87,7 +89,7 @@ export default function PurchaseOrdersList() {
   async function save(e) {
     e.preventDefault();
     const payload = {
-      supplierId, orderDate,
+      supplierId, orderDate, notes,
       items: items.filter((i) => i.description).map((i) => ({ productId: i.productId || null, description: i.description, quantity: parseFloat(i.quantity) || 0, unitCost: parseFloat(i.unitPrice) || 0 })),
     };
     try {
@@ -165,6 +167,13 @@ export default function PurchaseOrdersList() {
             </div>
             <LineItemsEditor items={items} setItems={setItems} products={products} priceLabel="Costo unit." priceSourceField="purchase_cost" />
             {editingPo && <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{t('Puedes ajustar cantidades y líneas mientras la orden no esté marcada como recibida.')}</div>}
+
+            <div className="field" style={{ marginTop: 16 }}>
+              <label>{t('Comentarios e instrucciones para el proveedor')}</label>
+              <textarea rows={6} style={{ resize: 'vertical', minHeight: 120 }} value={notes} onChange={(e) => setNotes(e.target.value)}
+                placeholder={t('Ej.: condiciones de entrega, especificaciones del equipo, datos de facturación, contacto en sitio…')} />
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('Aparece en la orden de compra impresa.')} · {notes.length.toLocaleString()} {t('caracteres')}</div>
+            </div>
 
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)', marginTop: 16, display: 'block' }}>{t('Archivos adjuntos')}</label>
             {editingPo ? (
