@@ -20,7 +20,7 @@ const PRODUCT_COLUMNS = [
 
 const EMPTY = {
   name: '', sku: '', description: '', productTypeId: '', purchaseCost: '', freightCost: '',
-  marginPercent: '30', sellingPrice: '', stockQty: '0', unit: 'unidad', supplierId: '', photoUrl: '', trackSerials: false,
+  marginPercent: '30', sellingPrice: '', stockQty: '0', unit: 'unidad', supplierId: '', photoUrl: '', trackSerials: false, serials: '',
 };
 
 function computePrice(cost, freight, margin) {
@@ -65,16 +65,17 @@ export default function ProductsList() {
     setForm({
       name: p.name, sku: p.sku || '', description: p.description || '', productTypeId: p.product_type_id || '',
       purchaseCost: p.purchase_cost, freightCost: p.freight_cost, marginPercent: p.margin_percent,
-      sellingPrice: p.selling_price, stockQty: p.stock_qty, unit: p.unit, supplierId: p.supplier_id || '', photoUrl: p.photo_url || '', trackSerials: !!p.track_serials,
+      sellingPrice: p.selling_price, stockQty: p.stock_qty, unit: p.unit, supplierId: p.supplier_id || '', photoUrl: p.photo_url || '', trackSerials: !!p.track_serials, serials: '',
     });
     setPhotoFile(null); setOverridePrice(false); setError(''); setModalOpen(true);
   }
 
   const computedPrice = computePrice(form.purchaseCost, form.freightCost, form.marginPercent);
 
+  const serialList = [...new Set(String(form.serials || '').split(/[\n,;\t]+/).map((s) => s.trim()).filter(Boolean))];
   async function save(e) {
     e.preventDefault();
-    const payload = { ...form };
+    const payload = { ...form, serials: form.trackSerials ? serialList.join('\n') : '' };
     if (!overridePrice) payload.sellingPrice = computedPrice;
     const fd = toFormData(payload);
     if (photoFile) fd.append('photo', photoFile);
@@ -216,6 +217,14 @@ export default function ProductsList() {
                   <input type="checkbox" style={{ width: 'auto' }} checked={!!form.trackSerials} onChange={(e) => setForm({ ...form, trackSerials: e.target.checked })} />
                   {t('Maneja números de serie (cada unidad con su serial: grúas, compresores, buckets…)')}
                 </label>
+                {form.trackSerials && (
+                  <div className="field" style={{ marginTop: 8, background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+                    <label>{editing ? t('Agregar números de serie') : t('Números de serie de las unidades que ya tienes')} <span className="muted" style={{ fontWeight: 400 }}>({serialList.length})</span></label>
+                    {editing && editing.serials_available > 0 && <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>{t('Ya registrados y disponibles:')} {editing.serials_available} · <Link to={`/seriales?producto=${editing.id}`}>{t('ver seriales')}</Link></div>}
+                    <textarea rows={4} className="mono" placeholder={t('Un serial por línea (sirve un lector de código de barras)')} value={form.serials} onChange={(e) => setForm({ ...form, serials: e.target.value })} />
+                    <div className="hint">{t('Opcional. Los que lleguen en una orden de compra se piden al recibirla. El stock nunca queda por debajo de las unidades con serial disponibles.')}</div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">

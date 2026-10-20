@@ -29,10 +29,13 @@ function receivePurchaseOrder(poId, { lines, receiptDate, notes, userId, bill, c
     const pending = Number(item.quantity) - Number(item.received_qty || 0) - Number(item.short_qty || 0);
     if (qty - pending > 0.0001) throw httpError(400, `"${item.description}": se pidieron ${item.quantity}, ya se recibieron ${item.received_qty || 0}; no se pueden recibir ${qty} más.`);
     const serials = [...new Set((l.serials || []).map((s) => String(s).trim()).filter(Boolean))];
+    // Al recibir se puede indicar que la línea tiene seriales aunque el producto no lo tuviera
+    // marcado (o la línea no tenga producto: se crea en inventario con la descripción).
+    if (l.hasSerials && !item.track_serials) { item.track_serials = 1; item.mark_serials = true; }
     if (item.track_serials) {
       if (serials.length !== qty) throw httpError(400, `"${item.description}" maneja números de serie: ingresa ${qty} serial(es) (uno por unidad); hay ${serials.length}.`);
       for (const sn of serials) {
-        const dup = get('SELECT id FROM product_serials WHERE product_id = ? AND serial = ?', [item.product_id, sn]);
+        const dup = item.product_id && get('SELECT id FROM product_serials WHERE product_id = ? AND serial = ?', [item.product_id, sn]);
         if (dup) throw httpError(400, `El serial ${sn} ya existe para "${item.product_name || item.description}".`);
       }
     }
@@ -52,6 +55,16 @@ function receivePurchaseOrder(poId, { lines, receiptDate, notes, userId, bill, c
     const rid = run('INSERT INTO goods_receipts (number, purchase_order_id, receipt_date, notes, created_by) VALUES (?,?,?,?,?)',
       [number, poId, date, notes || null, userId || null]).lastInsertRowid;
     for (const { item, qty, serials } of clean) {
+      if (item.mark_serials) {
+        if (!item.product_id) {
+          // Línea escrita a mano: se crea el producto en inventario para poder llevar sus seriales.
+          item.product_id = run(`INSERT INTO products (name, purchase_cost, selling_price, stock_qty, unit, supplier_id, track_serials, active)
+                                 VALUES (?,?,?,0,'unidad',?,1,1)`, [item.description, item.unit_cost || 0, item.unit_cost || 0, po.supplier_id]).lastInsertRowid;
+          run('UPDATE purchase_order_items SET product_id = ? WHERE id = ?', [item.product_id, item.id]);
+        } else {
+          run('UPDATE products SET track_serials = 1 WHERE id = ?', [item.product_id]);
+        }
+      }
       run('INSERT INTO goods_receipt_items (goods_receipt_id, purchase_order_item_id, product_id, description, quantity) VALUES (?,?,?,?,?)',
         [rid, item.id, item.product_id || null, item.description, qty]);
       run('UPDATE purchase_order_items SET received_qty = received_qty + ? WHERE id = ?', [qty, item.id]);

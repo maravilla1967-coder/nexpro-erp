@@ -4,6 +4,17 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Sí': 'Yes',
+  '¿Tiene número de serie?': 'Does it have a serial number?',
+  'Números de serie de': 'Serial numbers for',
+  'Esta línea no tiene producto de inventario: se creará el producto con esta descripción para llevar sus seriales.': 'This line has no inventory product: a product with this description will be created to track its serials.',
+  'Indica si tiene número de serie:': 'Indicate whether it has a serial number:',
+  'Falta escribir un serial por unidad en:': 'Enter one serial per unit for:',
+  'Números de serie de las unidades que ya tienes': 'Serial numbers of units you already have',
+  'Ya registrados y disponibles:': 'Already registered and available:',
+  'ver seriales': 'view serials',
+  'Un serial por línea (sirve un lector de código de barras)': 'One serial per line (a barcode scanner works)',
+  'Opcional. Los que lleguen en una orden de compra se piden al recibirla. El stock nunca queda por debajo de las unidades con serial disponibles.': 'Optional. Units arriving on a purchase order are asked for when receiving it. Stock never drops below the available serialized units.',
   'No está enlazado a ningún vehículo ni orden de trabajo (puedes enlazarlo con "Editar").': 'Not linked to any vehicle or work order (link it with "Edit").',
   'Para registrar el pago escribe el monto.': 'To record the payment, enter the amount.',
   'No todavía — guardar y pagar después': 'Not yet — save and pay later',

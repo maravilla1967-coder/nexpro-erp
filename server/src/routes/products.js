@@ -42,6 +42,31 @@ function setTrackSerials(id, v) {
   run('UPDATE products SET track_serials = ? WHERE id = ?', [on ? 1 : 0, id]);
 }
 
+// Números de serie escritos al crear/editar el producto (uno por línea, o separados por coma):
+// se dan de alta como unidades disponibles. El stock nunca queda por debajo de las unidades
+// con serial disponibles.
+function parseSerials(v) {
+  return [...new Set(String(v || '').split(/[\n,;\t]+/).map((s) => s.trim()).filter(Boolean))];
+}
+function addProductSerials(productId, serials, userId) {
+  if (!serials.length) return;
+  const p = get('SELECT * FROM products WHERE id = ?', [productId]);
+  const date = new Date().toISOString().slice(0, 10);
+  run('UPDATE products SET track_serials = 1 WHERE id = ?', [productId]);
+  for (const sn of serials) {
+    const id = run(`INSERT INTO product_serials (product_id, serial, status, supplier_id, received_date, unit_cost, status_date, notes)
+                    VALUES (?,?,?,?,?,?,?,?)`, [productId, sn, 'disponible', p.supplier_id || null, date, p.purchase_cost, date, 'Alta desde la ficha del producto']).lastInsertRowid;
+    run('INSERT INTO serial_events (serial_id, event, notes, created_by) VALUES (?,?,?,?)', [id, 'alta_manual', 'Ficha del producto', userId || null]);
+  }
+  const avail = get(`SELECT COUNT(*) n FROM product_serials WHERE product_id = ? AND status = 'disponible'`, [productId]).n;
+  run('UPDATE products SET stock_qty = MAX(stock_qty, ?) WHERE id = ?', [avail, productId]);
+}
+function duplicateSerial(productId, serials) {
+  if (!productId) return null;
+  for (const sn of serials) if (get('SELECT id FROM product_serials WHERE product_id = ? AND serial = ?', [productId, sn])) return sn;
+  return null;
+}
+
 router.get('/', (req, res) => {
   const { q, typeId, active } = req.query;
   let sql = `SELECT p.*, pt.name as product_type_name, s.name as supplier_name,
@@ -100,6 +125,7 @@ router.post('/', upload.single('photo'), (req, res) => {
      b.active !== undefined ? (b.active === 'false' ? 0 : 1) : 1]
   );
   setTrackSerials(result.lastInsertRowid, b.trackSerials);
+  addProductSerials(result.lastInsertRowid, parseSerials(b.serials), req.user && req.user.id);
   res.status(201).json(get('SELECT * FROM products WHERE id = ?', [result.lastInsertRowid]));
 });
 
@@ -107,6 +133,9 @@ router.put('/:id', upload.single('photo'), (req, res) => {
   const b = req.body;
   const existing = get('SELECT * FROM products WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Producto no encontrado' });
+  const newSerials = parseSerials(b.serials);
+  const dup = duplicateSerial(existing.id, newSerials);
+  if (dup) return res.status(400).json({ error: `El serial ${dup} ya está registrado para este producto.` });
 
   const purchaseCost = b.purchaseCost !== undefined ? parseFloat(b.purchaseCost) : existing.purchase_cost;
   const freightCost = b.freightCost !== undefined ? parseFloat(b.freightCost) : existing.freight_cost;
@@ -127,6 +156,7 @@ router.put('/:id', upload.single('photo'), (req, res) => {
      nowIso(), req.params.id]
   );
   setTrackSerials(req.params.id, b.trackSerials);
+  addProductSerials(existing.id, newSerials, req.user && req.user.id);
   res.json(get('SELECT * FROM products WHERE id = ?', [req.params.id]));
 });
 

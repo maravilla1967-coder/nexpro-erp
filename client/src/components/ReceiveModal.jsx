@@ -10,7 +10,7 @@ export default function ReceiveModal({ po, onDone, onClose }) {
   const { t } = useI18n();
   const pendingOf = (it) => Math.max(0, Number(it.quantity) - Number(it.received_qty || 0) - Number(it.short_qty || 0));
   const [lines, setLines] = useState(
-    po.items.filter((it) => pendingOf(it) > 0).map((it) => ({ item: it, quantity: pendingOf(it), serialsText: '' }))
+    po.items.filter((it) => pendingOf(it) > 0).map((it) => ({ item: it, quantity: pendingOf(it), serialsText: '', hasSerials: it.track_serials ? true : null }))
   );
   const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
@@ -38,12 +38,16 @@ export default function ReceiveModal({ po, onDone, onClose }) {
     e.preventDefault();
     setSaving(true); setError('');
     try {
+      const unanswered = lines.filter((l) => (parseFloat(l.quantity) || 0) > 0 && l.hasSerials === null);
+      if (unanswered.length) { setError(`${t('Indica si tiene número de serie:')} ${unanswered.map((l) => l.item.description).join(', ')}`); setSaving(false); return; }
+      const incomplete = lines.filter((l) => l.hasSerials && (parseFloat(l.quantity) || 0) > 0 && parseSerials(l.serialsText).length !== (parseFloat(l.quantity) || 0));
+      if (incomplete.length) { setError(`${t('Falta escribir un serial por unidad en:')} ${incomplete.map((l) => l.item.description).join(', ')}`); setSaving(false); return; }
       if (closeShort && leftAfter > 0 && !shortNote.trim()) { setError(t('Escribe el motivo del faltante.')); setSaving(false); return; }
       const updated = await api.post(`/purchase-orders/${po.id}/receipts`, {
         receiptDate, notes,
         bill: { mode: billMode, billNumber, amount: billAmount === '' ? undefined : billAmount, dueDate: billMode === 'credito' ? (dueDate || autoDue) : undefined, method: payMethod, reference: payRef },
         closeShort: closeShort && leftAfter > 0 ? { note: shortNote } : undefined,
-        lines: lines.map((l) => ({ itemId: l.item.id, quantity: parseFloat(l.quantity) || 0, serials: parseSerials(l.serialsText) })),
+        lines: lines.map((l) => ({ itemId: l.item.id, quantity: parseFloat(l.quantity) || 0, hasSerials: l.hasSerials === true, serials: l.hasSerials ? parseSerials(l.serialsText) : [] })),
       });
       onDone(updated);
     } catch (err) { setError(err.message); setSaving(false); }
@@ -63,20 +67,30 @@ export default function ReceiveModal({ po, onDone, onClose }) {
                 return (
                   <React.Fragment key={l.item.id}>
                     <tr>
-                      <td>{l.item.description}{l.item.track_serials ? <div className="muted" style={{ fontSize: 12 }}>🔢 {t('Maneja números de serie')}</div> : null}</td>
+                      <td>{l.item.description}
+                        {n > 0 && (l.item.track_serials
+                          ? <div className="muted" style={{ fontSize: 12 }}>🔢 {t('Maneja números de serie')}</div>
+                          : <div style={{ fontSize: 12, marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span className="muted">{t('¿Tiene número de serie?')}</span>
+                              <button type="button" className={`btn btn-sm ${l.hasSerials === true ? 'btn-primary' : ''}`} style={{ padding: '1px 10px' }} onClick={() => upd(i, { hasSerials: true })}>{t('Sí')}</button>
+                              <button type="button" className={`btn btn-sm ${l.hasSerials === false ? 'btn-primary' : ''}`} style={{ padding: '1px 10px' }} onClick={() => upd(i, { hasSerials: false })}>{t('No')}</button>
+                            </div>)}
+                      </td>
                       <td className="text-right">{l.item.quantity}</td>
                       <td className="text-right muted">{l.item.received_qty || 0}</td>
                       <td className="text-right">{pendingOf(l.item)}</td>
                       <td><input type="number" min="0" step="any" max={pendingOf(l.item)} value={l.quantity} onChange={(e) => upd(i, { quantity: e.target.value })} /></td>
                     </tr>
-                    {l.item.track_serials && n > 0 ? (
+                    {l.hasSerials && n > 0 ? (
                       <tr>
                         <td colSpan={5} style={{ background: '#f8fafc' }}>
                           <label style={{ fontSize: 12, fontWeight: 600 }}>
-                            {t('Números de serie')} <span className={sn.length === n ? '' : 'text-danger'}>({sn.length}/{n})</span>
+                            {t('Números de serie de')} {l.item.description} <span className={sn.length === n ? '' : 'text-danger'}>({sn.length}/{n})</span>
+                            {sn.length === n && <span style={{ color: 'var(--green, #15803d)' }}> ✓</span>}
                           </label>
-                          <textarea rows={Math.min(6, Math.max(2, n))} className="mono" placeholder={t('Un serial por línea (o separados por coma)')}
+                          <textarea rows={Math.min(6, Math.max(2, n))} className="mono" autoFocus placeholder={t('Un serial por línea (o separados por coma)')}
                             value={l.serialsText} onChange={(e) => upd(i, { serialsText: e.target.value })} />
+                          {!l.item.product_id && <div className="muted" style={{ fontSize: 12 }}>{t('Esta línea no tiene producto de inventario: se creará el producto con esta descripción para llevar sus seriales.')}</div>}
                         </td>
                       </tr>
                     ) : null}
