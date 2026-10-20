@@ -476,3 +476,30 @@ CREATE TABLE IF NOT EXISTS payment_files (
   original_name TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Comprobante de pago sin factura (documento soporte): pago a un proveedor de servicios que
+-- no expide factura. Deja constancia de quién hizo el trabajo, qué se hizo, en qué vehículo u
+-- orden de trabajo, cuánto se pagó y cómo. Crea la cuenta por pagar enlazada (supplier_bills).
+CREATE TABLE IF NOT EXISTS service_vouchers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+  service_date TEXT,
+  service_type TEXT,
+  description TEXT NOT NULL,
+  amount REAL NOT NULL DEFAULT 0,
+  vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL,
+  work_order_id INTEGER REFERENCES work_orders(id) ON DELETE SET NULL,
+  bill_id INTEGER REFERENCES supplier_bills(id) ON DELETE SET NULL,
+  received_by TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS service_voucher_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  voucher_id INTEGER NOT NULL REFERENCES service_vouchers(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

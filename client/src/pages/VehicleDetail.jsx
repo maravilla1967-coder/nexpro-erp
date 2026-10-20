@@ -49,7 +49,8 @@ export default function VehicleDetail() {
     api.get(`/vehicles/${id}`).then(setVehicle).catch(console.error);
     api.get('/serials', { vehicleId: id }).then(setInstalledSerials).catch(() => {});
   }
-  useEffect(() => { load(); }, [id]);
+  const [vouchers, setVouchers] = useState([]);
+  useEffect(() => { load(); api.get('/service-vouchers', { vehicleId: id }).then(setVouchers).catch(() => {}); }, [id]);
   useEffect(() => {
     api.get('/vehicles/equipment-types').then(setEquipTypes);
     api.get('/customers').then(setCustomers).catch(() => {});
@@ -364,7 +365,7 @@ export default function VehicleDetail() {
                           <button className="btn-row-action edit" onClick={() => openEditWo(wo)}>{t('Editar')}</button>
                         )}
                       </td>
-                      <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
+                      <td style={{ whiteSpace: 'nowrap' }}><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link> · <Link to={`/pagos-sin-factura?nuevo=1&vehiculo=${id}&orden=${wo.id}`} title={t('Registrar pago a un proveedor de servicios sin factura')}>{t('Pago sin factura')}</Link></td>
                     </tr>
                   );
                 })}
@@ -372,6 +373,32 @@ export default function VehicleDetail() {
             </table>
           )}
           <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>{t('Gestiona el detalle de horas/servicios de cada orden en')} <Link to="/ordenes-trabajo">{t('Órdenes de Trabajo')}</Link>. {t('Las órdenes marcadas como "completado" pueden facturarse: selecciónalas con la casilla y haz clic en "Facturar seleccionadas".')}</div>
+        </div>
+
+        <div className="card">
+          <div className="card-title">
+            {t('Pagos a proveedores sin factura')}
+            <Link className="btn btn-sm" to={`/pagos-sin-factura?nuevo=1&vehiculo=${id}`}>{t('+ Pago sin factura')}</Link>
+          </div>
+          {vouchers.length === 0 ? <div className="empty-state">{t('Ningún pago a terceros registrado para este vehículo.')}</div> : (
+            <table>
+              <thead><tr><th>{t('Número')}</th><th>{t('Fecha')}</th><th>{t('Proveedor')}</th><th>{t('Trabajo')}</th><th>{t('Orden')}</th><th className="text-right">{t('Monto')}</th><th></th></tr></thead>
+              <tbody>
+                {vouchers.map((sv) => (
+                  <tr key={sv.id}>
+                    <td className="mono"><Link to={`/pagos-sin-factura/${sv.id}/documento`}>{sv.number}</Link></td>
+                    <td className="muted">{sv.service_date}</td>
+                    <td>{sv.supplier_name}</td>
+                    <td>{sv.service_type ? <strong>{sv.service_type}: </strong> : null}{String(sv.description).slice(0, 70)}{String(sv.description).length > 70 ? '…' : ''}</td>
+                    <td className="mono muted">{sv.work_order_number || '—'}</td>
+                    <td className="text-right">${Number(sv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td><Pill value={sv.bill_status || 'pendiente'} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {vouchers.length > 0 && <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{t('Total pagado a terceros en este vehículo:')} <strong>${vouchers.reduce((s, x) => s + Number(x.amount), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></div>}
         </div>
       </div>
 

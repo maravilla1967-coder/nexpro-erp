@@ -25,6 +25,8 @@ import WorkOrderDocument from './pages/WorkOrderDocument.jsx';
 import WarrantiesList from './pages/WarrantiesList.jsx';
 import ReceivablesPage from './pages/ReceivablesPage.jsx';
 import PayablesPage from './pages/PayablesPage.jsx';
+import ServiceVouchersList from './pages/ServiceVouchersList.jsx';
+import ServiceVoucherDocument from './pages/ServiceVoucherDocument.jsx';
 import SerialsPage from './pages/SerialsPage.jsx';
 import WarrantyDocument from './pages/WarrantyDocument.jsx';
 import UsersList from './pages/UsersList.jsx';
@@ -63,6 +65,7 @@ const NAV = [
       { to: '/proveedores', text: 'Proveedores', icon: '🏭' },
       { to: '/compras', text: 'Órdenes de Compra', icon: '🛒' },
       { to: '/cuentas-por-pagar', text: 'Cuentas por pagar', icon: '🧾' },
+      { to: '/pagos-sin-factura', text: 'Pagos sin factura', icon: '🧰' },
       { to: '/seriales', text: 'Números de serie', icon: '🔢' },
     ],
   },
@@ -229,6 +232,8 @@ function MainShell() {
           <Route path="/garantias" element={<WarrantiesList />} />
           <Route path="/cartera" element={<ReceivablesPage />} />
           <Route path="/cuentas-por-pagar" element={<PayablesPage />} />
+          <Route path="/pagos-sin-factura" element={<ServiceVouchersList />} />
+          <Route path="/pagos-sin-factura/:id/documento" element={<ServiceVoucherDocument />} />
           <Route path="/seriales" element={<SerialsPage />} />
           <Route path="/garantias/:id/documento" element={<WarrantyDocument />} />
           <Route path="/aprobaciones" element={<ApprovalsList />} />

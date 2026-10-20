@@ -175,7 +175,7 @@ export default function PayablesPage() {
                       <td><RowBox ex={ex} row={b} /></td>
                       <td className="clickable" onClick={() => openEdit(b)}><strong>{b.supplier_name}</strong></td>
                       <td className="mono clickable" onClick={() => openEdit(b)}>{b.bill_number || '—'}</td>
-                      <td className="mono muted">{b.purchase_order_number || '—'}{b.goods_receipt_number ? <div style={{ fontSize: 11 }}>{b.goods_receipt_number}</div> : null}</td>
+                      <td className="mono muted">{b.purchase_order_number || '—'}{b.goods_receipt_number ? <div style={{ fontSize: 11 }}>{b.goods_receipt_number}</div> : null}{b.service_voucher_id ? <div style={{ fontSize: 11 }}><Link to={`/pagos-sin-factura/${b.service_voucher_id}/documento`} onClick={(e) => e.stopPropagation()}>{t('Comprobante sin factura')}</Link></div> : null}</td>
                       <td className="muted">{b.due_date || '—'}{b.balance > 0.004 && b.days_overdue > 0 && <> <span className={`aging-pill b-${b.bucket.replace('+', 'p')}`}>{b.days_overdue} {t('días')}</span></>}</td>
                       <td><Pill value={b.status} /></td>
                       <td className="text-right">{money(b.amount)}</td>
