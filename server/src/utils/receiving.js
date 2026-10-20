@@ -69,7 +69,7 @@ function receivePurchaseOrder(poId, { lines, receiptDate, notes, userId, bill, c
     // Cuenta por pagar enlazada a esta recepción (y a la orden).
     if (mode === 'credito' || mode === 'pagada') {
       const billDate = (bill && bill.billDate) || date;
-      const termsDays = supplier.payment_terms_days;
+      const termsDays = po.payment_terms_days != null ? po.payment_terms_days : supplier.payment_terms_days;
       const dueDate = (bill && bill.dueDate) || (mode === 'pagada' ? billDate : addDays(billDate, termsDays == null ? 30 : termsDays));
       const billId = run(
         `INSERT INTO supplier_bills (supplier_id, purchase_order_id, goods_receipt_id, bill_number, bill_date, due_date, amount, status, notes)

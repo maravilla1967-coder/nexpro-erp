@@ -4,6 +4,10 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Las del proveedor': "Supplier's",
+  'sin definir (30 días)': 'not set (30 days)',
+  'Se usan al recibir la mercancía para crear la cuenta por pagar. Cámbialas en el proveedor para todas sus órdenes.': 'Used when receiving goods to create the payable. Change them on the supplier for all of its orders.',
+  'Condiciones de pago:': 'Payment terms:',
   'Condiciones de pago': 'Payment terms',
   '— Sin definir (30 días por defecto) —': '— Not set (30 days by default) —',
   'Contado / prepago': 'Cash / prepaid',

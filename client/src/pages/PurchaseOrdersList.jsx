@@ -33,6 +33,7 @@ export default function PurchaseOrdersList() {
   const [orderDate, setOrderDate] = useState(todayStr());
   const [items, setItems] = useState([{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
   const [notes, setNotes] = useState('');
+  const [poTerms, setPoTerms] = useState('');
   const [error, setError] = useState('');
   const [uploadingDocs, setUploadingDocs] = useState(false);
 
@@ -45,7 +46,7 @@ export default function PurchaseOrdersList() {
 
   function openNew() {
     setEditingPo(null);
-    setSupplierId(''); setOrderDate(todayStr()); setNotes('');
+    setSupplierId(''); setOrderDate(todayStr()); setNotes(''); setPoTerms('');
     setItems([{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
     setError(''); setModalOpen(true);
   }
@@ -56,6 +57,7 @@ export default function PurchaseOrdersList() {
     setSupplierId(full.supplier_id);
     setOrderDate(full.order_date || todayStr());
     setNotes(full.notes || '');
+    setPoTerms(full.payment_terms_days == null ? '' : String(full.payment_terms_days));
     setItems(
       full.items.length > 0
         ? full.items.map((it) => ({ productId: it.product_id || '', description: it.description, quantity: it.quantity, unitPrice: it.unit_cost }))
@@ -90,7 +92,7 @@ export default function PurchaseOrdersList() {
   async function save(e) {
     e.preventDefault();
     const payload = {
-      supplierId, orderDate, notes,
+      supplierId, orderDate, notes, paymentTermsDays: poTerms,
       items: linesLocked ? undefined : items.filter((i) => i.description).map((i) => ({ productId: i.productId || null, description: i.description, quantity: parseFloat(i.quantity) || 0, unitCost: parseFloat(i.unitPrice) || 0 })),
     };
     try {
@@ -175,6 +177,21 @@ export default function PurchaseOrdersList() {
               </div>
               <div className="field"><label>{t('Fecha de la orden')}</label>
                 <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
+              </div>
+              <div className="field"><label>{t('Condiciones de pago')}</label>
+                {(() => {
+                  const sup = suppliers.find((s) => String(s.id) === String(supplierId));
+                  const st = sup ? sup.payment_terms_days : null;
+                  const lbl = (d) => (d == null ? t('sin definir (30 días)') : Number(d) === 0 ? t('Contado / prepago') : `${t('Crédito')} ${d} ${t('días')}`);
+                  return (
+                    <select value={poTerms} onChange={(e) => setPoTerms(e.target.value)}>
+                      <option value="">{t('Las del proveedor')}: {lbl(st)}</option>
+                      <option value="0">{t('Contado / prepago')}</option>
+                      {[15, 30, 45, 60, 90].map((d) => <option key={d} value={String(d)}>{t('Crédito')} {d} {t('días')}</option>)}
+                    </select>
+                  );
+                })()}
+                <div className="hint">{t('Se usan al recibir la mercancía para crear la cuenta por pagar. Cámbialas en el proveedor para todas sus órdenes.')}</div>
               </div>
             </div>
             {linesLocked ? (

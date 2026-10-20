@@ -6,6 +6,7 @@ const { makeDocUploader } = require('../middleware/upload');
 const { receivePurchaseOrder, closeShort, reopenShort } = require('../utils/receiving');
 
 const router = express.Router();
+const termsVal = (v) => { if (v === undefined) return undefined; if (v === null || String(v).trim() === '') return null; const n = parseInt(v, 10); return Number.isNaN(n) || n < 0 ? null : n; };
 router.use(requireModuleEdit('compras'));
 const docUpload = makeDocUploader('purchase-order-docs');
 
@@ -66,6 +67,8 @@ router.get('/:id', (req, res) => {
     [req.params.id]
   );
   if (!po) return res.status(404).json({ error: 'Orden de compra no encontrada' });
+  // Condiciones de pago que aplican: las de la orden si se fijaron, si no las del proveedor.
+  po.effective_terms_days = po.payment_terms_days != null ? po.payment_terms_days : po.supplier_terms_days;
   res.json(withItems(po));
 });
 
@@ -80,8 +83,8 @@ router.post('/', (req, res) => {
   const number = nextPoNumber(vendorCode);
   const orderDate = b.orderDate || new Date().toISOString().slice(0, 10);
   const result = run(
-    `INSERT INTO purchase_orders (number, supplier_id, status, order_date, notes) VALUES (?,?,?,?,?)`,
-    [number, b.supplierId, b.status || 'borrador', orderDate, b.notes || null]
+    `INSERT INTO purchase_orders (number, supplier_id, status, order_date, notes, payment_terms_days) VALUES (?,?,?,?,?,?)`,
+    [number, b.supplierId, b.status || 'borrador', orderDate, b.notes || null, termsVal(b.paymentTermsDays) ?? null]
   );
   const poId = result.lastInsertRowid;
   for (const item of b.items) {
@@ -117,8 +120,9 @@ router.put('/:id', (req, res) => {
     return res.json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id])));
   }
   run(
-    `UPDATE purchase_orders SET status=?, order_date=?, notes=? WHERE id=?`,
-    [b.status ?? existing.status, b.orderDate ?? existing.order_date, b.notes ?? existing.notes, req.params.id]
+    `UPDATE purchase_orders SET status=?, order_date=?, notes=?, payment_terms_days=? WHERE id=?`,
+    [b.status ?? existing.status, b.orderDate ?? existing.order_date, b.notes ?? existing.notes,
+     termsVal(b.paymentTermsDays) === undefined ? existing.payment_terms_days : termsVal(b.paymentTermsDays), req.params.id]
   );
 
   if (Array.isArray(b.items)) {

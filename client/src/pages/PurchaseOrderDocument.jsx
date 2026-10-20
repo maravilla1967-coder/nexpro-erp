@@ -38,6 +38,7 @@ export default function PurchaseOrderDocument() {
               <div><strong>No.</strong> {po.number}</div>
               <div><strong>{t('Fecha:')}</strong> {po.order_date || po.created_at}</div>
               <div><strong>{t('Estado:')}</strong> <Pill value={po.status} /></div>
+              {po.effective_terms_days != null && <div><strong>{t('Condiciones de pago:')}</strong> {Number(po.effective_terms_days) === 0 ? t('Contado / prepago') : `${t('Crédito')} ${po.effective_terms_days} ${t('días')}`}</div>}
             </div>
           </div>
 

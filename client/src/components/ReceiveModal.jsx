@@ -14,7 +14,7 @@ export default function ReceiveModal({ po, onDone, onClose }) {
   );
   const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
-  const terms = po.supplier_terms_days; // null = sin definir, 0 = contado
+  const terms = po.effective_terms_days !== undefined ? po.effective_terms_days : po.supplier_terms_days; // null = sin definir, 0 = contado
   const [billMode, setBillMode] = useState(terms === 0 ? 'pagada' : 'credito');
   const [billNumber, setBillNumber] = useState('');
   const [billAmount, setBillAmount] = useState('');
