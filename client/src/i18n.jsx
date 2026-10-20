@@ -4,6 +4,10 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  '🔎 Buscar por número, proveedor, producto, SKU, serial, comentario, factura, monto…': '🔎 Search by number, supplier, product, SKU, serial, comment, invoice, amount…',
+  'Limpiar': 'Clear',
+  'de': 'of',
+  'Ninguna orden coincide con la búsqueda.': 'No orders match your search.',
   'Sí': 'Yes',
   '¿Tiene número de serie?': 'Does it have a serial number?',
   'Números de serie de': 'Serial numbers for',

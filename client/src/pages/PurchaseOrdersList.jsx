@@ -23,7 +23,22 @@ function todayStr() { return new Date().toISOString().slice(0, 10); }
 export default function PurchaseOrdersList() {
   const { t } = useI18n();
   const [list, setList] = useState([]);
-  const ex = useListExport({ rows: list, getDate: poDate, getNumber: poNumber });
+  const [q, setQ] = useState('');
+  const [statusF, setStatusF] = useState('');
+  const [supplierF, setSupplierF] = useState('');
+  // Buscador: cada palabra debe aparecer en algún dato de la orden (número, proveedor, productos,
+  // SKU, seriales, comentarios, facturas del proveedor, recepciones, monto o fecha).
+  const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const words = norm(q).split(/\s+/).filter(Boolean);
+  const filtered = list.filter((po) => {
+    if (statusF && po.status !== statusF) return false;
+    if (supplierF && String(po.supplier_id) !== supplierF) return false;
+    if (!words.length) return true;
+    const hay = norm([po.number, po.supplier_name, po.items_summary, po.search_products, po.search_serials, po.search_bills, po.search_receipts,
+      po.notes, po.short_note, po.status, po.order_date, po.created_at, po.total, Number(po.total || 0).toFixed(2)].join(' '));
+    return words.every((w) => hay.includes(w.replace(/[$,]/g, '')));
+  });
+  const ex = useListExport({ rows: filtered, getDate: poDate, getNumber: poNumber });
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -135,8 +150,22 @@ export default function PurchaseOrdersList() {
         <button className="btn btn-primary" onClick={openNew}>{t('+ Nueva orden de compra')}</button>
       </div>
       <div className="content">
+        <div className="toolbar" style={{ flexWrap: 'wrap' }}>
+          <input className="search-input" style={{ flex: '1 1 340px' }} autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder={t('🔎 Buscar por número, proveedor, producto, SKU, serial, comentario, factura, monto…')} />
+          <select style={{ width: 220 }} value={supplierF} onChange={(e) => setSupplierF(e.target.value)}>
+            <option value="">{t('Todos los proveedores')}</option>
+            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select style={{ width: 170 }} value={statusF} onChange={(e) => setStatusF(e.target.value)}>
+            <option value="">{t('Todos los estados')}</option>
+            {['borrador', 'enviada', 'parcial', 'recibida', 'cerrada', 'cancelado'].map((s) => <option key={s} value={s}>{t(s)}</option>)}
+          </select>
+          {(q || statusF || supplierF) && <button className="btn btn-sm" onClick={() => { setQ(''); setStatusF(''); setSupplierF(''); }}>{t('Limpiar')}</button>}
+          {(q || statusF || supplierF) && <span className="muted" style={{ fontSize: 13 }}>{filtered.length} {t('de')} {list.length}</span>}
+        </div>
         <div className="card">
-          {list.length === 0 ? <div className="empty-state">{t('No hay órdenes de compra todavía.')}</div> : (
+          {list.length === 0 ? <div className="empty-state">{t('No hay órdenes de compra todavía.')}</div> : filtered.length === 0 ? <div className="empty-state">{t('Ninguna orden coincide con la búsqueda.')}</div> : (
             <><ListExportBar ex={ex} title={t('Órdenes de Compra')} filename="ordenes-de-compra" columns={PO_COLUMNS} />
             <table>
               <thead><tr><th><SelectAllBox ex={ex} /></th><th>{t('Número')}</th><th>{t('Proveedor')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th style={{ textAlign: 'right' }}>{t('Total')}</th><th></th></tr></thead>

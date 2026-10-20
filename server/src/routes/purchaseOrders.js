@@ -48,7 +48,13 @@ router.get('/', (req, res) => {
   const list = all(
     `SELECT po.*, s.name as supplier_name,
             (SELECT COALESCE(SUM(i.quantity * i.unit_cost), 0) FROM purchase_order_items i WHERE i.purchase_order_id = po.id) AS total,
-            (SELECT GROUP_CONCAT(i.description, '; ') FROM purchase_order_items i WHERE i.purchase_order_id = po.id) AS items_summary
+            (SELECT GROUP_CONCAT(i.description, '; ') FROM purchase_order_items i WHERE i.purchase_order_id = po.id) AS items_summary,
+            -- Texto para el buscador de la lista: productos (nombre/SKU), seriales recibidos,
+            -- facturas del proveedor y recepciones de la orden.
+            (SELECT GROUP_CONCAT(COALESCE(p.name,'') || ' ' || COALESCE(p.sku,''), ' ') FROM purchase_order_items i JOIN products p ON p.id = i.product_id WHERE i.purchase_order_id = po.id) AS search_products,
+            (SELECT GROUP_CONCAT(ps.serial, ' ') FROM product_serials ps WHERE ps.purchase_order_id = po.id) AS search_serials,
+            (SELECT GROUP_CONCAT(COALESCE(b.bill_number,''), ' ') FROM supplier_bills b WHERE b.purchase_order_id = po.id) AS search_bills,
+            (SELECT GROUP_CONCAT(gr.number, ' ') FROM goods_receipts gr WHERE gr.purchase_order_id = po.id) AS search_receipts
      FROM purchase_orders po
      LEFT JOIN suppliers s ON s.id = po.supplier_id ORDER BY po.created_at DESC`
   );
