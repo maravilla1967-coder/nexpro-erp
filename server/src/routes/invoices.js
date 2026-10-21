@@ -3,6 +3,7 @@ const { db, all, get, run } = require('../../db');
 const { nextDocNumber, asInvoiceNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 const { round2, refreshInvoiceStatus } = require('../utils/payments');
+const { setPaymentBank } = require('../utils/bank');
 const { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment, paymentUpload, saveFilesForPayment } = require('../utils/paymentFiles');
 
 const router = express.Router();
@@ -423,6 +424,7 @@ router.post('/:id/payments', paymentUpload, (req, res) => {
     [inv.id, b.paymentDate || new Date().toISOString().slice(0, 10), amount, Math.max(0, round2(b.surcharge)), Math.max(0, round2(b.processorFee)), b.method || null, b.reference || null, b.notes || null, req.user ? req.user.id : null]
   ).lastInsertRowid;
   saveFilesForPayment('invoice', newId, req.files);
+  setPaymentBank('invoice', newId, b.bankAccountId);
   refreshInvoiceStatus(inv.id);
   res.status(201).json({ ...getFullInvoice(inv.id), newPaymentId: newId });
 });
@@ -447,6 +449,7 @@ router.put('/:id/payments/:paymentId', paymentUpload, (req, res) => {
     run(`DELETE FROM payment_files WHERE id = ? AND kind = 'invoice' AND payment_id = ?`, [fid, pay.id]);
   }
   saveFilesForPayment('invoice', pay.id, req.files);
+  if (b.bankAccountId !== undefined) setPaymentBank('invoice', pay.id, b.bankAccountId);
   refreshInvoiceStatus(req.params.id);
   res.json(getFullInvoice(req.params.id));
 });

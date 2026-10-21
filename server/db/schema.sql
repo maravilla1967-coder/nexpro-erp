@@ -503,3 +503,63 @@ CREATE TABLE IF NOT EXISTS service_voucher_files (
   original_name TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ===== Finanzas / Bancos =====
+-- Cuentas bancarias (o caja / tarjeta) con saldo inicial. El saldo = saldo inicial + cobros de
+-- facturas (invoice_payments.bank_account_id) − pagos a proveedores (supplier_bill_payments
+-- .bank_account_id) ± movimientos propios del banco (bank_transactions).
+CREATE TABLE IF NOT EXISTS bank_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  bank_name TEXT,
+  account_type TEXT NOT NULL DEFAULT 'corriente', -- corriente / ahorros / tarjeta / efectivo / otra
+  account_number TEXT,
+  routing_number TEXT,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  opening_balance REAL NOT NULL DEFAULT 0,
+  opening_date TEXT,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- Préstamos recibidos de socios o terceros (el dinero entra a una cuenta como bank_transaction).
+CREATE TABLE IF NOT EXISTS loans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  lender_name TEXT NOT NULL,
+  lender_type TEXT NOT NULL DEFAULT 'socio', -- socio / tercero / banco
+  principal REAL NOT NULL DEFAULT 0,
+  loan_date TEXT,
+  interest_rate REAL,
+  due_date TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- Movimientos propios del banco: préstamos recibidos y sus abonos, nómina, transferencias entre
+-- cuentas, comisiones, impuestos, aportes y otros ingresos/egresos.
+CREATE TABLE IF NOT EXISTS bank_transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL REFERENCES bank_accounts(id) ON DELETE CASCADE,
+  tx_date TEXT NOT NULL,
+  direction TEXT NOT NULL, -- 'in' ingreso / 'out' egreso
+  category TEXT NOT NULL,
+  amount REAL NOT NULL,
+  payee TEXT,
+  description TEXT,
+  reference TEXT,
+  period TEXT, -- nómina: periodo pagado
+  loan_id INTEGER REFERENCES loans(id) ON DELETE CASCADE,
+  transfer_group TEXT,
+  cleared INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS bank_transaction_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  transaction_id INTEGER NOT NULL REFERENCES bank_transactions(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

@@ -26,6 +26,9 @@ import WarrantiesList from './pages/WarrantiesList.jsx';
 import ReceivablesPage from './pages/ReceivablesPage.jsx';
 import PayablesPage from './pages/PayablesPage.jsx';
 import HelpPage from './pages/HelpPage.jsx';
+import FinancePage from './pages/FinancePage.jsx';
+import AccountRegister from './pages/AccountRegister.jsx';
+import LoansPage from './pages/LoansPage.jsx';
 import HelpButton from './components/HelpButton.jsx';
 import ServiceVouchersList from './pages/ServiceVouchersList.jsx';
 import ServiceVoucherDocument from './pages/ServiceVoucherDocument.jsx';
@@ -166,7 +169,8 @@ function AccountMenu() {
 
 function MainShell() {
   const { t } = useI18n();
-  const { isAdmin } = useAuth();
+  const { isAdmin, canEdit } = useAuth();
+  const showFinance = isAdmin || canEdit('finanzas');
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -196,6 +200,13 @@ function MainShell() {
             ))}
           </div>
         ))}
+        {showFinance && (
+          <div className="nav-group">
+            <div className="nav-label">{t('Finanzas')}</div>
+            <NavLink to="/finanzas" end={false} className={({ isActive }) => `nav-link ${isActive && !window.location.pathname.startsWith('/finanzas/prestamos') ? 'active' : ''}`}><span>🏦</span><span>{t('Bancos')}</span></NavLink>
+            <NavLink to="/finanzas/prestamos" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span>🤝</span><span>{t('Préstamos')}</span></NavLink>
+          </div>
+        )}
         <div className="nav-group">
           <div className="nav-label">{t('Administración')}</div>
           <NavLink to={APPROVALS_LINK.to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -221,6 +232,9 @@ function MainShell() {
         <HelpButton />
         <Routes>
           <Route path="/ayuda" element={<HelpPage />} />
+          <Route path="/finanzas" element={<FinancePage />} />
+          <Route path="/finanzas/cuenta/:id" element={<AccountRegister />} />
+          <Route path="/finanzas/prestamos" element={<LoansPage />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/clientes" element={<CustomersList />} />
           <Route path="/clientes/:id" element={<CustomerDetail />} />

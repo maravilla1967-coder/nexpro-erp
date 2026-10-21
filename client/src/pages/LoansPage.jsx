@@ -1,0 +1,93 @@
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { api } from '../api.js';
+import Pill from '../components/Pill.jsx';
+import Modal from '../components/Modal.jsx';
+import { useI18n } from '../i18n.jsx';
+import { useAuth } from '../auth.jsx';
+import { LoanModal, LoanPaymentModal, CATEGORY_LABELS, fmt$ } from '../components/FinanceModals.jsx';
+
+// Préstamos recibidos de socios y terceros: cuánto entró, cuánto se ha abonado y el saldo.
+export default function LoansPage() {
+  const { t } = useI18n();
+  const { isAdmin } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const [loans, setLoans] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [modal, setModal] = useState(null);
+  const [viewing, setViewing] = useState(null);
+  const [error, setError] = useState('');
+  function load() {
+    api.get('/bank/loans').then((l) => { setLoans(l); const v = params.get('ver'); if (v) { setViewing(l.find((x) => String(x.id) === v) || null); setParams({}, { replace: true }); } }).catch((e) => setError(e.message));
+    api.get('/bank/accounts').then((a) => setAccounts(a.filter((x) => x.active))).catch(() => {});
+  }
+  useEffect(load, []);
+  const done = () => { setModal(null); setViewing(null); load(); };
+  const open = loans.filter((l) => l.balance > 0.004);
+  async function del(l) {
+    if (!window.confirm(`${t('¿Borrar el préstamo')} ${l.number} ${t('y todos sus movimientos en el banco?')}`)) return;
+    try { await api.del(`/bank/loans/${l.id}`); done(); } catch (err) { alert(err.message); }
+  }
+
+  if (error) return <div className="content"><div className="error-banner">{error}</div></div>;
+  return (
+    <>
+      <div className="topbar">
+        <div><h1>{t('Préstamos')}</h1><div className="sub">{t('Dinero recibido de socios y terceros, abonos y saldo pendiente')}</div></div>
+        {accounts.length > 0 && <button className="btn btn-primary" onClick={() => setModal({ type: 'loan' })}>{t('+ Préstamo recibido')}</button>}
+      </div>
+      <div className="content">
+        <div className="chain-summary">
+          <div className="chain-box"><span>{t('Saldo por pagar')}</span><strong>{fmt$(open.reduce((s, l) => s + l.balance, 0))}</strong></div>
+          <div className="chain-box"><span>{t('De socios')}</span><strong>{fmt$(open.filter((l) => l.lender_type === 'socio').reduce((s, l) => s + l.balance, 0))}</strong></div>
+          <div className="chain-box"><span>{t('De terceros / bancos')}</span><strong>{fmt$(open.filter((l) => l.lender_type !== 'socio').reduce((s, l) => s + l.balance, 0))}</strong></div>
+          <div className="chain-box"><span>{t('Intereses pagados')}</span><strong>{fmt$(loans.reduce((s, l) => s + l.interest_paid, 0))}</strong></div>
+        </div>
+        <div className="card">
+          {accounts.length === 0 && <div className="muted" style={{ marginBottom: 8 }}>{t('Primero crea una cuenta en Finanzas → Bancos.')}</div>}
+          {loans.length === 0 ? <div className="empty-state">{t('No hay préstamos registrados.')}</div> : (
+            <table>
+              <thead><tr><th>{t('Número')}</th><th>{t('Prestamista')}</th><th>{t('Tipo')}</th><th>{t('Fecha')}</th><th className="text-right">{t('Monto')}</th><th className="text-right">{t('Abonado')}</th><th className="text-right">{t('Saldo')}</th><th>{t('Estado')}</th><th></th></tr></thead>
+              <tbody>{loans.map((l) => (
+                <tr key={l.id} className="clickable" onClick={() => setViewing(l)}>
+                  <td className="mono">{l.number}</td><td>{l.lender_name}</td><td>{t(l.lender_type === 'socio' ? 'Socio' : l.lender_type === 'banco' ? 'Banco / entidad' : 'Tercero')}</td>
+                  <td className="muted">{l.loan_date}</td><td className="text-right">{fmt$(l.principal)}</td><td className="text-right muted">{fmt$(l.repaid)}</td>
+                  <td className="text-right"><strong>{fmt$(l.balance)}</strong></td><td><Pill value={l.status} /></td>
+                  <td onClick={(e) => e.stopPropagation()}>{l.balance > 0.004 && <button className="link-btn" onClick={() => setModal({ type: 'pay', loan: l })}>{t('Registrar abono')}</button>}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+        </div>
+      </div>
+      {viewing && (
+        <Modal title={`${t('Préstamo')} ${viewing.number} · ${viewing.lender_name}`} onClose={() => setViewing(null)} wide>
+          <div className="chain-summary">
+            <div className="chain-box"><span>{t('Monto')}</span><strong>{fmt$(viewing.principal)}</strong></div>
+            <div className="chain-box"><span>{t('Abonado a capital')}</span><strong>{fmt$(viewing.repaid)}</strong></div>
+            <div className="chain-box"><span>{t('Intereses pagados')}</span><strong>{fmt$(viewing.interest_paid)}</strong></div>
+            <div className="chain-box"><span>{t('Saldo')}</span><strong>{fmt$(viewing.balance)}</strong></div>
+          </div>
+          <div style={{ fontSize: 13, marginBottom: 8 }}>
+            {viewing.interest_rate != null && <span>{t('Interés anual:')} {viewing.interest_rate}% · </span>}
+            {viewing.due_date && <span>{t('Vence:')} {viewing.due_date} · </span>}
+            {viewing.notes && <span>{viewing.notes}</span>}
+          </div>
+          <table>
+            <thead><tr><th>{t('Fecha')}</th><th>{t('Movimiento')}</th><th>{t('Cuenta')}</th><th>{t('Referencia')}</th><th className="text-right">{t('Monto')}</th></tr></thead>
+            <tbody>{viewing.transactions.map((x) => (
+              <tr key={x.id}><td className="muted">{x.tx_date}</td><td>{t(CATEGORY_LABELS[x.category] || x.category)}</td><td>{x.account_name}</td><td>{x.reference || '—'}</td>
+                <td className="text-right" style={{ color: x.direction === 'in' ? '#15803d' : 'var(--red)' }}>{x.direction === 'in' ? '+' : '−'}{fmt$(x.amount)}</td></tr>
+            ))}</tbody>
+          </table>
+          <div className="modal-footer">
+            {isAdmin && <button className="btn btn-danger" onClick={() => del(viewing)}>{t('Eliminar')}</button>}
+            {viewing.balance > 0.004 && <button className="btn btn-primary" onClick={() => setModal({ type: 'pay', loan: viewing })}>{t('Registrar abono')}</button>}
+          </div>
+        </Modal>
+      )}
+      {modal?.type === 'loan' && <LoanModal accounts={accounts} onDone={done} onClose={() => setModal(null)} />}
+      {modal?.type === 'pay' && <LoanPaymentModal accounts={accounts} loan={modal.loan} onDone={done} onClose={() => setModal(null)} />}
+    </>
+  );
+}

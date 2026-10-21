@@ -1,5 +1,6 @@
 const { db, all, get, run } = require('../../db');
 const { nextDocNumber } = require('./numbering');
+const { setPaymentBank } = require('./bank');
 
 // Recepción de mercancía contra una orden de compra.
 //   lines: [{ itemId, quantity, serials: ['ABC123', …] }]
@@ -91,8 +92,9 @@ function receivePurchaseOrder(poId, { lines, receiptDate, notes, userId, bill, c
          `Recepción ${number} · OC ${po.number}`]
       ).lastInsertRowid;
       if (mode === 'pagada') {
-        run(`INSERT INTO supplier_bill_payments (bill_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
-          [billId, billDate, billAmount, (bill && bill.method) || null, (bill && bill.reference) || null, 'Pagada al recibir', userId || null]);
+        const bpId = run(`INSERT INTO supplier_bill_payments (bill_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
+          [billId, billDate, billAmount, (bill && bill.method) || null, (bill && bill.reference) || null, 'Pagada al recibir', userId || null]).lastInsertRowid;
+        setPaymentBank('bill', bpId, bill && bill.bankAccountId);
         run(`UPDATE supplier_bills SET status = 'pagada' WHERE id = ?`, [billId]);
       }
     }

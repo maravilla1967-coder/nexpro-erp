@@ -4,6 +4,7 @@ const { requireModuleEdit } = require('../middleware/auth');
 const { makeDocUploader } = require('../middleware/upload');
 const { nextDocNumber } = require('../utils/numbering');
 const { attachFiles } = require('../utils/paymentFiles');
+const { setPaymentBank } = require('../utils/bank');
 
 // Comprobantes de pago sin factura (NX-PS-AAAAMMDD-NN): pago a un proveedor de servicios
 // (persona o empresa) que no expide factura. Cada comprobante crea su cuenta por pagar
@@ -116,8 +117,9 @@ router.post('/', upload.array('files', 10), (req, res) => {
     // La cuenta por pagar se crea cuando ya hay monto (si es borrador sin monto, se crea al editarlo).
     const billId = amount > 0 ? createBill(supplierId, number, date, String(b.dueDate || '').slice(0, 10) || date, amount, payNow) : null;
     if (payNow) {
-      run(`INSERT INTO supplier_bill_payments (bill_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
-        [billId, String(b.paymentDate || '').slice(0, 10) || date, amount, b.method || null, b.reference || null, 'Pago sin factura', req.user ? req.user.id : null]);
+      const bpId = run(`INSERT INTO supplier_bill_payments (bill_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
+        [billId, String(b.paymentDate || '').slice(0, 10) || date, amount, b.method || null, b.reference || null, 'Pago sin factura', req.user ? req.user.id : null]).lastInsertRowid;
+      setPaymentBank('bill', bpId, b.bankAccountId);
     }
     const id = run(
       `INSERT INTO service_vouchers (number, supplier_id, service_date, service_type, description, amount, vehicle_id, work_order_id, bill_id, received_by, notes, created_by)
@@ -189,6 +191,7 @@ router.post('/:id/payments', upload.array('files', 10), (req, res) => {
   for (const f of req.files || []) {
     run('INSERT INTO payment_files (kind, payment_id, file_url, original_name) VALUES (?,?,?,?)', ['bill', pid, `/uploads/service-voucher-docs/${f.filename}`, f.originalname]);
   }
+  setPaymentBank('bill', pid, b.bankAccountId);
   refreshBill(billId);
   res.status(201).json(getFull(v.id));
 });

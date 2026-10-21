@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Modal from './Modal.jsx';
 import { api } from '../api.js';
+import { useBankAccounts, BankAccountSelect, defaultAccount } from './PaymentModal.jsx';
 import { useI18n } from '../i18n.jsx';
 
 // Recepción de mercancía contra una orden de compra: por cada línea se indica cuánto llegó
@@ -22,6 +23,9 @@ export default function ReceiveModal({ po, onDone, onClose }) {
   const [payMethod, setPayMethod] = useState('transferencia');
   const [payRef, setPayRef] = useState('');
   const [closeShort, setCloseShort] = useState(false);
+  const accounts = useBankAccounts();
+  const [bankAccountId, setBankAccountId] = useState(null);
+  React.useEffect(() => { if (bankAccountId === null && accounts) setBankAccountId(defaultAccount(accounts)); }, [accounts]);
   const [shortNote, setShortNote] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -45,7 +49,7 @@ export default function ReceiveModal({ po, onDone, onClose }) {
       if (closeShort && leftAfter > 0 && !shortNote.trim()) { setError(t('Escribe el motivo del faltante.')); setSaving(false); return; }
       const updated = await api.post(`/purchase-orders/${po.id}/receipts`, {
         receiptDate, notes,
-        bill: { mode: billMode, billNumber, amount: billAmount === '' ? undefined : billAmount, dueDate: billMode === 'credito' ? (dueDate || autoDue) : undefined, method: payMethod, reference: payRef },
+        bill: { mode: billMode, billNumber, amount: billAmount === '' ? undefined : billAmount, dueDate: billMode === 'credito' ? (dueDate || autoDue) : undefined, method: payMethod, reference: payRef, bankAccountId: bankAccountId || '' },
         closeShort: closeShort && leftAfter > 0 ? { note: shortNote } : undefined,
         lines: lines.map((l) => ({ itemId: l.item.id, quantity: parseFloat(l.quantity) || 0, hasSerials: l.hasSerials === true, serials: l.hasSerials ? parseSerials(l.serialsText) : [] })),
       });
@@ -136,6 +140,7 @@ export default function ReceiveModal({ po, onDone, onClose }) {
                       {['transferencia', 'ach', 'cheque', 'tarjeta', 'efectivo', 'otro'].map((m) => <option key={m} value={m}>{t(m)}</option>)}
                     </select></div>
                   <div className="field"><label>{t('Referencia del pago')}</label><input value={payRef} onChange={(e) => setPayRef(e.target.value)} /></div>
+                  <BankAccountSelect accounts={accounts} value={bankAccountId} onChange={setBankAccountId} label={t('Cuenta bancaria de donde salió el pago')} />
                 </>}
               </div>
             )}

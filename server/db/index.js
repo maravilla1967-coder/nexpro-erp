@@ -46,6 +46,11 @@ tryAlter('ALTER TABLE supplier_bills ADD COLUMN goods_receipt_id INTEGER REFEREN
 tryAlter('ALTER TABLE purchase_order_items ADD COLUMN short_qty REAL NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN short_note TEXT');
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN payment_terms_days INTEGER'); // vacío = las del proveedor
+// Finanzas: cada cobro / pago puede quedar en una cuenta bancaria (y conciliado).
+tryAlter('ALTER TABLE invoice_payments ADD COLUMN bank_account_id INTEGER REFERENCES bank_accounts(id) ON DELETE SET NULL');
+tryAlter('ALTER TABLE invoice_payments ADD COLUMN bank_cleared INTEGER NOT NULL DEFAULT 0');
+tryAlter('ALTER TABLE supplier_bill_payments ADD COLUMN bank_account_id INTEGER REFERENCES bank_accounts(id) ON DELETE SET NULL');
+tryAlter('ALTER TABLE supplier_bill_payments ADD COLUMN bank_cleared INTEGER NOT NULL DEFAULT 0');
 
 function all(sql, params = []) {
   const stmt = db.prepare(sql);

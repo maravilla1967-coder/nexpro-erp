@@ -12,6 +12,7 @@ const MODULES = [
   { key: 'mecanicos', label: 'Mecánicos' },
   { key: 'ordenes_trabajo', label: 'Órdenes de Trabajo' },
   { key: 'garantias', label: 'Garantías' },
+  { key: 'finanzas', label: 'Bancos y finanzas' },
 ];
 
 const MODULE_KEYS = MODULES.map((m) => m.key);

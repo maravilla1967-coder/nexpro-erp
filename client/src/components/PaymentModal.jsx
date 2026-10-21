@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { api } from '../api.js';
 import { useI18n } from '../i18n.jsx';
@@ -98,6 +98,30 @@ export function parseAmount(v) {
   return Number.isNaN(n) ? NaN : Math.round(n * 100) / 100;
 }
 
+// Cuentas bancarias para elegir a dónde entra / de dónde sale el dinero (Finanzas).
+export function useBankAccounts() {
+  const [accounts, setAccounts] = useState(null);
+  useEffect(() => { api.get('/bank/accounts/options').then(setAccounts).catch(() => setAccounts([])); }, []);
+  return accounts;
+}
+export function BankAccountSelect({ accounts, value, onChange, label }) {
+  const { t } = useI18n();
+  if (!accounts) return null;
+  return (
+    <div className="field">
+      <label>{label || t('Cuenta bancaria')}</label>
+      {accounts.length === 0
+        ? <div className="muted" style={{ fontSize: 12 }}>{t('Aún no hay cuentas bancarias. Créalas en Finanzas → Bancos para que el pago quede en el banco.')}</div>
+        : <select value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
+            <option value="">{t('— Sin cuenta —')}</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.last4 ? ` ••••${a.last4}` : ''}{a.bank_name ? ` · ${a.bank_name}` : ''}</option>)}
+          </select>}
+    </div>
+  );
+}
+const defaultAccount = (accounts) => { const d = (accounts || []).find((a) => a.is_default) || (accounts || [])[0]; return d ? String(d.id) : ''; };
+export { defaultAccount };
+
 // showSurcharge: muestra el campo "Recargo cobrado al cliente" (solo cobros de facturas).
 export default function PaymentModal({ title, balance, onSave, onClose, initial, submitLabel, showSurcharge }) {
   const { t } = useI18n();
@@ -114,6 +138,9 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [files, setFiles] = useState([]);
+  const accounts = useBankAccounts();
+  const [bankAccountId, setBankAccountId] = useState(initial ? (initial.bank_account_id ? String(initial.bank_account_id) : '') : null);
+  useEffect(() => { if (bankAccountId === null && accounts) setBankAccountId(defaultAccount(accounts)); }, [accounts]);
   const [reading, setReading] = useState(false);
   const [removedIds, setRemovedIds] = useState([]);
   const busy = React.useRef(false);
@@ -155,7 +182,7 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
     if (Number.isNaN(surchargeN) || surchargeN < 0) { setError(t('El recargo no es un número válido.')); return; }
     if (Number.isNaN(feeN) || feeN < 0) { setError(t('La comisión no es un número válida.')); return; }
     setSaving(true); busy.current = true;
-    try { await onSave({ ...form, amount: amountN, surcharge: surchargeN, processorFee: feeN, ...(removedIds.length ? { removeFileIds: removedIds.join(',') } : {}) }, toSend); }
+    try { await onSave({ ...form, amount: amountN, surcharge: surchargeN, processorFee: feeN, bankAccountId: bankAccountId ?? '', ...(removedIds.length ? { removeFileIds: removedIds.join(',') } : {}) }, toSend); }
     catch (err) { setError(err.message || String(err)); setSaving(false); busy.current = false; }
   }
 
@@ -202,6 +229,7 @@ export default function PaymentModal({ title, balance, onSave, onClose, initial,
             {feeN > 0 && <div className="strong"><span>{t('Neto recibido en el banco')}</span><span>{money(totalCharged - feeN)}</span></div>}
           </div>
         )}
+        <BankAccountSelect accounts={accounts} value={bankAccountId} onChange={setBankAccountId} label={showSurcharge ? t('Cuenta bancaria donde entró el dinero') : t('Cuenta bancaria de donde salió el pago')} />
         <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={form.notes} onChange={set('notes')} /></div>
         <div className="field">
           <label>{t('Comprobante del pago (tiquete de la tarjeta, transferencia, cheque…)')}</label>

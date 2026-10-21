@@ -323,6 +323,44 @@ export const MANUAL = [
     ],
   },
   {
+    id: 'finanzas', icon: '🏦', routes: ['/finanzas'],
+    title: L('Bancos y finanzas', 'Banks and finance'),
+    summary: L('Saldo de cada cuenta bancaria y todos sus movimientos, como una chequera (estilo Microsoft Money). Los cobros de facturas, pagos a proveedores y pagos sin factura entran solos; aquí se registran además préstamos, nómina, transferencias y otros movimientos.', 'Balance of each bank account and all its transactions, like a checkbook (Microsoft Money style). Invoice collections, supplier payments and payments without invoice come in automatically; loans, payroll, transfers and other transactions are recorded here too.'),
+    tasks: [
+      { title: L('Crear una cuenta bancaria', 'Create a bank account'), steps: [
+        L('Finanzas → Bancos → "+ Cuenta".', 'Finance → Banks → "+ Account".'),
+        L('Nombre (ej. Chase Operativa), banco, tipo (corriente, ahorros, tarjeta, caja), número de cuenta y routing.', 'Name (e.g. Chase Operating), bank, type (checking, savings, card, cash), account number and routing.'),
+        L('Saldo inicial y su fecha, tal como aparece en el extracto del banco. Desde ahí el ERP suma y resta.', 'Opening balance and its date, as shown on the bank statement. From there the ERP adds and subtracts.'),
+        L('Marca "Cuenta principal" en la que más usas: se propone en todos los pagos.', 'Tick "Main account" on the one you use most: it is suggested on every payment.'),
+      ] },
+      { title: L('Cómo entran los cobros y pagos', 'How collections and payments come in'), steps: [
+        L('Al registrar un pago en una factura, elige "Cuenta bancaria donde entró el dinero". Entra el neto: abono + recargo − comisión de Square.', 'When recording a payment on an invoice, choose "Bank account the money went into". The net goes in: amount + surcharge − Square fee.'),
+        L('Al pagar una factura de proveedor, al recibir una orden "ya pagada" o en un pago sin factura, elige la cuenta de donde salió.', 'When paying a supplier invoice, receiving an order as "already paid" or on a payment without invoice, choose the account it came from.'),
+        L('Si corriges el pago en su documento, el banco se actualiza solo. Cada movimiento tiene el enlace a su documento.', 'If you fix the payment on its document, the bank updates automatically. Each transaction links to its document.'),
+        L('"Cobros y pagos sin cuenta bancaria" (abajo en Bancos) lista los pagos registrados sin cuenta: asígnales el banco.', '"Collections and payments without a bank account" (bottom of Banks) lists payments recorded without an account: assign them the bank.'),
+      ] },
+      { title: L('Nómina, transferencias y otros movimientos', 'Payroll, transfers and other transactions'), steps: [
+        L('"Nómina": cuenta, fecha, periodo y una línea por empleado con su monto y referencia.', '"Payroll": account, date, period and one line per employee with amount and reference.'),
+        L('"Transferencia": mueve dinero entre tus cuentas (sale de una y entra a la otra).', '"Transfer": moves money between your accounts (out of one, into the other).'),
+        L('"+ Ingreso" / "+ Egreso": aportes de capital, intereses, reembolsos, comisiones bancarias, impuestos, gastos, retiros de socio. Puedes adjuntar el soporte.', '"+ Income" / "+ Expense": capital contributions, interest, refunds, bank fees, taxes, expenses, partner withdrawals. You can attach the support.'),
+      ] },
+      { title: L('Préstamos de socios y terceros', 'Loans from partners and third parties'), steps: [
+        L('"Préstamo recibido": quién prestó (socio, tercero o banco), monto, cuenta donde entró, interés y vencimiento. Queda un préstamo NX-PR-… y el ingreso en el banco.', '"Loan received": lender (partner, third party or bank), amount, account it went into, interest and due date. A loan NX-PR-… and the bank income are created.'),
+        L('Finanzas → Préstamos → "Registrar abono": abono a capital e intereses aparte; baja el saldo del préstamo y sale del banco.', 'Finance → Loans → "Record repayment": principal and interest separately; it lowers the loan balance and goes out of the bank.'),
+      ] },
+      { title: L('Conciliar con el extracto del banco', 'Reconcile with the bank statement'), steps: [
+        L('Abre la cuenta (clic en su tarjeta). Marca ✓ cada movimiento que aparece en el extracto.', 'Open the account (click its card). Tick ✓ each transaction that appears on the statement.'),
+        L('"Saldo conciliado" debe coincidir con el saldo del extracto; la diferencia son los movimientos sin ✓.', '"Reconciled balance" should match the statement balance; the difference is the unticked transactions.'),
+        L('Busca por beneficiario, documento o monto; filtra por categoría o fechas; exporta a Excel o imprime.', 'Search by payee, document or amount; filter by category or dates; export to Excel or print.'),
+      ] },
+    ],
+    tips: [L('Solo el administrador y quien tenga el permiso "Bancos y finanzas" ven este módulo.', 'Only the administrator and people with the "Banks and finance" permission see this module.')],
+    problems: [
+      { q: L('El saldo no coincide con el banco', 'The balance does not match the bank'), a: L('Revisa el saldo inicial y su fecha, los "Cobros y pagos sin cuenta bancaria" y los movimientos sin ✓ en el registro.', 'Check the opening balance and its date, the "Collections and payments without a bank account", and the unticked transactions in the register.') },
+      { q: L('No puedo editar un cobro desde el banco', 'I cannot edit a collection from the bank'), a: L('Los que vienen de una factura o de un proveedor se corrigen en su documento (enlace en "Documento"); así quedan iguales en los dos lados.', 'Those that come from an invoice or a supplier are fixed on their document (link under "Document"); that way both sides stay the same.') },
+    ],
+  },
+  {
     id: 'aprobaciones', icon: '✅', routes: ['/aprobaciones'],
     title: L('Aprobaciones', 'Approvals'),
     summary: L('Los cambios que un usuario (no administrador) hace a facturas y pedidos ya creados quedan esperando que el administrador los apruebe.', 'Changes a user (not administrator) makes to existing invoices and orders wait for the administrator\'s approval.'),

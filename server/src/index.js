@@ -96,6 +96,7 @@ app.use('/api/work-orders', require('./routes/workOrders'));
 app.use('/api/warranties', require('./routes/warranties'));
 app.use('/api/payables', require('./routes/payables'));
 app.use('/api/service-vouchers', require('./routes/serviceVouchers'));
+app.use('/api/bank', require('./routes/bank'));
 app.use('/api/serials', require('./routes/serials'));
 
 // Servir el frontend compilado (producción)

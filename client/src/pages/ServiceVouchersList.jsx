@@ -5,7 +5,7 @@ import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
-import { PAYMENT_METHODS, methodLabel, readFilesNow } from '../components/PaymentModal.jsx';
+import { PAYMENT_METHODS, methodLabel, readFilesNow, useBankAccounts, BankAccountSelect, defaultAccount } from '../components/PaymentModal.jsx';
 
 // Comprobantes de pago sin factura: pagos a proveedores de servicios que no expiden factura
 // (soldador, pintor, técnico independiente…). Se enlazan al vehículo y/o a la orden de trabajo.
@@ -44,6 +44,7 @@ export default function ServiceVouchersList() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState('');
+  const accounts = useBankAccounts();
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   function load() { api.get('/service-vouchers').then(setList).catch(console.error); }
@@ -71,7 +72,7 @@ export default function ServiceVouchersList() {
     const amt = parseFloat(String(form.amount).replace(/[$,\s]/g, '')) || 0;
     if (form.payNow === '1' && !(amt > 0)) { setError(t('Para registrar el pago escribe el monto.')); return; }
     const fd = new FormData();
-    const payload = { ...form, amount: amt };
+    const payload = { ...form, amount: amt, bankAccountId: form.bankAccountId ?? defaultAccount(accounts) };
     if (form.supplierMode === 'existente') { ['providerName', 'providerTaxId', 'providerPhone', 'providerAddress', 'providerEmail'].forEach((k) => delete payload[k]); }
     else delete payload.supplierId;
     delete payload.supplierMode;
@@ -185,6 +186,7 @@ export default function ServiceVouchersList() {
                   <select value={form.method} onChange={set('method')}>{PAYMENT_METHODS.map((m) => <option key={m} value={m}>{methodLabel(t, m)}</option>)}</select></div>
                 <div className="field"><label>{t('Referencia (no. de cheque, Zelle, confirmación…)')}</label><input value={form.reference} onChange={set('reference')} /></div>
                 <div className="field"><label>{t('Fecha del pago')}</label><input type="date" value={form.paymentDate} onChange={set('paymentDate')} /></div>
+                <BankAccountSelect accounts={accounts} value={form.bankAccountId ?? defaultAccount(accounts)} onChange={(v) => setForm({ ...form, bankAccountId: v })} label={t('Cuenta bancaria de donde salió el pago')} />
               </> : <div className="field"><label>{t('Fecha en que se debe pagar')}</label><input type="date" value={form.dueDate} onChange={set('dueDate')} /></div>}
               <div className="field"><label>{t('Recibido / aprobado por (Nexpro)')}</label><input value={form.receivedBy} onChange={set('receivedBy')} /></div>
             </div>

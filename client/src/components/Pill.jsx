@@ -9,7 +9,7 @@ const COLORS = {
   nuevo: 'gray', calificado: 'blue', propuesta: 'orange', negociacion: 'amber',
   ganado: 'green', perdido: 'red', activo: 'green',
   admin: 'blue', usuario: 'gray', invitado: 'amber', desactivado: 'red', rechazado: 'red',
-  abierta: 'amber', parcial: 'orange', corriente: 'green', disponible: 'green', vendido: 'blue', instalado: 'orange', dado_de_baja: 'red', anulada: 'red', aprobada: 'green', rechazada: 'red', cerrada: 'gray', registrada: 'green',
+  abierta: 'amber', parcial: 'orange', corriente: 'green', disponible: 'green', vendido: 'blue', instalado: 'orange', dado_de_baja: 'red', anulada: 'red', aprobada: 'green', rechazada: 'red', cerrada: 'gray', registrada: 'green', vigente: 'amber', pagado: 'green',
 };
 
 export default function Pill({ value }) {

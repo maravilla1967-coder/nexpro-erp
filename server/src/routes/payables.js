@@ -2,6 +2,7 @@ const express = require('express');
 const { all, get, run } = require('../../db');
 const { requireModuleEdit } = require('../middleware/auth');
 const { makeDocUploader } = require('../middleware/upload');
+const { setPaymentBank } = require('../utils/bank');
 const { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment, paymentUpload, saveFilesForPayment } = require('../utils/paymentFiles');
 
 // Cuentas por pagar: facturas de proveedores (con o sin orden de compra), sus pagos y la
@@ -115,6 +116,7 @@ router.post('/:id/payments', paymentUpload, (req, res) => {
   const newId = run(`INSERT INTO supplier_bill_payments (bill_id, payment_date, amount, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?)`,
     [bill.id, p.paymentDate || new Date().toISOString().slice(0, 10), amount, p.method || null, p.reference || null, p.notes || null, req.user ? req.user.id : null]).lastInsertRowid;
   saveFilesForPayment('bill', newId, req.files);
+  setPaymentBank('bill', newId, p.bankAccountId);
   refreshStatus(bill.id);
   res.status(201).json({ ...getFull(bill.id), newPaymentId: newId });
 });
