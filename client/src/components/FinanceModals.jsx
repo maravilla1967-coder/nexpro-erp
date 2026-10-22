@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import { api } from '../api.js';
 import { useI18n } from '../i18n.jsx';
@@ -172,7 +172,7 @@ export function TransferModal({ accounts, accountId, onDone, onClose }) {
 
 export function LoanModal({ accounts, onDone, onClose }) {
   const { t } = useI18n();
-  const [f, setF] = useState({ lenderName: '', lenderType: 'socio', principal: '', loanDate: today(), accountId: defaultId(accounts), interestRate: '', dueDate: '', reference: '', notes: '' });
+  const [f, setF] = useState({ lenderName: '', lenderType: 'socio', principal: '', loanDate: today(), accountId: defaultId(accounts), interestRate: '', dayBasis: '365', dueDate: '', reference: '', notes: '' });
   const [files, setFiles] = useState([]);
   const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -193,6 +193,8 @@ export function LoanModal({ accounts, onDone, onClose }) {
           <div className="field"><label>{t('Fecha')}</label><input type="date" value={f.loanDate} onChange={set('loanDate')} /></div>
           <AccountSelect accounts={accounts} value={f.accountId} onChange={(v) => setF({ ...f, accountId: v })} label={t('Cuenta donde entró el dinero')} />
           <div className="field"><label>{t('Interés anual (%)')}</label><input inputMode="decimal" value={f.interestRate} onChange={set('interestRate')} /></div>
+          <div className="field"><label>{t('Cálculo de intereses por días')}</label>
+            <select value={f.dayBasis} onChange={set('dayBasis')}><option value="365">{t('Año de 365 días (días reales)')}</option><option value="360">{t('Año comercial de 360 días')}</option></select></div>
           <div className="field"><label>{t('Fecha de vencimiento')}</label><input type="date" value={f.dueDate} onChange={set('dueDate')} /></div>
           <div className="field"><label>{t('Referencia')}</label><input value={f.reference} onChange={set('reference')} /></div>
         </div>
@@ -209,6 +211,9 @@ export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
   const { t } = useI18n();
   const [f, setF] = useState({ accountId: defaultId(accounts), amount: '', interest: '', date: today(), reference: '' });
   const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
+  const [acc, setAcc] = useState(null);
+  // Intereses causados hasta la fecha del pago (interés simple por días sobre el saldo).
+  useEffect(() => { if (f.date) api.get(`/bank/loans/${loan.id}`, { asOf: f.date }).then(setAcc).catch(() => {}); }, [f.date, loan.id]);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   async function save(e) {
     e.preventDefault(); setError(''); setSaving(true);
@@ -223,7 +228,16 @@ export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
           <AccountSelect accounts={accounts} value={f.accountId} onChange={(v) => setF({ ...f, accountId: v })} label={t('Cuenta de donde sale el pago')} />
           <div className="field"><label>{t('Fecha')}</label><input type="date" value={f.date} onChange={set('date')} /></div>
           <div className="field"><label>{t('Abono a capital')}</label><input inputMode="decimal" placeholder="0.00" value={f.amount} onChange={set('amount')} /></div>
-          <div className="field"><label>{t('Intereses (opcional)')}</label><input inputMode="decimal" placeholder="0.00" value={f.interest} onChange={set('interest')} /></div>
+          <div className="field"><label>{t('Intereses (opcional)')}</label><input inputMode="decimal" placeholder="0.00" value={f.interest} onChange={set('interest')} />
+            {acc && Number(loan.interest_rate) > 0 && (
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                <span className="muted">{t('Pendientes al')} {acc.interest_as_of}: </span><strong>{fmt$(acc.interest_due)}</strong>{' '}
+                <span className="muted">({acc.interest_days} {t('días')}, {loan.interest_rate}% / {acc.day_basis || 365})</span>{' '}
+                {acc.interest_due > 0 && <button type="button" className="link-btn" onClick={() => setF({ ...f, interest: acc.interest_due.toFixed(2) })}>{t('Usar este valor')}</button>}
+              </div>
+            )}
+            {Number(loan.interest_rate) > 0 ? null : <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('El préstamo no tiene tasa de interés; si cobra intereses, ponle la tasa en el préstamo.')}</div>}
+          </div>
           <div className="field"><label>{t('Referencia')}</label><input value={f.reference} onChange={set('reference')} /></div>
         </div>
         <Footer error={error} saving={saving} onClose={onClose} label={t('Registrar abono')} />
@@ -263,6 +277,35 @@ export function AccountModal({ initial, onDone, onClose }) {
         <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}><input type="checkbox" style={{ width: 'auto' }} checked={f.isDefault} onChange={(e) => setF({ ...f, isDefault: e.target.checked })} /> {t('Cuenta principal (se propone en todos los pagos)')}</label>
         {initial && <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 4 }}><input type="checkbox" style={{ width: 'auto' }} checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Activa')}</label>}
         <div className="field" style={{ marginTop: 8 }}><label>{t('Notas')}</label><input value={f.notes} onChange={set('notes')} /></div>
+        <Footer error={error} saving={saving} onClose={onClose} />
+      </form>
+    </Modal>
+  );
+}
+
+export function LoanTermsModal({ loan, onDone, onClose }) {
+  const { t } = useI18n();
+  const [f, setF] = useState({ lenderName: loan.lender_name, lenderType: loan.lender_type, loanDate: loan.loan_date || '', interestRate: loan.interest_rate ?? '', dayBasis: String(loan.day_basis || 365), dueDate: loan.due_date || '', notes: loan.notes || '' });
+  const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  async function save(e) {
+    e.preventDefault(); setError(''); setSaving(true);
+    try { await api.put(`/bank/loans/${loan.id}`, f); onDone(); } catch (err) { setError(err.message); setSaving(false); }
+  }
+  return (
+    <Modal title={`${t('Condiciones del préstamo')} ${loan.number}`} onClose={onClose}>
+      <form onSubmit={save} noValidate>
+        <div className="grid grid-2">
+          <div className="field"><label>{t('Quién prestó *')}</label><input value={f.lenderName} onChange={set('lenderName')} /></div>
+          <div className="field"><label>{t('Tipo')}</label>
+            <select value={f.lenderType} onChange={set('lenderType')}><option value="socio">{t('Socio')}</option><option value="tercero">{t('Tercero')}</option><option value="banco">{t('Banco / entidad')}</option></select></div>
+          <div className="field"><label>{t('Fecha del préstamo (desde cuándo corren los intereses)')}</label><input type="date" value={f.loanDate} onChange={set('loanDate')} /></div>
+          <div className="field"><label>{t('Interés anual (%)')}</label><input inputMode="decimal" value={f.interestRate} onChange={set('interestRate')} /></div>
+          <div className="field"><label>{t('Cálculo de intereses por días')}</label>
+            <select value={f.dayBasis} onChange={set('dayBasis')}><option value="365">{t('Año de 365 días (días reales)')}</option><option value="360">{t('Año comercial de 360 días')}</option></select></div>
+          <div className="field"><label>{t('Fecha de vencimiento')}</label><input type="date" value={f.dueDate} onChange={set('dueDate')} /></div>
+        </div>
+        <div className="field"><label>{t('Condiciones / notas')}</label><textarea rows={2} value={f.notes} onChange={set('notes')} /></div>
         <Footer error={error} saving={saving} onClose={onClose} />
       </form>
     </Modal>

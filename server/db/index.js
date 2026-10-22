@@ -51,6 +51,8 @@ tryAlter('ALTER TABLE invoice_payments ADD COLUMN bank_account_id INTEGER REFERE
 tryAlter('ALTER TABLE invoice_payments ADD COLUMN bank_cleared INTEGER NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE supplier_bill_payments ADD COLUMN bank_account_id INTEGER REFERENCES bank_accounts(id) ON DELETE SET NULL');
 tryAlter('ALTER TABLE supplier_bill_payments ADD COLUMN bank_cleared INTEGER NOT NULL DEFAULT 0');
+// Préstamos: base de días para el interés (365 = actual/365, 360 = comercial).
+tryAlter('ALTER TABLE loans ADD COLUMN day_basis INTEGER NOT NULL DEFAULT 365');
 
 function all(sql, params = []) {
   const stmt = db.prepare(sql);

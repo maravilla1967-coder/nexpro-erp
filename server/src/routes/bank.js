@@ -266,18 +266,44 @@ router.post('/transfers', (req, res) => {
 });
 
 // ---- Préstamos de socios y terceros ----
-function loanFull(l) {
+// Interés simple por días sobre el saldo de capital: cada tramo entre abonos a capital genera
+// saldo × tasa anual × días / base (365 o 360). Intereses pendientes = causados − pagados.
+const dayDiff = (a, b) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000);
+function interestAccrued(l, txs, asOf) {
+  const rate = Number(l.interest_rate) || 0;
+  const basis = Number(l.day_basis) || 365;
+  const start = String(l.loan_date || '').slice(0, 10);
+  const until = String(asOf || new Date().toISOString().slice(0, 10)).slice(0, 10);
+  if (!rate || !start || until <= start) return { accrued: 0, days: Math.max(0, dayDiff(start || until, until)), segments: [] };
+  const caps = txs.filter((t) => t.category === 'abono_prestamo' && String(t.tx_date).slice(0, 10) <= until)
+    .map((t) => ({ date: String(t.tx_date).slice(0, 10) < start ? start : String(t.tx_date).slice(0, 10), amount: t.amount })).sort((a, b) => (a.date < b.date ? -1 : 1));
+  let bal = Number(l.principal) || 0; let from = start; let total = 0; const segments = [];
+  const close = (to) => {
+    const d = dayDiff(from, to);
+    if (d > 0 && bal > 0) { const i = bal * (rate / 100) * d / basis; total += i; segments.push({ from, to, days: d, balance: round2(bal), interest: round2(i) }); }
+    from = to;
+  };
+  for (const c of caps) { close(c.date); bal = Math.max(0, bal - c.amount); }
+  close(until);
+  return { accrued: round2(total), days: dayDiff(start, until), segments };
+}
+function loanFull(l, asOf) {
   const txs = all(`SELECT t.*, a.name AS account_name FROM bank_transactions t LEFT JOIN bank_accounts a ON a.id = t.account_id WHERE t.loan_id = ? ORDER BY t.tx_date, t.id`, [l.id]);
   const received = round2(txs.filter((t) => t.direction === 'in').reduce((s, t) => s + t.amount, 0));
   const repaid = round2(txs.filter((t) => t.direction === 'out' && t.category === 'abono_prestamo').reduce((s, t) => s + t.amount, 0));
   const interest = round2(txs.filter((t) => t.direction === 'out' && t.category === 'intereses_prestamo').reduce((s, t) => s + t.amount, 0));
-  return { ...l, transactions: txs, received, repaid, interest_paid: interest, balance: round2(l.principal - repaid), status: l.principal - repaid <= 0.004 ? 'pagado' : 'vigente' };
+  const acc = interestAccrued(l, txs, asOf);
+  const lastInt = txs.filter((t) => t.category === 'intereses_prestamo').map((t) => String(t.tx_date).slice(0, 10)).sort().pop() || null;
+  return { ...l, transactions: txs, received, repaid, interest_paid: interest, balance: round2(l.principal - repaid), status: l.principal - repaid <= 0.004 ? 'pagado' : 'vigente',
+    interest_accrued: acc.accrued, interest_due: round2(Math.max(0, acc.accrued - interest)), interest_days: acc.days, interest_segments: acc.segments,
+    interest_as_of: String(asOf || new Date().toISOString().slice(0, 10)).slice(0, 10), last_interest_date: lastInt,
+    daily_interest: round2((l.principal - repaid) * ((Number(l.interest_rate) || 0) / 100) / (Number(l.day_basis) || 365)) };
 }
 router.get('/loans', (req, res) => res.json(all('SELECT * FROM loans ORDER BY loan_date DESC, id DESC').map(loanFull)));
 router.get('/loans/:id', (req, res) => {
   const l = get('SELECT * FROM loans WHERE id = ?', [req.params.id]);
   if (!l) return res.status(404).json({ error: 'Préstamo no encontrado' });
-  res.json(loanFull(l));
+  res.json(loanFull(l, req.query.asOf));
 });
 router.post('/loans', upload.array('files', 10), (req, res) => {
   const b = req.body || {};
@@ -292,8 +318,8 @@ router.post('/loans', upload.array('files', 10), (req, res) => {
   db.exec('BEGIN');
   try {
     const number = nextDocNumber('loans', 'PR');
-    const id = run('INSERT INTO loans (number, lender_name, lender_type, principal, loan_date, interest_rate, due_date, notes, created_by) VALUES (?,?,?,?,?,?,?,?,?)',
-      [number, lender, type, principal, date, b.interestRate ? parseFloat(b.interestRate) : null, b.dueDate || null, b.notes || null, req.user.id]).lastInsertRowid;
+    const id = run('INSERT INTO loans (number, lender_name, lender_type, principal, loan_date, interest_rate, due_date, notes, created_by, day_basis) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [number, lender, type, principal, date, b.interestRate ? parseFloat(b.interestRate) : null, b.dueDate || null, b.notes || null, req.user.id, String(b.dayBasis) === '360' ? 360 : 365]).lastInsertRowid;
     const txId = insertTx(acc.id, { direction: 'in', category: type === 'socio' ? 'prestamo_socio' : 'prestamo_tercero', amount: principal, tx_date: date, payee: lender,
       description: `Préstamo ${number}${b.notes ? ` — ${b.notes}` : ''}`, reference: b.reference || null, period: null }, { loanId: id }, req.user.id);
     saveTxFiles(txId, req.files);
@@ -305,8 +331,9 @@ router.put('/loans/:id', (req, res) => {
   const l = get('SELECT * FROM loans WHERE id = ?', [req.params.id]);
   if (!l) return res.status(404).json({ error: 'Préstamo no encontrado' });
   const b = req.body || {};
-  run('UPDATE loans SET lender_name=?, lender_type=?, interest_rate=?, due_date=?, notes=? WHERE id=?',
-    [b.lenderName || l.lender_name, b.lenderType || l.lender_type, b.interestRate !== undefined && b.interestRate !== '' ? parseFloat(b.interestRate) : l.interest_rate, b.dueDate ?? l.due_date, b.notes ?? l.notes, l.id]);
+  run('UPDATE loans SET lender_name=?, lender_type=?, interest_rate=?, due_date=?, notes=?, day_basis=?, loan_date=? WHERE id=?',
+    [b.lenderName || l.lender_name, b.lenderType || l.lender_type, b.interestRate !== undefined && b.interestRate !== '' ? parseFloat(b.interestRate) : l.interest_rate, b.dueDate ?? l.due_date, b.notes ?? l.notes,
+     b.dayBasis !== undefined ? (String(b.dayBasis) === '360' ? 360 : 365) : l.day_basis, b.loanDate || l.loan_date, l.id]);
   res.json(loanFull(get('SELECT * FROM loans WHERE id = ?', [l.id])));
 });
 // Abono al préstamo (capital y, si hay, intereses aparte).
@@ -325,7 +352,7 @@ router.post('/loans/:id/payments', upload.array('files', 10), (req, res) => {
   if (capital > 0) first = insertTx(acc.id, { direction: 'out', category: 'abono_prestamo', amount: capital, tx_date: date, payee: l.lender_name, description: `Abono a capital ${l.number}`, reference: b.reference || null, period: null }, { loanId: l.id }, req.user.id);
   if (interest > 0) { const i = insertTx(acc.id, { direction: 'out', category: 'intereses_prestamo', amount: interest, tx_date: date, payee: l.lender_name, description: `Intereses ${l.number}`, reference: b.reference || null, period: null }, { loanId: l.id }, req.user.id); first = first || i; }
   saveTxFiles(first, req.files);
-  res.status(201).json(loanFull(l));
+  res.status(201).json(loanFull(get('SELECT * FROM loans WHERE id = ?', [l.id])));
 });
 router.delete('/loans/:id', (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede borrar un préstamo.' });
