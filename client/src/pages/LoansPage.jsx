@@ -16,6 +16,9 @@ export default function LoansPage() {
   const [accounts, setAccounts] = useState([]);
   const [modal, setModal] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10));
+  // Consultar los intereses a cualquier fecha sin registrar un pago.
+  React.useEffect(() => { if (viewing && viewing.interest_rate && asOf) api.get(`/bank/loans/${viewing.id}`, { asOf }).then((l) => setViewing((v) => (v && v.id === l.id ? l : v))).catch(() => {}); }, [asOf, viewing && viewing.id]);
   const [error, setError] = useState('');
   function load() {
     api.get('/bank/loans').then((l) => { setLoans(l); const v = params.get('ver'); if (v) { setViewing(l.find((x) => String(x.id) === v) || null); setParams({}, { replace: true }); } }).catch((e) => setError(e.message));
@@ -71,11 +74,14 @@ export default function LoansPage() {
             <div className="chain-box"><span>{t('Abonado a capital')}</span><strong>{fmt$(viewing.repaid)}</strong></div>
             <div className="chain-box"><span>{t('Intereses pagados')}</span><strong>{fmt$(viewing.interest_paid)}</strong></div>
             <div className="chain-box"><span>{t('Saldo')}</span><strong>{fmt$(viewing.balance)}</strong></div>
-            {viewing.interest_rate ? <div className="chain-box"><span>{t('Intereses por pagar a hoy')}</span><strong>{fmt$(viewing.interest_due)}</strong><span>{fmt$(viewing.daily_interest)} {t('por día')}</span></div> : null}
+            {viewing.interest_rate ? <div className="chain-box"><span>{t('Intereses por pagar al')} {viewing.interest_as_of}</span><strong>{fmt$(viewing.interest_due)}</strong><span>{fmt$(viewing.daily_interest)} {t('por día')}</span></div> : null}
           </div>
           {viewing.interest_rate ? (
             <div style={{ fontSize: 13, background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
-              <div><strong>{t('Cálculo de intereses')}</strong> · {viewing.interest_rate}% {t('anual')} · {t('año de')} {viewing.day_basis || 365} {t('días')} · {t('desde')} {viewing.loan_date}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div><strong>{t('Cálculo de intereses')}</strong> · {viewing.interest_rate}% {t('anual')} · {t('año de')} {viewing.day_basis || 365} {t('días')} · {t('desde')} {viewing.interest_start || viewing.loan_date}</div>
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0 }}>{t('Calcular al')} <input type="date" style={{ width: 160 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
+              </div>
               <div className="muted">{t('Causados')}: {fmt$(viewing.interest_accrued)} − {t('pagados')}: {fmt$(viewing.interest_paid)} = <strong>{fmt$(viewing.interest_due)}</strong> ({viewing.interest_days} {t('días')})</div>
               {viewing.interest_segments.length > 1 && (
                 <table style={{ marginTop: 6 }}><thead><tr><th>{t('Desde')}</th><th>{t('Hasta')}</th><th className="text-right">{t('Días')}</th><th className="text-right">{t('Saldo de capital')}</th><th className="text-right">{t('Intereses')}</th></tr></thead>

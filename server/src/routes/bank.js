@@ -230,6 +230,7 @@ router.put('/transactions/:id', upload.array('files', 10), (req, res) => {
   run(`UPDATE bank_transactions SET account_id=?, tx_date=?, direction=?, category=?, amount=?, payee=?, description=?, reference=?, period=? WHERE id=?`,
     [b.accountId || t.account_id, f.tx_date, f.direction, f.category, f.amount, f.payee, f.description, f.reference, f.period, t.id]);
   if (t.transfer_group) run('UPDATE bank_transactions SET amount = ?, tx_date = ? WHERE transfer_group = ? AND id != ?', [f.amount, f.tx_date, t.transfer_group, t.id]);
+  if (t.loan_id && t.direction === 'in') run('UPDATE loans SET loan_date = ? WHERE id = ?', [f.tx_date, t.loan_id]);
   saveTxFiles(t.id, req.files);
   res.json({ ok: true });
 });
@@ -272,7 +273,10 @@ const dayDiff = (a, b) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(
 function interestAccrued(l, txs, asOf) {
   const rate = Number(l.interest_rate) || 0;
   const basis = Number(l.day_basis) || 365;
-  const start = String(l.loan_date || '').slice(0, 10);
+  // Los intereses corren desde que entró el dinero: la fecha del préstamo o la del desembolso
+  // en el banco si es anterior (p. ej. un préstamo antiguo registrado hoy con su fecha real).
+  const inDates = txs.filter((t) => t.direction === 'in').map((t) => String(t.tx_date).slice(0, 10));
+  const start = [String(l.loan_date || '').slice(0, 10), ...inDates].filter(Boolean).sort()[0] || '';
   const until = String(asOf || new Date().toISOString().slice(0, 10)).slice(0, 10);
   if (!rate || !start || until <= start) return { accrued: 0, days: Math.max(0, dayDiff(start || until, until)), segments: [] };
   const caps = txs.filter((t) => t.category === 'abono_prestamo' && String(t.tx_date).slice(0, 10) <= until)
@@ -294,7 +298,8 @@ function loanFull(l, asOf) {
   const interest = round2(txs.filter((t) => t.direction === 'out' && t.category === 'intereses_prestamo').reduce((s, t) => s + t.amount, 0));
   const acc = interestAccrued(l, txs, asOf);
   const lastInt = txs.filter((t) => t.category === 'intereses_prestamo').map((t) => String(t.tx_date).slice(0, 10)).sort().pop() || null;
-  return { ...l, transactions: txs, received, repaid, interest_paid: interest, balance: round2(l.principal - repaid), status: l.principal - repaid <= 0.004 ? 'pagado' : 'vigente',
+  const startDate = [String(l.loan_date || '').slice(0, 10), ...txs.filter((t) => t.direction === 'in').map((t) => String(t.tx_date).slice(0, 10))].filter(Boolean).sort()[0] || l.loan_date;
+  return { ...l, interest_start: startDate, transactions: txs, received, repaid, interest_paid: interest, balance: round2(l.principal - repaid), status: l.principal - repaid <= 0.004 ? 'pagado' : 'vigente',
     interest_accrued: acc.accrued, interest_due: round2(Math.max(0, acc.accrued - interest)), interest_days: acc.days, interest_segments: acc.segments,
     interest_as_of: String(asOf || new Date().toISOString().slice(0, 10)).slice(0, 10), last_interest_date: lastInt,
     daily_interest: round2((l.principal - repaid) * ((Number(l.interest_rate) || 0) / 100) / (Number(l.day_basis) || 365)) };

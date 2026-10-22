@@ -4,6 +4,8 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Intereses por pagar al': 'Interest due as of',
+  'Calcular al': 'Calculate as of',
   'Cálculo de intereses por días': 'Daily interest calculation',
   'Año de 365 días (días reales)': '365-day year (actual days)',
   'Año comercial de 360 días': '360-day commercial year',
