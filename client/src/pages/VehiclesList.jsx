@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import CustomerPicker from '../components/CustomerPicker.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
@@ -135,8 +136,7 @@ export default function VehiclesList() {
               <div className="field"><label>{t('Tipo de chasis')}</label><input placeholder="CA, DRW, SRW..." value={form.chassisType} onChange={(e) => setForm({ ...form, chassisType: e.target.value })} /></div>
               <div className="field"><label>{t('Placa')}</label><input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} /></div>
               <div className="field"><label>{t('Cliente / empresa')}</label>
-                <input list="customers-list" placeholder={t('Escribe o elige el cliente')} value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
-                <datalist id="customers-list">{customers.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+                <CustomerPicker freeText customers={customers} placeholder={t('Escribe o elige el cliente')} value={form.customerName} onChange={(name) => setForm((f) => ({ ...f, customerName: name }))} />
                 {form.customerName.trim() && !customers.some((c) => c.name.trim().toLowerCase() === form.customerName.trim().toLowerCase()) && (
                   <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>✚ {t('Cliente nuevo: se creará en Clientes al guardar y quedará enlazado al vehículo.')}</div>
                 )}

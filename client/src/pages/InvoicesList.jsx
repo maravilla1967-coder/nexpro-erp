@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import CustomerPicker from '../components/CustomerPicker.jsx';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
@@ -100,10 +101,7 @@ export default function InvoicesList() {
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
               <div className="field"><label>{t('Cliente *')}</label>
-                <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                  <option value="">{t('— Seleccionar —')}</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <CustomerPicker required customers={customers} value={customerId} onChange={setCustomerId} />
               </div>
               <div className="field"><label>{t('Impuesto (%)')}</label><input type="number" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} /></div>
             </div>

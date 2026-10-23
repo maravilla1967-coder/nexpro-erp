@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import CustomerPicker from '../components/CustomerPicker.jsx';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
@@ -102,10 +103,10 @@ export default function ReceivablesPage() {
         )}
 
         <div className="toolbar">
-          <select style={{ width: 280 }} value={customer} onChange={(e) => setCustomer(e.target.value)}>
-            <option value="">{t('Todos los clientes')}</option>
-            {[...new Map(data.rows.map((r) => [r.customer_id, r.customer_name])).entries()].map(([cid, name]) => <option key={cid} value={cid}>{name}</option>)}
-          </select>
+          <div style={{ width: 300 }}>
+            <CustomerPicker customers={[...new Map(data.rows.map((r) => [r.customer_id, r.customer_name])).entries()].map(([id, name]) => ({ id, name }))}
+              value={customer} onChange={setCustomer} emptyLabel={t('Todos los clientes')} placeholder={t('Todos los clientes — escribe para buscar')} />
+          </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
             <input type="checkbox" style={{ width: 'auto' }} checked={includePaid} onChange={(e) => setIncludePaid(e.target.checked)} />
             {t('Incluir facturas pagadas (ver todas, como en Facturación)')}

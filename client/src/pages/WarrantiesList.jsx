@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import CustomerPicker from '../components/CustomerPicker.jsx';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
@@ -317,10 +318,7 @@ export default function WarrantiesList() {
                 </select>
               </div>
               <div className="field"><label>{t('Cliente')}</label>
-                <select value={form.customerId} onChange={set('customerId')}>
-                  <option value="">{t('— Ninguno —')}</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <CustomerPicker customers={customers} value={form.customerId} emptyLabel={t('— Ninguno —')} onChange={(id) => setForm((f) => ({ ...f, customerId: id }))} />
               </div>
               <div className="field"><label>{t('Responsable')}</label>
                 <select value={form.responsibleUserId} onChange={set('responsibleUserId')}>
