@@ -70,6 +70,9 @@ export default function ProductsList() {
   const { t } = useI18n();
   const [list, setList] = useState([]);
   const ex = useListExport({ rows: list });
+  // Columnas de carrocería / instalación: solo se muestran si algún producto visible tiene esos datos.
+  const showBody = ex.visible.some((p) => p.chassis_ca || p.gvwr || p.body_weight);
+  const showInst = ex.visible.some((p) => p.installation_cost);
   const [types, setTypes] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [q, setQ] = useState('');
@@ -82,6 +85,7 @@ export default function ProductsList() {
   const [photoFile, setPhotoFile] = useState(null);
   const [error, setError] = useState('');
   const [overridePrice, setOverridePrice] = useState(false);
+  const [bodyOpen, setBodyOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [imp, setImp] = useState({ rows: [], fileName: '', supplierName: 'Reading Truck', productTypeName: 'Reading Bodies', marginPercent: '30', preview: null, done: null, error: '', busy: false });
 
@@ -96,7 +100,7 @@ export default function ProductsList() {
   useEffect(() => { loadAll(); }, [q, typeId]);
 
   function openNew() {
-    setEditing(null); setForm(EMPTY); setPhotoFile(null); setOverridePrice(false); setError(''); setModalOpen(true);
+    setEditing(null); setForm(EMPTY); setBodyOpen(false); setPhotoFile(null); setOverridePrice(false); setError(''); setModalOpen(true);
   }
   function openEdit(p) {
     setEditing(p);
@@ -107,6 +111,7 @@ export default function ProductsList() {
       vendorItemNumber: p.vendor_item_number || '', chassisCa: p.chassis_ca ?? '', gvwr: p.gvwr ?? '', bodyWeight: p.body_weight ?? '',
       installationCost: p.installation_cost || '', vendorStocked: !!p.vendor_stocked,
     });
+    setBodyOpen(!!(p.chassis_ca || p.gvwr || p.body_weight || p.vendor_stocked));
     setPhotoFile(null); setOverridePrice(false); setError(''); setModalOpen(true);
   }
 
@@ -196,7 +201,7 @@ export default function ProductsList() {
             <><ListExportBar ex={ex} title={t('Inventario')} filename="inventario" columns={PRODUCT_COLUMNS} />
             <table>
               <thead>
-                <tr><th><SelectAllBox ex={ex} /></th><th></th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Tipo')}</th><th>{t('CA / GVWR / Peso')}</th><th>{t('Costo+Flete')}</th><th>{t('Instalación')}</th><th>{t('Margen')}</th><th>{t('Precio venta')}</th><th>{t('Stock')}</th><th></th></tr>
+                <tr><th><SelectAllBox ex={ex} /></th><th></th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Tipo')}</th>{showBody && <th>{t('CA / GVWR / Peso')}</th>}<th>{t('Costo+Flete')}</th>{showInst && <th>{t('Instalación')}</th>}<th>{t('Margen')}</th><th>{t('Precio venta')}</th><th>{t('Stock')}</th><th></th></tr>
               </thead>
               <tbody>
                 {ex.visible.map((p) => (
@@ -206,9 +211,9 @@ export default function ProductsList() {
                     <td onClick={() => openEdit(p)} className="clickable"><strong>{p.name}</strong>{p.description ? <div className="muted" style={{ fontSize: 12 }}>{p.description}</div> : null}{p.vendor_stocked ? <div className="muted" style={{ fontSize: 12 }}>✓ {t('En stock del fabricante')}</div> : null}</td>
                     <td className="mono muted">{p.sku || '—'}</td>
                     <td className="muted">{p.product_type_name || '—'}</td>
-                    <td className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{p.chassis_ca || p.gvwr || p.body_weight ? <>CA {inch(p.chassis_ca)}<br />GVWR {lbs(p.gvwr)}<br />{t('Peso')} {lbs(p.body_weight)} lb</> : '—'}</td>
+                    {showBody && <td className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{p.chassis_ca || p.gvwr || p.body_weight ? <>CA {inch(p.chassis_ca)}<br />GVWR {lbs(p.gvwr)}<br />{t('Peso')} {lbs(p.body_weight)} lb</> : '—'}</td>}
                     <td>${(p.purchase_cost + p.freight_cost).toLocaleString()}</td>
-                    <td className="muted">{p.installation_cost ? '$' + Number(p.installation_cost).toLocaleString() : '—'}</td>
+                    {showInst && <td className="muted">{p.installation_cost ? '$' + Number(p.installation_cost).toLocaleString() : '—'}</td>}
                     <td>{p.margin_percent}%</td>
                     <td><strong>${Number(p.selling_price).toLocaleString()}</strong></td>
                     <td className={p.stock_qty <= 0 ? 'muted' : ''}>{p.stock_qty} {p.unit}{p.track_serials ? <div><Link className="muted" style={{ fontSize: 12 }} to={`/seriales?producto=${p.id}`}>🔢 {p.serials_available} {t('seriales disp.')}</Link></div> : null}</td>
@@ -251,19 +256,28 @@ export default function ProductsList() {
                   {form.photoUrl && !photoFile && <img className="thumb-lg" src={form.photoUrl} style={{ marginTop: 8 }} />}
                 </div>
                 <div className="field"><label>{t('Descripción')}</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-                <div style={{ background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('Datos del fabricante / carrocería')}</div>
+                <div className="grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
                   <div className="field"><label>{t('Item # del fabricante')}</label><input className="mono" value={form.vendorItemNumber} onChange={(e) => setForm({ ...form, vendorItemNumber: e.target.value })} /></div>
-                  <div className="grid grid-2">
-                    <div className="field"><label>{t('CA del chasis (pulgadas)')}</label><input type="number" step="0.1" value={form.chassisCa} onChange={(e) => setForm({ ...form, chassisCa: e.target.value })} /></div>
-                    <div className="field"><label>{t('GVWR del chasis (lb)')}</label><input type="number" step="1" value={form.gvwr} onChange={(e) => setForm({ ...form, gvwr: e.target.value })} /></div>
-                    <div className="field"><label>{t('Peso de la carrocería (lb)')}</label><input type="number" step="1" value={form.bodyWeight} onChange={(e) => setForm({ ...form, bodyWeight: e.target.value })} /></div>
-                    <div className="field"><label>{t('Costo de instalación ($)')}</label><input type="number" step="0.01" value={form.installationCost} onChange={(e) => setForm({ ...form, installationCost: e.target.value })} /></div>
-                  </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    <input type="checkbox" style={{ width: 'auto' }} checked={!!form.vendorStocked} onChange={(e) => setForm({ ...form, vendorStocked: e.target.checked })} />
-                    {t('Configuración en stock del fabricante (✓)')}
-                  </label>
+                  <div className="field"><label>{t('Costo de instalación ($)')}</label><input type="number" step="0.01" value={form.installationCost} onChange={(e) => setForm({ ...form, installationCost: e.target.value })} /></div>
+                </div>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, background: '#f8fafc' }}>
+                  <button type="button" onClick={() => setBodyOpen(!bodyOpen)}
+                    style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '8px 10px', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: 'inherit' }}>
+                    {bodyOpen ? '▾' : '▸'} {t('Datos de carrocería (CA, GVWR, peso)')}
+                  </button>
+                  {bodyOpen && (
+                    <div style={{ padding: '0 10px 8px' }}>
+                      <div className="grid grid-2">
+                        <div className="field"><label>{t('CA del chasis (pulgadas)')}</label><input type="number" step="0.1" value={form.chassisCa} onChange={(e) => setForm({ ...form, chassisCa: e.target.value })} /></div>
+                        <div className="field"><label>{t('GVWR del chasis (lb)')}</label><input type="number" step="1" value={form.gvwr} onChange={(e) => setForm({ ...form, gvwr: e.target.value })} /></div>
+                        <div className="field"><label>{t('Peso de la carrocería (lb)')}</label><input type="number" step="1" value={form.bodyWeight} onChange={(e) => setForm({ ...form, bodyWeight: e.target.value })} /></div>
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                        <input type="checkbox" style={{ width: 'auto' }} checked={!!form.vendorStocked} onChange={(e) => setForm({ ...form, vendorStocked: e.target.checked })} />
+                        {t('Configuración en stock del fabricante (✓)')}
+                      </label>
+                    </div>
+                  )}
                 </div>
               </div>
               <div>

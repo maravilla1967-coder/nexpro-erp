@@ -783,6 +783,7 @@ const DICT = {
   'En stock del fabricante': 'Manufacturer stocked',
   'Peso': 'Weight',
   'Datos del fabricante / carrocería': 'Manufacturer / body data',
+  'Datos de carrocería (CA, GVWR, peso)': 'Body data (CA, GVWR, weight)',
   'Item # del fabricante': 'Manufacturer item #',
   'CA del chasis (pulgadas)': 'Chassis CA (inches)',
   'GVWR del chasis (lb)': 'Chassis GVWR (lb)',
