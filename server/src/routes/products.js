@@ -66,7 +66,9 @@ function setVendorFields(id, b) {
 // ---- Importar lista de precios (CSV/JSON ya convertido a filas en el navegador) ----
 // POST /api/products/import  { rows: [...], supplierName, productTypeName, marginPercent, dryRun }
 // Cada fila: sku, name, vendorItemNumber, description, chassisCa, gvwr, bodyWeight, purchaseCost,
-// installationCost, vendorStocked, trackSerials. Se empata por SKU: si existe se actualiza, si no se crea.
+// installationCost, vendorStocked (= configuración fija), trackSerials, y opcionales productType (tipo por fila,
+// reemplaza al general) y previousSku (SKU anterior del mismo artículo: si existe se actualiza y se le cambia el SKU).
+// Se empata por SKU: si existe se actualiza, si no se crea.
 // Con dryRun = true no escribe nada: solo devuelve qué haría con cada fila (para revisar antes).
 router.post('/import', (req, res) => {
   const { rows, supplierName, productTypeName, dryRun } = req.body || {};
@@ -76,6 +78,14 @@ router.post('/import', (req, res) => {
   const supplier = supplierName ? get('SELECT id, name FROM suppliers WHERE lower(name) = lower(?)', [supplierName.trim()])
     || get('SELECT id, name FROM suppliers WHERE name LIKE ? ORDER BY id LIMIT 1', [`%${supplierName.trim()}%`]) : null;
   const ptype = productTypeName ? get('SELECT id, name FROM product_types WHERE lower(name) = lower(?)', [productTypeName.trim()]) : null;
+  const typeCache = {};
+  const findType = (n) => {
+    const k = String(n || '').trim().toLowerCase();
+    if (!k) return null;
+    if (!(k in typeCache)) typeCache[k] = get('SELECT id, name FROM product_types WHERE lower(name) = ?', [k]) || null;
+    return typeCache[k];
+  };
+  const findBySku = (sku) => (sku ? get('SELECT id, name, sku, purchase_cost, (SELECT COUNT(*) FROM product_serials ps WHERE ps.product_id = products.id) AS nserials FROM products WHERE sku = ?', [sku]) : null);
 
   const seen = new Set();
   const results = rows.map((r, i) => {
@@ -88,8 +98,17 @@ router.post('/import', (req, res) => {
     if (cost === null || cost === undefined) errors.push('Costo inválido');
     if (sku && seen.has(sku)) errors.push('SKU repetido en el archivo');
     seen.add(sku);
-    const existing = sku ? get('SELECT id, name, purchase_cost FROM products WHERE sku = ?', [sku]) : null;
+    let existing = findBySku(sku);
+    let renamedFrom = null;
+    const prev = String(r.previousSku || '').trim();
+    if (!existing && prev) {
+      existing = findBySku(prev);
+      if (existing) renamedFrom = prev;
+    }
+    const rowType = String(r.productType || '').trim();
     return {
+      productType: rowType || productTypeName || '', renamedFrom, existingId: existing ? existing.id : null,
+      hasSerials: existing ? existing.nserials > 0 : false,
       row: i + 1, sku, name, vendorItemNumber: r.vendorItemNumber || '', description: r.description || '',
       chassisCa: num(r.chassisCa), gvwr: num(r.gvwr), bodyWeight: num(r.bodyWeight), purchaseCost: cost,
       installationCost: num(r.installationCost) || 0, vendorStocked: bool01(r.vendorStocked) || 0,
@@ -107,31 +126,40 @@ router.post('/import', (req, res) => {
     error: results.filter((r) => r.action === 'error').length,
     supplier: supplier ? supplier.name : (supplierName ? `${supplierName} (se creará)` : null),
     productType: ptype ? ptype.name : (productTypeName ? `${productTypeName} (se creará)` : null),
+    productTypes: [...new Set(results.map((r) => r.productType).filter(Boolean))]
+      .map((n) => (findType(n) ? findType(n).name : `${n} (se creará)`)),
+    renamed: results.filter((r) => r.renamedFrom).length,
     marginPercent: margin,
   };
   if (dryRun || summary.error > 0) return res.json({ dryRun: true, summary, results });
 
   let supplierId = supplier ? supplier.id : null;
   if (!supplierId && supplierName) supplierId = run('INSERT INTO suppliers (name) VALUES (?)', [supplierName.trim()]).lastInsertRowid;
-  let typeId = ptype ? ptype.id : null;
-  if (!typeId && productTypeName) typeId = run('INSERT INTO product_types (name) VALUES (?)', [productTypeName.trim()]).lastInsertRowid;
+  const typeIdFor = (n) => {
+    if (!n) return null;
+    const t = findType(n);
+    if (t) return t.id;
+    const id = run('INSERT INTO product_types (name) VALUES (?)', [n.trim()]).lastInsertRowid;
+    typeCache[n.trim().toLowerCase()] = { id, name: n.trim() };
+    return id;
+  };
 
   db.exec('BEGIN');
   try {
     for (const r of results) {
-      const existing = get('SELECT id FROM products WHERE sku = ?', [r.sku]);
+      const typeId = typeIdFor(r.productType);
       let id;
-      if (existing) {
-        id = existing.id;
-        run(`UPDATE products SET name=?, description=?, purchase_cost=?, margin_percent=?, selling_price=?,
+      if (r.existingId) {
+        id = r.existingId;
+        run(`UPDATE products SET sku=?, name=?, description=?, purchase_cost=?, margin_percent=?, selling_price=?,
                product_type_id=COALESCE(?, product_type_id), supplier_id=COALESCE(?, supplier_id), updated_at=? WHERE id=?`,
-          [r.name, r.description || null, r.purchaseCost, margin, r.sellingPrice, typeId, supplierId, nowIso(), id]);
+          [r.sku, r.name, r.description || null, r.purchaseCost, margin, r.sellingPrice, typeId, supplierId, nowIso(), id]);
       } else {
         id = run(`INSERT INTO products (sku, name, description, product_type_id, purchase_cost, freight_cost, margin_percent, selling_price, stock_qty, unit, supplier_id, active)
                   VALUES (?,?,?,?,?,0,?,?,0,'unidad',?,1)`,
           [r.sku, r.name, r.description || null, typeId, r.purchaseCost, margin, r.sellingPrice, supplierId]).lastInsertRowid;
       }
-      run('UPDATE products SET track_serials = ? WHERE id = ?', [r.trackSerials ? 1 : 0, id]);
+      run('UPDATE products SET track_serials = ? WHERE id = ?', [r.trackSerials || r.hasSerials ? 1 : 0, id]);
       setVendorFields(id, r);
     }
     db.exec('COMMIT');

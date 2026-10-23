@@ -208,7 +208,7 @@ export default function ProductsList() {
                   <tr key={p.id}>
                     <td><RowBox ex={ex} row={p} /></td>
                     <td>{p.photo_url ? <img className="thumb" src={p.photo_url} /> : <div className="thumb" />}</td>
-                    <td onClick={() => openEdit(p)} className="clickable"><strong>{p.name}</strong>{p.description ? <div className="muted" style={{ fontSize: 12 }}>{p.description}</div> : null}{p.vendor_stocked ? <div className="muted" style={{ fontSize: 12 }}>✓ {t('En stock del fabricante')}</div> : null}</td>
+                    <td onClick={() => openEdit(p)} className="clickable"><strong>{p.name}</strong>{p.description ? <div className="muted" style={{ fontSize: 12 }}>{p.description}</div> : null}{p.vendor_stocked ? <div className="muted" style={{ fontSize: 12 }}>✓ {t('Configuración fija')}</div> : null}</td>
                     <td className="mono muted">{p.sku || '—'}</td>
                     <td className="muted">{p.product_type_name || '—'}</td>
                     {showBody && <td className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{p.chassis_ca || p.gvwr || p.body_weight ? <>CA {inch(p.chassis_ca)}<br />GVWR {lbs(p.gvwr)}<br />{t('Peso')} {lbs(p.body_weight)} lb</> : '—'}</td>}
@@ -274,7 +274,7 @@ export default function ProductsList() {
                       </div>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                         <input type="checkbox" style={{ width: 'auto' }} checked={!!form.vendorStocked} onChange={(e) => setForm({ ...form, vendorStocked: e.target.checked })} />
-                        {t('Configuración en stock del fabricante (✓)')}
+                        {t('Configuración fija (Fixed Configuration) — se ordena tal cual')}
                       </label>
                     </div>
                   )}
@@ -346,18 +346,19 @@ export default function ProductsList() {
               <div style={{ margin: '10px 0', fontSize: 13 }}>
                 {imp.done ? <strong>✅ {t('Importado')}: </strong> : <strong>{t('Vista previa')}: </strong>}
                 {imp.preview.summary.crear} {t('nuevos')} · {imp.preview.summary.actualizar} {t('a actualizar')} · {imp.preview.summary.error} {t('con error')}
-                {' · '}{t('Proveedor')}: {imp.preview.summary.supplier || '—'} · {t('Tipo')}: {imp.preview.summary.productType || '—'} · {t('Margen')} {imp.preview.summary.marginPercent}%
+                {imp.preview.summary.renamed ? <> · {imp.preview.summary.renamed} {t('con SKU nuevo')}</> : null}
+                {' · '}{t('Proveedor')}: {imp.preview.summary.supplier || '—'} · {t('Tipo')}: {(imp.preview.summary.productTypes && imp.preview.summary.productTypes.length ? imp.preview.summary.productTypes.join(', ') : imp.preview.summary.productType) || '—'} · {t('Margen')} {imp.preview.summary.marginPercent}%
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table>
-                  <thead><tr><th>#</th><th>{t('Acción')}</th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Descripción')}</th><th>CA</th><th>GVWR</th><th>{t('Peso')}</th><th>{t('Costo')}</th><th>{t('Precio venta')}</th><th>{t('Instalación')}</th><th>✓</th><th>{t('Seriales')}</th></tr></thead>
+                  <thead><tr><th>#</th><th>{t('Acción')}</th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Descripción')}</th><th>CA</th><th>GVWR</th><th>{t('Peso')}</th><th>{t('Costo')}</th><th>{t('Precio venta')}</th><th>{t('Instalación')}</th><th>{t('Fija')}</th><th>{t('Seriales')}</th></tr></thead>
                   <tbody>
                     {imp.preview.results.map((r) => (
                       <tr key={r.row}>
                         <td className="muted">{r.row}</td>
                         <td>{r.action === 'error' ? <span style={{ color: '#b91c1c' }}>{r.errors.join(', ')}</span> : r.action === 'crear' ? t('Crear') : <>{t('Actualizar')}{r.previousCost !== null && r.previousCost !== r.purchaseCost ? <div className="muted" style={{ fontSize: 11 }}>{money(r.previousCost)} → {money(r.purchaseCost)}</div> : null}</>}</td>
                         <td><strong>{r.name}</strong></td>
-                        <td className="mono muted">{r.sku}</td>
+                        <td className="mono muted">{r.sku}{r.renamedFrom ? <div style={{ fontSize: 11 }}>{t('antes')}: {r.renamedFrom}</div> : null}</td>
                         <td style={{ fontSize: 12 }}>{r.description}</td>
                         <td>{inch(r.chassisCa)}</td>
                         <td>{lbs(r.gvwr)}</td>
