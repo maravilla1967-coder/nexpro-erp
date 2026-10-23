@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../i18n.jsx';
+import ProductPicker from './ProductPicker.jsx';
 
 // items: [{ productId, description, quantity, unitPrice }]
 // priceLabel: etiqueta de la columna de precio ("Costo unit." o "Precio unit.")
@@ -16,7 +17,7 @@ export default function LineItemsEditor({ items, setItems, products, priceLabel 
     copy[idx] = {
       ...copy[idx],
       productId: productId || '',
-      description: product ? product.name : copy[idx].description,
+      description: product ? (product.description && product.description !== product.name ? `${product.name} — ${product.description}` : product.name) : copy[idx].description,
       unitPrice: product ? product[priceSourceField] : copy[idx].unitPrice,
     };
     setItems(copy);
@@ -36,10 +37,7 @@ export default function LineItemsEditor({ items, setItems, products, priceLabel 
           {items.map((it, idx) => (
             <tr key={idx}>
               <td>
-                <select value={it.productId || ''} onChange={(e) => pickProduct(idx, e.target.value)}>
-                  <option value="">— manual —</option>
-                  {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <ProductPicker products={products} value={it.productId || ''} priceField={priceSourceField} onChange={(id) => pickProduct(idx, id)} />
               </td>
               <td><input value={it.description} onChange={(e) => update(idx, 'description', e.target.value)} /></td>
               <td><input type="number" step="0.01" value={it.quantity} onChange={(e) => update(idx, 'quantity', e.target.value)} /></td>
