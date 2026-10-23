@@ -63,6 +63,23 @@ function setVendorFields(id, b) {
   run(`UPDATE products SET ${cols.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`, [...cols.map(([, v]) => v), id]);
 }
 
+// ---- Listas de precios guardadas en el servidor (server/db/pricelists/*.csv) ----
+// Para cargar listas grandes sin subir el archivo desde el navegador: el navegador lee el CSV de aquí
+// y lo manda a /import (con vista previa primero). Requiere sesión iniciada (y permiso de inventario).
+const PRICELIST_DIR = require('path').join(__dirname, '..', '..', 'db', 'pricelists');
+router.get('/pricelists', (req, res) => {
+  const fs = require('fs');
+  res.json(fs.existsSync(PRICELIST_DIR) ? fs.readdirSync(PRICELIST_DIR).filter((f) => f.endsWith('.csv')) : []);
+});
+router.get('/pricelists/:file', (req, res) => {
+  const fs = require('fs');
+  const f = String(req.params.file);
+  if (!/^[\w.\-]+\.csv$/.test(f)) return res.status(400).json({ error: 'Nombre de archivo inválido' });
+  const full = require('path').join(PRICELIST_DIR, f);
+  if (!fs.existsSync(full)) return res.status(404).json({ error: 'No existe' });
+  res.type('text/csv').send(fs.readFileSync(full, 'utf8'));
+});
+
 // ---- Importar lista de precios (CSV/JSON ya convertido a filas en el navegador) ----
 // POST /api/products/import  { rows: [...], supplierName, productTypeName, marginPercent, dryRun }
 // Cada fila: sku, name, vendorItemNumber, description, chassisCa, gvwr, bodyWeight, purchaseCost,
