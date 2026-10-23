@@ -1,5 +1,5 @@
 const express = require('express');
-const { all, get, run, nowIso } = require('../../db');
+const { db, all, get, run, nowIso } = require('../../db');
 const { makeUploader } = require('../middleware/upload');
 const { requireModuleEdit } = require('../middleware/auth');
 
@@ -32,6 +32,114 @@ router.post('/types', (req, res) => {
 router.delete('/types/:id', (req, res) => {
   run('DELETE FROM product_types WHERE id = ?', [req.params.id]);
   res.status(204).end();
+});
+
+
+// ---- Datos del fabricante (carrocerías / equipos) ----
+// Item # del fabricante, CA del chasis (pulgadas), GVWR (lb), peso de la carrocería (lb),
+// costo de instalación y "configuración en stock" del fabricante.
+function num(v) {
+  if (v === undefined || v === null) return undefined;
+  const s = String(v).replace(/[$,"″\s]/g, '');
+  if (s === '') return null;
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : null;
+}
+function bool01(v) {
+  if (v === undefined || v === null || v === '') return undefined;
+  return ['1', 'true', 'yes', 'si', 'sí', 'x', '✓', '✔'].includes(String(v).trim().toLowerCase()) || v === true || v === 1 ? 1 : 0;
+}
+function setVendorFields(id, b) {
+  const map = {
+    vendor_item_number: b.vendorItemNumber !== undefined ? (String(b.vendorItemNumber).trim() || null) : undefined,
+    chassis_ca: num(b.chassisCa),
+    gvwr: num(b.gvwr),
+    body_weight: num(b.bodyWeight),
+    installation_cost: b.installationCost !== undefined ? (num(b.installationCost) || 0) : undefined,
+    vendor_stocked: bool01(b.vendorStocked),
+  };
+  const cols = Object.entries(map).filter(([, v]) => v !== undefined);
+  if (!cols.length) return;
+  run(`UPDATE products SET ${cols.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`, [...cols.map(([, v]) => v), id]);
+}
+
+// ---- Importar lista de precios (CSV/JSON ya convertido a filas en el navegador) ----
+// POST /api/products/import  { rows: [...], supplierName, productTypeName, marginPercent, dryRun }
+// Cada fila: sku, name, vendorItemNumber, description, chassisCa, gvwr, bodyWeight, purchaseCost,
+// installationCost, vendorStocked, trackSerials. Se empata por SKU: si existe se actualiza, si no se crea.
+// Con dryRun = true no escribe nada: solo devuelve qué haría con cada fila (para revisar antes).
+router.post('/import', (req, res) => {
+  const { rows, supplierName, productTypeName, dryRun } = req.body || {};
+  if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'No hay filas para importar' });
+  const margin = req.body.marginPercent !== undefined && req.body.marginPercent !== '' ? parseFloat(req.body.marginPercent) : 30;
+
+  const supplier = supplierName ? get('SELECT id, name FROM suppliers WHERE lower(name) = lower(?)', [supplierName.trim()])
+    || get('SELECT id, name FROM suppliers WHERE name LIKE ? ORDER BY id LIMIT 1', [`%${supplierName.trim()}%`]) : null;
+  const ptype = productTypeName ? get('SELECT id, name FROM product_types WHERE lower(name) = lower(?)', [productTypeName.trim()]) : null;
+
+  const seen = new Set();
+  const results = rows.map((r, i) => {
+    const sku = String(r.sku || '').trim();
+    const name = String(r.name || '').trim();
+    const cost = num(r.purchaseCost);
+    const errors = [];
+    if (!sku) errors.push('Falta SKU');
+    if (!name) errors.push('Falta nombre');
+    if (cost === null || cost === undefined) errors.push('Costo inválido');
+    if (sku && seen.has(sku)) errors.push('SKU repetido en el archivo');
+    seen.add(sku);
+    const existing = sku ? get('SELECT id, name, purchase_cost FROM products WHERE sku = ?', [sku]) : null;
+    return {
+      row: i + 1, sku, name, vendorItemNumber: r.vendorItemNumber || '', description: r.description || '',
+      chassisCa: num(r.chassisCa), gvwr: num(r.gvwr), bodyWeight: num(r.bodyWeight), purchaseCost: cost,
+      installationCost: num(r.installationCost) || 0, vendorStocked: bool01(r.vendorStocked) || 0,
+      trackSerials: bool01(r.trackSerials) ?? 1,
+      sellingPrice: cost != null ? calcSellingPrice(cost, 0, margin) : null,
+      action: errors.length ? 'error' : existing ? 'actualizar' : 'crear',
+      previousCost: existing ? existing.purchase_cost : null,
+      errors,
+    };
+  });
+
+  const summary = {
+    crear: results.filter((r) => r.action === 'crear').length,
+    actualizar: results.filter((r) => r.action === 'actualizar').length,
+    error: results.filter((r) => r.action === 'error').length,
+    supplier: supplier ? supplier.name : (supplierName ? `${supplierName} (se creará)` : null),
+    productType: ptype ? ptype.name : (productTypeName ? `${productTypeName} (se creará)` : null),
+    marginPercent: margin,
+  };
+  if (dryRun || summary.error > 0) return res.json({ dryRun: true, summary, results });
+
+  let supplierId = supplier ? supplier.id : null;
+  if (!supplierId && supplierName) supplierId = run('INSERT INTO suppliers (name) VALUES (?)', [supplierName.trim()]).lastInsertRowid;
+  let typeId = ptype ? ptype.id : null;
+  if (!typeId && productTypeName) typeId = run('INSERT INTO product_types (name) VALUES (?)', [productTypeName.trim()]).lastInsertRowid;
+
+  db.exec('BEGIN');
+  try {
+    for (const r of results) {
+      const existing = get('SELECT id FROM products WHERE sku = ?', [r.sku]);
+      let id;
+      if (existing) {
+        id = existing.id;
+        run(`UPDATE products SET name=?, description=?, purchase_cost=?, margin_percent=?, selling_price=?,
+               product_type_id=COALESCE(?, product_type_id), supplier_id=COALESCE(?, supplier_id), updated_at=? WHERE id=?`,
+          [r.name, r.description || null, r.purchaseCost, margin, r.sellingPrice, typeId, supplierId, nowIso(), id]);
+      } else {
+        id = run(`INSERT INTO products (sku, name, description, product_type_id, purchase_cost, freight_cost, margin_percent, selling_price, stock_qty, unit, supplier_id, active)
+                  VALUES (?,?,?,?,?,0,?,?,0,'unidad',?,1)`,
+          [r.sku, r.name, r.description || null, typeId, r.purchaseCost, margin, r.sellingPrice, supplierId]).lastInsertRowid;
+      }
+      run('UPDATE products SET track_serials = ? WHERE id = ?', [r.trackSerials ? 1 : 0, id]);
+      setVendorFields(id, r);
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    return res.status(500).json({ error: `No se importó nada: ${e.message}` });
+  }
+  res.json({ dryRun: false, summary, results });
 });
 
 // ---- Products ----
@@ -77,9 +185,9 @@ router.get('/', (req, res) => {
              WHERE 1=1`;
   const params = [];
   if (q) {
-    sql += ' AND (p.name LIKE ? OR p.sku LIKE ? OR p.description LIKE ?)';
+    sql += ' AND (p.name LIKE ? OR p.sku LIKE ? OR p.description LIKE ? OR p.vendor_item_number LIKE ?)';
     const like = `%${q}%`;
-    params.push(like, like, like);
+    params.push(like, like, like, like);
   }
   if (typeId) {
     sql += ' AND p.product_type_id = ?';
@@ -125,6 +233,7 @@ router.post('/', upload.single('photo'), (req, res) => {
      b.active !== undefined ? (b.active === 'false' ? 0 : 1) : 1]
   );
   setTrackSerials(result.lastInsertRowid, b.trackSerials);
+  setVendorFields(result.lastInsertRowid, b);
   addProductSerials(result.lastInsertRowid, parseSerials(b.serials), req.user && req.user.id);
   res.status(201).json(get('SELECT * FROM products WHERE id = ?', [result.lastInsertRowid]));
 });
@@ -156,6 +265,7 @@ router.put('/:id', upload.single('photo'), (req, res) => {
      nowIso(), req.params.id]
   );
   setTrackSerials(req.params.id, b.trackSerials);
+  setVendorFields(req.params.id, b);
   addProductSerials(existing.id, newSerials, req.user && req.user.id);
   res.json(get('SELECT * FROM products WHERE id = ?', [req.params.id]));
 });

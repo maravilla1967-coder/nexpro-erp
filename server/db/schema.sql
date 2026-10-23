@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS products (
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  -- Columnas agregadas por migración (db/index.js): track_serials, vendor_item_number,
+  -- chassis_ca, gvwr, body_weight, installation_cost, vendor_stocked
 );
 
 -- ===================== COMPRAS =====================

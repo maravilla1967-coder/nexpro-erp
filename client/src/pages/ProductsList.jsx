@@ -7,6 +7,12 @@ import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../component
 const PRODUCT_COLUMNS = [
   { label: 'Nombre', value: (r) => r.name },
   { label: 'SKU', value: (r) => r.sku, mono: true },
+  { label: 'Item # fabricante', value: (r) => r.vendor_item_number, mono: true },
+  { label: 'Descripción', value: (r) => r.description },
+  { label: 'CA chasis (in)', value: (r) => r.chassis_ca, type: 'number', noTotal: true },
+  { label: 'GVWR (lb)', value: (r) => r.gvwr, type: 'number', noTotal: true },
+  { label: 'Peso carrocería (lb)', value: (r) => r.body_weight, type: 'number', noTotal: true },
+  { label: 'Costo instalación', value: (r) => r.installation_cost, type: 'money', noTotal: true },
   { label: 'Tipo', value: (r) => r.product_type_name },
   { label: 'Proveedor', value: (r) => r.supplier_name },
   { label: 'Costo', value: (r) => r.purchase_cost, type: 'money', noTotal: true },
@@ -21,7 +27,37 @@ const PRODUCT_COLUMNS = [
 const EMPTY = {
   name: '', sku: '', description: '', productTypeId: '', purchaseCost: '', freightCost: '',
   marginPercent: '30', sellingPrice: '', stockQty: '0', unit: 'unidad', supplierId: '', photoUrl: '', trackSerials: false, serials: '',
+  vendorItemNumber: '', chassisCa: '', gvwr: '', bodyWeight: '', installationCost: '', vendorStocked: false,
 };
+
+// CSV sencillo (soporta comillas). Primera fila = encabezados con los nombres de campo del import.
+function parseCsv(text) {
+  const rows = [];
+  let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') q = false;
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); cell = '';
+      if (row.some((x) => x.trim() !== '')) rows.push(row);
+      row = [];
+    } else cell += c;
+  }
+  row.push(cell);
+  if (row.some((x) => x.trim() !== '')) rows.push(row);
+  if (!rows.length) return [];
+  const head = rows[0].map((h) => h.trim());
+  return rows.slice(1).map((r) => Object.fromEntries(head.map((h, i) => [h, (r[i] ?? '').trim()])));
+}
+const money = (n) => (n === null || n === undefined ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const inch = (n) => (n === null || n === undefined || n === '' ? '—' : `${Number(n)}"`);
+const lbs = (n) => (n === null || n === undefined || n === '' ? '—' : Number(n).toLocaleString('en-US'));
 
 function computePrice(cost, freight, margin) {
   const base = (parseFloat(cost) || 0) + (parseFloat(freight) || 0);
@@ -46,6 +82,8 @@ export default function ProductsList() {
   const [photoFile, setPhotoFile] = useState(null);
   const [error, setError] = useState('');
   const [overridePrice, setOverridePrice] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [imp, setImp] = useState({ rows: [], fileName: '', supplierName: 'Reading Truck', productTypeName: 'Reading Bodies', marginPercent: '30', preview: null, done: null, error: '', busy: false });
 
   function loadAll() {
     api.get('/products', { q, typeId }).then(setList).catch(console.error);
@@ -66,6 +104,8 @@ export default function ProductsList() {
       name: p.name, sku: p.sku || '', description: p.description || '', productTypeId: p.product_type_id || '',
       purchaseCost: p.purchase_cost, freightCost: p.freight_cost, marginPercent: p.margin_percent,
       sellingPrice: p.selling_price, stockQty: p.stock_qty, unit: p.unit, supplierId: p.supplier_id || '', photoUrl: p.photo_url || '', trackSerials: !!p.track_serials, serials: '',
+      vendorItemNumber: p.vendor_item_number || '', chassisCa: p.chassis_ca ?? '', gvwr: p.gvwr ?? '', bodyWeight: p.body_weight ?? '',
+      installationCost: p.installation_cost || '', vendorStocked: !!p.vendor_stocked,
     });
     setPhotoFile(null); setOverridePrice(false); setError(''); setModalOpen(true);
   }
@@ -93,6 +133,28 @@ export default function ProductsList() {
     loadAll();
   }
 
+  function openImport() {
+    setImp((s) => ({ ...s, rows: [], fileName: '', preview: null, done: null, error: '' }));
+    setImportOpen(true);
+  }
+  async function readImportFile(file) {
+    if (!file) return;
+    const text = await file.text();
+    const rows = parseCsv(text);
+    setImp((s) => ({ ...s, rows, fileName: file.name, preview: null, done: null, error: rows.length ? '' : t('El archivo no tiene filas') }));
+  }
+  async function runImport(dryRun) {
+    setImp((s) => ({ ...s, busy: true, error: '' }));
+    try {
+      const r = await api.post('/products/import', {
+        rows: imp.rows, supplierName: imp.supplierName, productTypeName: imp.productTypeName, marginPercent: imp.marginPercent, dryRun,
+      });
+      setImp((s) => ({ ...s, busy: false, preview: r, done: r.dryRun ? null : r }));
+      if (!r.dryRun) loadAll();
+      if (!r.dryRun) loadLookups();
+    } catch (err) { setImp((s) => ({ ...s, busy: false, error: err.message })); }
+  }
+
   async function saveType(e) {
     e.preventDefault();
     if (!newType.trim()) return;
@@ -115,6 +177,7 @@ export default function ProductsList() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" onClick={() => setTypeModalOpen(true)}>{t('Tipos de producto')}</button>
+          <button className="btn" onClick={openImport}>{t('Importar lista de precios')}</button>
           <button className="btn btn-primary" onClick={openNew}>{t('+ Nuevo producto')}</button>
         </div>
       </div>
@@ -133,17 +196,19 @@ export default function ProductsList() {
             <><ListExportBar ex={ex} title={t('Inventario')} filename="inventario" columns={PRODUCT_COLUMNS} />
             <table>
               <thead>
-                <tr><th><SelectAllBox ex={ex} /></th><th></th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Tipo')}</th><th>{t('Costo+Flete')}</th><th>{t('Margen')}</th><th>{t('Precio venta')}</th><th>{t('Stock')}</th><th></th></tr>
+                <tr><th><SelectAllBox ex={ex} /></th><th></th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Tipo')}</th><th>{t('CA / GVWR / Peso')}</th><th>{t('Costo+Flete')}</th><th>{t('Instalación')}</th><th>{t('Margen')}</th><th>{t('Precio venta')}</th><th>{t('Stock')}</th><th></th></tr>
               </thead>
               <tbody>
                 {ex.visible.map((p) => (
                   <tr key={p.id}>
                     <td><RowBox ex={ex} row={p} /></td>
                     <td>{p.photo_url ? <img className="thumb" src={p.photo_url} /> : <div className="thumb" />}</td>
-                    <td onClick={() => openEdit(p)} className="clickable"><strong>{p.name}</strong></td>
+                    <td onClick={() => openEdit(p)} className="clickable"><strong>{p.name}</strong>{p.description ? <div className="muted" style={{ fontSize: 12 }}>{p.description}</div> : null}{p.vendor_stocked ? <div className="muted" style={{ fontSize: 12 }}>✓ {t('En stock del fabricante')}</div> : null}</td>
                     <td className="mono muted">{p.sku || '—'}</td>
                     <td className="muted">{p.product_type_name || '—'}</td>
+                    <td className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{p.chassis_ca || p.gvwr || p.body_weight ? <>CA {inch(p.chassis_ca)}<br />GVWR {lbs(p.gvwr)}<br />{t('Peso')} {lbs(p.body_weight)} lb</> : '—'}</td>
                     <td>${(p.purchase_cost + p.freight_cost).toLocaleString()}</td>
+                    <td className="muted">{p.installation_cost ? '$' + Number(p.installation_cost).toLocaleString() : '—'}</td>
                     <td>{p.margin_percent}%</td>
                     <td><strong>${Number(p.selling_price).toLocaleString()}</strong></td>
                     <td className={p.stock_qty <= 0 ? 'muted' : ''}>{p.stock_qty} {p.unit}{p.track_serials ? <div><Link className="muted" style={{ fontSize: 12 }} to={`/seriales?producto=${p.id}`}>🔢 {p.serials_available} {t('seriales disp.')}</Link></div> : null}</td>
@@ -186,6 +251,20 @@ export default function ProductsList() {
                   {form.photoUrl && !photoFile && <img className="thumb-lg" src={form.photoUrl} style={{ marginTop: 8 }} />}
                 </div>
                 <div className="field"><label>{t('Descripción')}</label><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+                <div style={{ background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('Datos del fabricante / carrocería')}</div>
+                  <div className="field"><label>{t('Item # del fabricante')}</label><input className="mono" value={form.vendorItemNumber} onChange={(e) => setForm({ ...form, vendorItemNumber: e.target.value })} /></div>
+                  <div className="grid grid-2">
+                    <div className="field"><label>{t('CA del chasis (pulgadas)')}</label><input type="number" step="0.1" value={form.chassisCa} onChange={(e) => setForm({ ...form, chassisCa: e.target.value })} /></div>
+                    <div className="field"><label>{t('GVWR del chasis (lb)')}</label><input type="number" step="1" value={form.gvwr} onChange={(e) => setForm({ ...form, gvwr: e.target.value })} /></div>
+                    <div className="field"><label>{t('Peso de la carrocería (lb)')}</label><input type="number" step="1" value={form.bodyWeight} onChange={(e) => setForm({ ...form, bodyWeight: e.target.value })} /></div>
+                    <div className="field"><label>{t('Costo de instalación ($)')}</label><input type="number" step="0.01" value={form.installationCost} onChange={(e) => setForm({ ...form, installationCost: e.target.value })} /></div>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                    <input type="checkbox" style={{ width: 'auto' }} checked={!!form.vendorStocked} onChange={(e) => setForm({ ...form, vendorStocked: e.target.checked })} />
+                    {t('Configuración en stock del fabricante (✓)')}
+                  </label>
+                </div>
               </div>
               <div>
                 <div className="grid grid-2">
@@ -232,6 +311,61 @@ export default function ProductsList() {
               <button type="submit" className="btn btn-primary">{t('Guardar')}</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {importOpen && (
+        <Modal title={t('Importar lista de precios')} onClose={() => setImportOpen(false)} wide>
+          {imp.error && <div className="error-banner">{imp.error}</div>}
+          <div className="hint" style={{ marginBottom: 10, fontSize: 13 }}>{t('Archivo CSV con columnas: sku, name, vendorItemNumber, description, chassisCa, gvwr, bodyWeight, purchaseCost, installationCost, vendorStocked, trackSerials. Se empata por SKU: si ya existe se actualiza, si no se crea. Primero se muestra una vista previa; nada se guarda hasta que confirmes.')}</div>
+          <div className="grid grid-2">
+            <div className="field"><label>{t('Archivo CSV')}</label><input type="file" accept=".csv,text/csv" onChange={(e) => readImportFile(e.target.files[0])} /></div>
+            <div className="field"><label>{t('Margen de ganancia (%)')}</label><input type="number" value={imp.marginPercent} onChange={(e) => setImp({ ...imp, marginPercent: e.target.value, preview: null })} /></div>
+            <div className="field"><label>{t('Proveedor')}</label><input value={imp.supplierName} onChange={(e) => setImp({ ...imp, supplierName: e.target.value, preview: null })} /></div>
+            <div className="field"><label>{t('Tipo de producto')}</label><input value={imp.productTypeName} onChange={(e) => setImp({ ...imp, productTypeName: e.target.value, preview: null })} /></div>
+          </div>
+          {imp.rows.length > 0 && !imp.preview && (
+            <button className="btn btn-primary" disabled={imp.busy} onClick={() => runImport(true)}>{t('Ver vista previa')} ({imp.rows.length})</button>
+          )}
+          {imp.preview && (
+            <>
+              <div style={{ margin: '10px 0', fontSize: 13 }}>
+                {imp.done ? <strong>✅ {t('Importado')}: </strong> : <strong>{t('Vista previa')}: </strong>}
+                {imp.preview.summary.crear} {t('nuevos')} · {imp.preview.summary.actualizar} {t('a actualizar')} · {imp.preview.summary.error} {t('con error')}
+                {' · '}{t('Proveedor')}: {imp.preview.summary.supplier || '—'} · {t('Tipo')}: {imp.preview.summary.productType || '—'} · {t('Margen')} {imp.preview.summary.marginPercent}%
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table>
+                  <thead><tr><th>#</th><th>{t('Acción')}</th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Descripción')}</th><th>CA</th><th>GVWR</th><th>{t('Peso')}</th><th>{t('Costo')}</th><th>{t('Precio venta')}</th><th>{t('Instalación')}</th><th>✓</th><th>{t('Seriales')}</th></tr></thead>
+                  <tbody>
+                    {imp.preview.results.map((r) => (
+                      <tr key={r.row}>
+                        <td className="muted">{r.row}</td>
+                        <td>{r.action === 'error' ? <span style={{ color: '#b91c1c' }}>{r.errors.join(', ')}</span> : r.action === 'crear' ? t('Crear') : <>{t('Actualizar')}{r.previousCost !== null && r.previousCost !== r.purchaseCost ? <div className="muted" style={{ fontSize: 11 }}>{money(r.previousCost)} → {money(r.purchaseCost)}</div> : null}</>}</td>
+                        <td><strong>{r.name}</strong></td>
+                        <td className="mono muted">{r.sku}</td>
+                        <td style={{ fontSize: 12 }}>{r.description}</td>
+                        <td>{inch(r.chassisCa)}</td>
+                        <td>{lbs(r.gvwr)}</td>
+                        <td>{lbs(r.bodyWeight)}</td>
+                        <td>{money(r.purchaseCost)}</td>
+                        <td><strong>{money(r.sellingPrice)}</strong></td>
+                        <td>{money(r.installationCost)}</td>
+                        <td>{r.vendorStocked ? '✓' : '—'}</td>
+                        <td>{r.trackSerials ? t('Sí') : t('No')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+          <div className="modal-footer">
+            <button type="button" className="btn" onClick={() => setImportOpen(false)}>{imp.done ? t('Cerrar') : t('Cancelar')}</button>
+            {imp.preview && !imp.done && imp.preview.summary.error === 0 && (
+              <button className="btn btn-primary" disabled={imp.busy} onClick={() => runImport(false)}>{t('Confirmar e importar')} ({imp.preview.results.length})</button>
+            )}
+          </div>
         </Modal>
       )}
 

@@ -33,6 +33,15 @@ tryAlter('ALTER TABLE invoices ADD COLUMN include_wire_info INTEGER NOT NULL DEF
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN order_date TEXT');
 tryAlter('ALTER TABLE purchase_order_items ADD COLUMN received_qty REAL NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE products ADD COLUMN track_serials INTEGER NOT NULL DEFAULT 0');
+// Datos del fabricante para carrocerías / equipos (listas de precios Reading, etc.):
+// Item # del fabricante, CA del chasis (pulgadas), GVWR del chasis (lb), peso de la carrocería (lb),
+// costo de instalación y si es configuración en stock del fabricante (✓ en la lista).
+tryAlter('ALTER TABLE products ADD COLUMN vendor_item_number TEXT');
+tryAlter('ALTER TABLE products ADD COLUMN chassis_ca REAL');
+tryAlter('ALTER TABLE products ADD COLUMN gvwr REAL');
+tryAlter('ALTER TABLE products ADD COLUMN body_weight REAL');
+tryAlter('ALTER TABLE products ADD COLUMN installation_cost REAL NOT NULL DEFAULT 0');
+tryAlter('ALTER TABLE products ADD COLUMN vendor_stocked INTEGER NOT NULL DEFAULT 0');
 // Recargo cobrado al cliente aparte del abono (p. ej. 3% por pagar con tarjeta en Square).
 // No reduce el saldo de la factura: el total cobrado = amount + surcharge.
 tryAlter('ALTER TABLE invoice_payments ADD COLUMN surcharge REAL NOT NULL DEFAULT 0');
