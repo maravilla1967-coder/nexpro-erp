@@ -226,8 +226,22 @@ export default function PurchaseOrdersList() {
             {linesLocked ? (
               <>
                 <table>
-                  <thead><tr><th>{t('Descripción')}</th><th className="text-right">{t('Pedido')}</th><th className="text-right">{t('Recibido')}</th><th className="text-right">{t('Costo unit.')}</th></tr></thead>
-                  <tbody>{editingPo.items.map((it) => <tr key={it.id}><td>{it.description}</td><td className="text-right">{it.quantity}</td><td className="text-right">{it.received_qty || 0}</td><td className="text-right">${Number(it.unit_cost).toLocaleString('en-US')}</td></tr>)}</tbody>
+                  <thead><tr><th>{t('Descripción')}</th><th className="text-right">{t('Pedido')}</th><th className="text-right">{t('Recibido')}</th><th className="text-right">{t('Costo unit.')}</th><th className="text-right">{t('Subtotal')}</th></tr></thead>
+                  <tbody>{editingPo.items.map((it) => (
+                    <tr key={it.id}>
+                      <td>{it.description}</td>
+                      <td className="text-right">{it.quantity}</td>
+                      <td className="text-right">{it.received_qty || 0}</td>
+                      <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{fmt$(it.unit_cost)}</td>
+                      <td className="text-right" style={{ whiteSpace: 'nowrap' }}>{fmt$(Number(it.quantity) * Number(it.unit_cost))}</td>
+                    </tr>
+                  ))}</tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={4} className="text-right"><strong>{t('Total')}</strong></td>
+                      <td className="text-right" style={{ whiteSpace: 'nowrap' }}><strong>{fmt$(editingPo.items.reduce((sum, it) => sum + Number(it.quantity) * Number(it.unit_cost), 0))}</strong></td>
+                    </tr>
+                  </tfoot>
                 </table>
                 <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>🔒 {t('Las líneas no se pueden cambiar porque ya hay mercancía recibida (ya entró al inventario). Sí puedes cambiar la fecha, los comentarios y los adjuntos.')}</div>
               </>
