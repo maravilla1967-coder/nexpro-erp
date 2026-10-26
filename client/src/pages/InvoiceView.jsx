@@ -148,10 +148,16 @@ export default function InvoiceView() {
           {invoice.balance > 0.004 && !['cancelado', 'anulada'].includes(invoice.status) && (
             <button type="button" className="btn" onClick={() => setPayOpen(true)}>{t('💵 Registrar pago')}</button>
           )}
+          <Link to={`/facturas/${id}/entrega`} className="btn">🚚 {invoice.delivery_number ? t('Boleta de entrega') : t('Crear boleta de entrega')}</Link>
           <button className="btn btn-primary" onClick={() => window.print()}>{t('Imprimir / Guardar PDF')}</button>
         </div>
       </div>
       <div className="content">
+        {invoice.delivery_number && (
+          <div className="no-print muted" style={{ marginBottom: 10, fontSize: 13 }}>
+            🚚 {t('Entregada')}: <Link to={`/facturas/${id}/entrega`}>{invoice.delivery_number}</Link> · {invoice.delivery_date}{invoice.delivery_received_by ? ` · ${t('recibió')} ${invoice.delivery_received_by}` : ''}
+          </div>
+        )}
         <div className="card invoice-sheet">
           <div className="invoice-header">
             <DocumentBrand />

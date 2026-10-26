@@ -12,6 +12,7 @@ import SuppliersList from './pages/SuppliersList.jsx';
 import PurchaseOrdersList from './pages/PurchaseOrdersList.jsx';
 import PurchaseOrderDocument from './pages/PurchaseOrderDocument.jsx';
 import SalesOrdersList from './pages/SalesOrdersList.jsx';
+import DeliveryTicketDocument from './pages/DeliveryTicketDocument.jsx';
 import SalesOrderDocument from './pages/SalesOrderDocument.jsx';
 import InvoicesList from './pages/InvoicesList.jsx';
 import InvoiceView from './pages/InvoiceView.jsx';
@@ -246,6 +247,7 @@ function MainShell() {
           <Route path="/pedidos/:id/documento" element={<SalesOrderDocument />} />
           <Route path="/facturas" element={<InvoicesList />} />
           <Route path="/facturas/:id" element={<InvoiceView />} />
+          <Route path="/facturas/:id/entrega" element={<DeliveryTicketDocument />} />
           <Route path="/vehiculos" element={<VehiclesList />} />
           <Route path="/vehiculos/:id" element={<VehicleDetail />} />
           <Route path="/vehiculos/:id/documento" element={<VehicleReceptionDocument />} />

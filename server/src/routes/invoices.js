@@ -11,7 +11,9 @@ router.use(requireModuleEdit('facturas'));
 
 function withItems(inv) {
   if (!inv) return inv;
-  inv.items = all('SELECT * FROM invoice_items WHERE invoice_id = ?', [inv.id]);
+  inv.items = all(`SELECT ii.*, p.sku AS product_sku, p.vendor_item_number AS product_item_number, p.unit AS product_unit
+                   FROM invoice_items ii LEFT JOIN products p ON p.id = ii.product_id
+                   WHERE ii.invoice_id = ? ORDER BY ii.id`, [inv.id]);
   return inv;
 }
 
@@ -31,6 +33,10 @@ function getFullInvoice(id) {
   if (!inv) return inv;
   withItems(inv);
   inv.workOrders = all('SELECT id, number, status FROM work_orders WHERE invoice_id = ?', [inv.id]);
+  // Vehículos ligados a la factura (por sus órdenes de trabajo o por seriales instalados): para la boleta de entrega.
+  inv.vehicles = all(`SELECT DISTINCT v.id, v.vin, v.make, v.model, v.year, v.plate FROM vehicles v
+                      WHERE v.id IN (SELECT vehicle_id FROM work_orders WHERE invoice_id = ? AND vehicle_id IS NOT NULL
+                                     UNION SELECT vehicle_id FROM product_serials WHERE invoice_id = ? AND vehicle_id IS NOT NULL)`, [inv.id, inv.id]);
   inv.payments = all(
     `SELECT p.*, u.name AS created_by_name FROM invoice_payments p
      LEFT JOIN users u ON u.id = p.created_by WHERE p.invoice_id = ? ORDER BY p.payment_date, p.id`,
@@ -372,6 +378,33 @@ router.post('/:id/sync-work-orders', (req, res) => {
 // Editar o eliminar una factura existente: un administrador lo aplica de inmediato;
 // cualquier otro usuario con permiso de edición en "facturas" solo puede proponer el
 // cambio, que queda pendiente de autorización del administrador.
+// ---- Boleta de entrega (Delivery Ticket) ----
+// Crea o actualiza la boleta de entrega de la factura. El número se asigna la primera vez y
+// sigue al de la factura: NX-INV-AAAAMMDD-NN → NX-DT-AAAAMMDD-NN (si la factura tiene otro
+// formato, NX-DT-<número de factura>). No pasa por aprobación: no cambia montos ni líneas.
+function deliveryNumberFor(invNumber) {
+  const s = String(invNumber || '');
+  if (/^NX-INV-/.test(s)) return s.replace(/^NX-INV-/, 'NX-DT-');
+  return `NX-DT-${s.replace(/^NX-/, '')}`;
+}
+router.post('/:id/delivery', (req, res) => {
+  const inv = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
+  if (!inv) return res.status(404).json({ error: 'Factura no encontrada' });
+  const b = req.body || {};
+  const clean = (v) => (v === undefined ? undefined : (String(v).trim() || null));
+  const number = inv.delivery_number || deliveryNumberFor(inv.number);
+  const date = clean(b.deliveryDate) || inv.delivery_date || new Date().toISOString().slice(0, 10);
+  run(`UPDATE invoices SET delivery_number = ?, delivery_date = ?,
+         delivery_delivered_by = COALESCE(?, delivery_delivered_by), delivery_received_by = COALESCE(?, delivery_received_by),
+         delivery_notes = COALESCE(?, delivery_notes) WHERE id = ?`,
+    [number, date, clean(b.deliveredBy) ?? null, clean(b.receivedBy) ?? null, clean(b.notes) ?? null, inv.id]);
+  // Permite borrar un campo enviándolo vacío ('')
+  for (const [k, col] of [['deliveredBy', 'delivery_delivered_by'], ['receivedBy', 'delivery_received_by'], ['notes', 'delivery_notes']]) {
+    if (b[k] !== undefined && clean(b[k]) === null) run(`UPDATE invoices SET ${col} = NULL WHERE id = ?`, [inv.id]);
+  }
+  res.json(getFullInvoice(inv.id));
+});
+
 router.put('/:id', (req, res) => {
   const existing = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Factura no encontrada' });

@@ -75,7 +75,7 @@ export default function InvoicesList() {
                 {ex.visible.map((inv) => (
                   <tr key={inv.id}>
                     <td><RowBox ex={ex} row={inv} /></td>
-                    <td className="mono"><Link to={`/facturas/${inv.id}`}>{inv.number}</Link></td>
+                    <td className="mono"><Link to={`/facturas/${inv.id}`}>{inv.number}</Link>{inv.delivery_number ? <div style={{ fontSize: 11 }}><Link className="muted" to={`/facturas/${inv.id}/entrega`} title={`${t('Boleta de entrega')} ${inv.delivery_number}`}>🚚 {inv.delivery_number}</Link></div> : null}</td>
                     <td>{inv.customer_name}</td>
                     <td><strong>${Number(inv.total).toLocaleString()}</strong></td>
                     <td className={inv.balance > 0.004 ? '' : 'muted'}>{money(inv.balance)}</td>

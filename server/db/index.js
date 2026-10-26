@@ -42,6 +42,13 @@ tryAlter('ALTER TABLE products ADD COLUMN gvwr REAL');
 tryAlter('ALTER TABLE products ADD COLUMN body_weight REAL');
 tryAlter('ALTER TABLE products ADD COLUMN installation_cost REAL NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE products ADD COLUMN vendor_stocked INTEGER NOT NULL DEFAULT 0');
+// Boleta de entrega (Delivery Ticket) de la factura: número NX-DT-…, fecha, quién entrega,
+// quién recibe y notas. Se crea desde la factura y lista todo lo facturado (sin precios).
+tryAlter('ALTER TABLE invoices ADD COLUMN delivery_number TEXT');
+tryAlter('ALTER TABLE invoices ADD COLUMN delivery_date TEXT');
+tryAlter('ALTER TABLE invoices ADD COLUMN delivery_delivered_by TEXT');
+tryAlter('ALTER TABLE invoices ADD COLUMN delivery_received_by TEXT');
+tryAlter('ALTER TABLE invoices ADD COLUMN delivery_notes TEXT');
 // Recargo cobrado al cliente aparte del abono (p. ej. 3% por pagar con tarjeta en Square).
 // No reduce el saldo de la factura: el total cobrado = amount + surcharge.
 tryAlter('ALTER TABLE invoice_payments ADD COLUMN surcharge REAL NOT NULL DEFAULT 0');
