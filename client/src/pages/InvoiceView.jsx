@@ -182,7 +182,12 @@ export default function InvoiceView() {
             <tbody>
               {invoice.items.map((it) => (
                 <tr key={it.id}>
-                  <td>{it.description}</td>
+                  <td>{it.description}
+                    {(() => {
+                      const sn = serials.filter((x) => it.product_id && String(x.product_id) === String(it.product_id));
+                      return sn.length > 0 ? <div style={{ fontSize: 12, marginTop: 2 }}><strong>{t('Serial(es):')}</strong> <span className="mono">{sn.map((x) => x.serial).join(', ')}</span></div> : null;
+                    })()}
+                  </td>
                   <td className="text-right">{it.quantity}</td>
                   <td className="text-right">${Number(it.unit_price).toLocaleString()}</td>
                   <td className="text-right">${(it.quantity * it.unit_price).toLocaleString()}</td>
