@@ -215,7 +215,7 @@ export const MANUAL = [
     tips: [L('Si una factura no tiene fecha de vencimiento, se calcula con los "días de crédito" de arriba.', 'If an invoice has no due date, it is calculated with the "credit days" at the top.')],
   },
   {
-    id: 'inventario', icon: '📦', routes: ['/inventario'],
+    id: 'inventario', icon: '📦', routes: ['/inventario', '/productos'],
     title: L('Inventario y productos', 'Inventory and products'),
     summary: L('Productos con costo, flete, margen y precio de venta, stock y, si aplica, números de serie por unidad.', 'Products with cost, freight, margin and selling price, stock and, when applicable, serial numbers per unit.'),
     tasks: [

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import { useI18n } from '../i18n.jsx';
@@ -75,7 +75,8 @@ export default function ProductsList() {
   const showInst = ex.visible.some((p) => p.installation_cost);
   const [types, setTypes] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [q, setQ] = useState('');
+  const [searchParams] = useSearchParams();
+  const [q, setQ] = useState(searchParams.get('q') || '');
   const [typeId, setTypeId] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [typeModalOpen, setTypeModalOpen] = useState(false);
@@ -177,10 +178,11 @@ export default function ProductsList() {
     <>
       <div className="topbar">
         <div>
-          <h1>{t('Inventario')}</h1>
-          <div className="sub">{t('Productos, costos y precios de venta')}</div>
+          <h1>{t('Catálogo de productos')}</h1>
+          <div className="sub">{t('Todo lo que se puede vender o comprar: costos y precios. Lo que hay en bodega está en Inventario.')}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <Link to="/inventario" className="btn">📦 {t('Inventario disponible')}</Link>
           <button className="btn" onClick={() => setTypeModalOpen(true)}>{t('Tipos de producto')}</button>
           <button className="btn" onClick={openImport}>{t('Importar lista de precios')}</button>
           <button className="btn btn-primary" onClick={openNew}>{t('+ Nuevo producto')}</button>

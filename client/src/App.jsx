@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import CustomersList from './pages/CustomersList.jsx';
 import CustomerDetail from './pages/CustomerDetail.jsx';
 import ProductsList from './pages/ProductsList.jsx';
+import InventoryStockPage from './pages/InventoryStockPage.jsx';
 import SuppliersList from './pages/SuppliersList.jsx';
 import PurchaseOrdersList from './pages/PurchaseOrdersList.jsx';
 import PurchaseOrderDocument from './pages/PurchaseOrderDocument.jsx';
@@ -68,6 +69,7 @@ const NAV = [
     label: 'Inventario y Compras',
     links: [
       { to: '/inventario', text: 'Inventario', icon: '📦' },
+      { to: '/productos', text: 'Catálogo de productos', icon: '🏷️' },
       { to: '/proveedores', text: 'Proveedores', icon: '🏭' },
       { to: '/compras', text: 'Órdenes de Compra', icon: '🛒' },
       { to: '/cuentas-por-pagar', text: 'Cuentas por pagar', icon: '🧾' },
@@ -239,7 +241,8 @@ function MainShell() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/clientes" element={<CustomersList />} />
           <Route path="/clientes/:id" element={<CustomerDetail />} />
-          <Route path="/inventario" element={<ProductsList />} />
+          <Route path="/inventario" element={<InventoryStockPage />} />
+          <Route path="/productos" element={<ProductsList />} />
           <Route path="/proveedores" element={<SuppliersList />} />
           <Route path="/compras" element={<PurchaseOrdersList />} />
           <Route path="/compras/:id/documento" element={<PurchaseOrderDocument />} />
