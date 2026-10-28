@@ -4,7 +4,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
-import WorkOrderPartsEditor, { partsTotal } from '../components/WorkOrderPartsEditor.jsx';
+import WorkOrderPartsEditor, { partsTotal, partFromApi, partToApi } from '../components/WorkOrderPartsEditor.jsx';
+import AssigneeSelect, { assigneeValue, assigneePayload, assigneeName } from '../components/AssigneeSelect.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
 const EQUIP_EMPTY = { typeName: '', serialNumber: '', manufacturer: '', model: '', notes: '' };
@@ -19,6 +20,7 @@ export default function VehicleDetail() {
   const [mechanics, setMechanics] = useState([]);
   const [services, setServices] = useState([]);
   const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
 
   const [equipModalOpen, setEquipModalOpen] = useState(false);
   const [equipForm, setEquipForm] = useState(EQUIP_EMPTY);
@@ -58,6 +60,7 @@ export default function VehicleDetail() {
     api.get('/vehicles/equipment-types').then(setEquipTypes);
     api.get('/customers').then(setCustomers).catch(() => {});
     api.get('/mechanics', { active: 'true' }).then(setMechanics);
+    api.get('/suppliers').then(setSuppliers).catch(() => {});
     api.get('/services', { active: 'true' }).then(setServices);
     api.get('/products', { active: 'true' }).then(setProducts).catch(() => {});
   }, []);
@@ -139,14 +142,14 @@ export default function VehicleDetail() {
 
   function openEditWo(wo) {
     setEditingWo(wo);
-    setWoMechanicId(wo.mechanic_id || ''); setWoStatus(wo.status);
+    setWoMechanicId(assigneeValue(wo)); setWoStatus(wo.status);
     setWoServices(
       wo.services.length > 0
         ? wo.services.map((s) => ({ serviceId: s.service_id || '', description: s.description, pricingType: s.pricing_type, hours: s.hours ?? 0, hourlyRate: s.hourly_rate ?? 0, flatPrice: s.flat_price ?? 0 }))
         : [{ serviceId: '', description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 }]
     );
     setWoNotes(wo.notes || ''); setWoDiagnosis(wo.diagnosis || ''); setWoResolution(wo.resolution || '');
-    setWoParts((wo.parts || []).map((p) => ({ productId: p.product_id || '', description: p.description, action: p.action, quantity: p.quantity, unitCost: p.unit_cost, notes: p.notes || '' })));
+    setWoParts((wo.parts || []).map(partFromApi));
     setError(''); setWoModalOpen(true);
   }
   function updateWoService(idx, field, value) {
@@ -186,16 +189,13 @@ export default function VehicleDetail() {
   async function saveWorkOrder(e) {
     e.preventDefault();
     const payload = {
-      vehicleId: id, mechanicId: woMechanicId || null,
+      vehicleId: id, ...assigneePayload(woMechanicId),
       notes: woNotes || null, diagnosis: woDiagnosis || null, resolution: woResolution || null,
       services: woServices.filter((s) => s.description).map((s) => ({
         serviceId: s.serviceId || null, description: s.description, pricingType: s.pricingType,
         hours: parseFloat(s.hours) || 0, hourlyRate: parseFloat(s.hourlyRate) || 0, flatPrice: parseFloat(s.flatPrice) || 0,
       })),
-      parts: woParts.filter((p) => p.description).map((p) => ({
-        productId: p.productId || null, description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
-        notes: p.notes || null,
-      })),
+      parts: woParts.filter((p) => p.description).map(partToApi),
     };
     try {
       if (editingWo) {
@@ -340,7 +340,7 @@ export default function VehicleDetail() {
           </div>
           {vehicle.workOrders.length === 0 ? <div className="empty-state">{t('Sin órdenes de trabajo todavía.')}</div> : (
             <table>
-              <thead><tr><th></th><th>{t('Número')}</th><th>{t('Mecánico')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
+              <thead><tr><th></th><th>{t('Número')}</th><th>{t('Asignado a')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
               <tbody>
                 {vehicle.workOrders.map((wo) => {
                   const facturable = wo.status === 'completado' && !wo.invoice_id;
@@ -352,7 +352,7 @@ export default function VehicleDetail() {
                         )}
                       </td>
                       <td className="mono">{wo.number}</td>
-                      <td>{wo.mechanic_name || '—'}</td>
+                      <td>{assigneeName(wo, t)}</td>
                       <td><Pill value={wo.status} /></td>
                       <td className="muted">{wo.created_at}</td>
                       <td>
@@ -496,11 +496,8 @@ export default function VehicleDetail() {
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
               <div className="field">
-                <label>{t('Mecánico asignado')}</label>
-                <select value={woMechanicId} onChange={(e) => setWoMechanicId(e.target.value)}>
-                  <option value="">{t('— Sin asignar —')}</option>
-                  {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+                <label>{t('Asignado a (mecánico o proveedor)')}</label>
+                <AssigneeSelect value={woMechanicId} onChange={setWoMechanicId} mechanics={mechanics} suppliers={suppliers} />
               </div>
               {editingWo && (
                 <div className="field">
@@ -558,7 +555,7 @@ export default function VehicleDetail() {
             <div className="field"><label>{t('Solución / Reparación realizada')}</label><textarea rows={2} value={woResolution} onChange={(e) => setWoResolution(e.target.value)} /></div>
 
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes y productos')}</label>
-            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} />
+            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} defaultAction={String(woMechanicId).startsWith('s:') ? 'proveedor' : 'reemplazada'} />
 
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)', marginTop: 16, display: 'block' }}>{t('Fotos')}</label>
             {editingWo ? (

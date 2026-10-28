@@ -261,7 +261,7 @@ router.post('/from-work-orders', (req, res) => {
     }
     for (const p of parts) {
       items.push({
-        description: `${wo.number} — ${p.description}`,
+        description: `${wo.number} — ${p.description}${p.serial ? ` (S/N ${p.serial})` : ''}`,
         quantity: Number(p.quantity || 1),
         unitPrice: Number(p.unit_cost || 0),
         productId: p.product_id || null,
@@ -327,7 +327,7 @@ router.post('/:id/sync-work-orders', (req, res) => {
     }
     for (const p of parts) {
       expectedItems.push({
-        description: `${wo.number} — ${p.description}`,
+        description: `${wo.number} — ${p.description}${p.serial ? ` (S/N ${p.serial})` : ''}`,
         quantity: Number(p.quantity || 1),
         unitPrice: Number(p.unit_cost || 0),
         productId: p.product_id || null,

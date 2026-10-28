@@ -26,6 +26,11 @@ tryAlter('ALTER TABLE services ADD COLUMN description_en TEXT');
 tryAlter('ALTER TABLE suppliers ADD COLUMN code TEXT');
 tryAlter('ALTER TABLE work_order_parts ADD COLUMN notes TEXT');
 tryAlter('ALTER TABLE work_order_parts ADD COLUMN product_id INTEGER REFERENCES products(id)');
+// Orden de trabajo asignada a un proveedor externo (ej. Florida Power Train instala bombas y PTO)
+// en lugar de un mecánico propio; y número de serie de cada parte (libre o ligado a inventario).
+tryAlter('ALTER TABLE work_orders ADD COLUMN supplier_id INTEGER REFERENCES suppliers(id)');
+tryAlter('ALTER TABLE work_order_parts ADD COLUMN serial TEXT');
+tryAlter('ALTER TABLE work_order_parts ADD COLUMN product_serial_id INTEGER REFERENCES product_serials(id)');
 tryAlter('ALTER TABLE customers ADD COLUMN zip TEXT');
 tryAlter('ALTER TABLE suppliers ADD COLUMN city TEXT');
 tryAlter('ALTER TABLE suppliers ADD COLUMN zip TEXT');

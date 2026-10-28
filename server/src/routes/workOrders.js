@@ -44,23 +44,70 @@ function withDetails(wo) {
   return wo;
 }
 
+// Guarda las partes de la orden. Cada parte puede llevar número de serie:
+//  - productSerialId: una unidad del inventario con control de seriales (queda "instalada" en el vehículo)
+//  - serial: texto libre (ej. la bomba o el PTO que instala un proveedor y no pasa por inventario).
+// Si se escribe un serial a mano y coincide con uno disponible del mismo producto, se liga solo.
 function insertParts(workOrderId, parts) {
   if (!Array.isArray(parts)) return;
   for (const p of parts) {
     if (!p.description) continue;
     const total = calcPartTotal(p);
+    const productId = p.productId || p.product_id || null;
+    let serial = (p.serial || '').trim() || null;
+    let productSerialId = p.productSerialId || p.product_serial_id || null;
+    if (productSerialId) {
+      const ps = get('SELECT * FROM product_serials WHERE id = ?', [productSerialId]);
+      if (!ps) productSerialId = null; else serial = ps.serial;
+    } else if (serial && productId) {
+      const ps = get(`SELECT id FROM product_serials WHERE product_id = ? AND serial = ? AND status = 'disponible'`, [productId, serial]);
+      if (ps) productSerialId = ps.id;
+    }
     run(
-      `INSERT INTO work_order_parts (work_order_id, product_id, description, action, quantity, unit_cost, total, notes)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [workOrderId, p.productId || p.product_id || null, p.description, p.action || 'reemplazada', Number(p.quantity ?? 1), Number(p.unitCost ?? p.unit_cost ?? 0), total, p.notes || null]
+      `INSERT INTO work_order_parts (work_order_id, product_id, description, action, quantity, unit_cost, total, notes, serial, product_serial_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [workOrderId, productId, p.description, p.action || 'reemplazada', Number(p.quantity ?? 1), Number(p.unitCost ?? p.unit_cost ?? 0), total, p.notes || null, serial, productSerialId]
     );
   }
 }
 
+// Sincroniza el estado de los seriales de inventario con las partes de la orden:
+// los nuevos quedan "instalado" en el vehículo; los que se quitaron vuelven a "disponible".
+function syncPartSerials(workOrderId, previousSerialIds, userId) {
+  const wo = get('SELECT wo.number, wo.vehicle_id, v.vin, v.customer_id FROM work_orders wo JOIN vehicles v ON v.id = wo.vehicle_id WHERE wo.id = ?', [workOrderId]);
+  if (!wo) return;
+  const current = all('SELECT product_serial_id FROM work_order_parts WHERE work_order_id = ? AND product_serial_id IS NOT NULL', [workOrderId])
+    .map((r) => r.product_serial_id);
+  const today = new Date().toISOString().slice(0, 10);
+  for (const id of current) {
+    if (previousSerialIds.includes(id)) continue;
+    const ps = get('SELECT * FROM product_serials WHERE id = ?', [id]);
+    if (!ps || (ps.status === 'instalado' && ps.vehicle_id === wo.vehicle_id)) continue;
+    run(`UPDATE product_serials SET status='instalado', vehicle_id=?, customer_id=COALESCE(customer_id, ?), status_date=? WHERE id=?`,
+      [wo.vehicle_id, wo.customer_id || null, today, id]);
+    run('INSERT INTO serial_events (serial_id, event, reference, notes, created_by) VALUES (?,?,?,?,?)',
+      [id, 'instalado', `${wo.number} · VIN ${wo.vin}`, 'Instalado desde la orden de trabajo', userId || null]);
+  }
+  for (const id of previousSerialIds) {
+    if (current.includes(id)) continue;
+    const ps = get('SELECT * FROM product_serials WHERE id = ?', [id]);
+    if (!ps || ps.status !== 'instalado' || ps.vehicle_id !== wo.vehicle_id) continue;
+    run(`UPDATE product_serials SET status='disponible', vehicle_id=NULL, customer_id=NULL, invoice_id=NULL, status_date=? WHERE id=?`, [today, id]);
+    run('INSERT INTO serial_events (serial_id, event, reference, notes, created_by) VALUES (?,?,?,?,?)',
+      [id, 'disponible', wo.number, 'Se quitó de la orden de trabajo', userId || null]);
+  }
+}
+
+function serialIdsOf(workOrderId) {
+  return all('SELECT product_serial_id FROM work_order_parts WHERE work_order_id = ? AND product_serial_id IS NOT NULL', [workOrderId])
+    .map((r) => r.product_serial_id);
+}
+
 router.get('/', (req, res) => {
   const { status } = req.query;
-  let sql = `SELECT wo.*, v.vin, v.make, v.model, v.year, v.chassis_type, v.plate, m.name as mechanic_name, i.number as invoice_number
+  let sql = `SELECT wo.*, v.vin, v.make, v.model, v.year, v.chassis_type, v.plate, m.name as mechanic_name, sp.name as supplier_name, i.number as invoice_number
              FROM work_orders wo
+             LEFT JOIN suppliers sp ON sp.id = wo.supplier_id
              LEFT JOIN vehicles v ON v.id = wo.vehicle_id
              LEFT JOIN mechanics m ON m.id = wo.mechanic_id
              LEFT JOIN invoices i ON i.id = wo.invoice_id WHERE 1=1`;
@@ -76,8 +123,9 @@ router.get('/', (req, res) => {
 
 router.get('/:id', (req, res) => {
   const wo = get(
-    `SELECT wo.*, v.vin, v.make, v.model, v.year, v.chassis_type, v.plate, v.customer_id, m.name as mechanic_name, i.number as invoice_number
+    `SELECT wo.*, v.vin, v.make, v.model, v.year, v.chassis_type, v.plate, v.customer_id, m.name as mechanic_name, sp.name as supplier_name, i.number as invoice_number
      FROM work_orders wo
+     LEFT JOIN suppliers sp ON sp.id = wo.supplier_id
      LEFT JOIN vehicles v ON v.id = wo.vehicle_id
      LEFT JOIN mechanics m ON m.id = wo.mechanic_id
      LEFT JOIN invoices i ON i.id = wo.invoice_id WHERE wo.id = ?`,
@@ -94,8 +142,8 @@ router.post('/', (req, res) => {
   // orden de trabajo y no un pedido o una factura).
   const number = nextDocNumber('work_orders', 'WO');
   const result = run(
-    `INSERT INTO work_orders (number, vehicle_id, mechanic_id, status, notes, diagnosis, resolution) VALUES (?,?,?,?,?,?,?)`,
-    [number, b.vehicleId, b.mechanicId || null, b.status || 'pendiente', b.notes || null, b.diagnosis || null, b.resolution || null]
+    `INSERT INTO work_orders (number, vehicle_id, mechanic_id, supplier_id, status, notes, diagnosis, resolution) VALUES (?,?,?,?,?,?,?,?)`,
+    [number, b.vehicleId, b.supplierId ? null : (b.mechanicId || null), b.supplierId || null, b.status || 'pendiente', b.notes || null, b.diagnosis || null, b.resolution || null]
   );
   const woId = result.lastInsertRowid;
   if (Array.isArray(b.services)) {
@@ -109,6 +157,7 @@ router.post('/', (req, res) => {
     }
   }
   insertParts(woId, b.parts);
+  syncPartSerials(woId, [], req.user && req.user.id);
   // actualizar estado del vehiculo
   run(`UPDATE vehicles SET status = 'en_servicio' WHERE id = ? AND status = 'recibido'`, [b.vehicleId]);
   res.status(201).json(withDetails(get('SELECT * FROM work_orders WHERE id = ?', [woId])));
@@ -119,8 +168,9 @@ router.put('/:id', (req, res) => {
   const existing = get('SELECT * FROM work_orders WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Orden de trabajo no encontrada' });
   run(
-    `UPDATE work_orders SET mechanic_id=?, status=?, notes=?, diagnosis=?, resolution=?, updated_at=? WHERE id=?`,
-    [b.mechanicId ?? existing.mechanic_id, b.status ?? existing.status, b.notes ?? existing.notes,
+    `UPDATE work_orders SET mechanic_id=?, supplier_id=?, status=?, notes=?, diagnosis=?, resolution=?, updated_at=? WHERE id=?`,
+    [b.supplierId ? null : (b.mechanicId !== undefined ? b.mechanicId : existing.mechanic_id),
+     b.supplierId !== undefined ? (b.supplierId || null) : (b.mechanicId ? null : existing.supplier_id), b.status ?? existing.status, b.notes ?? existing.notes,
      b.diagnosis ?? existing.diagnosis, b.resolution ?? existing.resolution, nowIso(), req.params.id]
   );
   if (Array.isArray(b.services)) {
@@ -135,8 +185,10 @@ router.put('/:id', (req, res) => {
     }
   }
   if (Array.isArray(b.parts)) {
+    const before = serialIdsOf(req.params.id);
     run('DELETE FROM work_order_parts WHERE work_order_id = ?', [req.params.id]);
     insertParts(req.params.id, b.parts);
+    syncPartSerials(Number(req.params.id), before, req.user && req.user.id);
   }
   if (b.status === 'completado') {
     run(`UPDATE vehicles SET status = 'completado' WHERE id = ?`, [existing.vehicle_id]);
@@ -145,6 +197,9 @@ router.put('/:id', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
+  const before = serialIdsOf(req.params.id);
+  run('DELETE FROM work_order_parts WHERE work_order_id = ?', [req.params.id]);
+  syncPartSerials(Number(req.params.id), before, req.user && req.user.id);
   run('DELETE FROM work_orders WHERE id = ?', [req.params.id]);
   res.status(204).end();
 });

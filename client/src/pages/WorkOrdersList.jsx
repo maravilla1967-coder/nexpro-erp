@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
-import WorkOrderPartsEditor, { partsTotal } from '../components/WorkOrderPartsEditor.jsx';
+import WorkOrderPartsEditor, { partsTotal, partFromApi, partToApi } from '../components/WorkOrderPartsEditor.jsx';
+import AssigneeSelect, { assigneeValue, assigneePayload, assigneeName } from '../components/AssigneeSelect.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
 export default function WorkOrdersList() {
@@ -14,6 +15,7 @@ export default function WorkOrdersList() {
   const [mechanics, setMechanics] = useState([]);
   const [services, setServices] = useState([]);
   const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [editing, setEditing] = useState(null);
   const [woMechanicId, setWoMechanicId] = useState('');
   const [woStatus, setWoStatus] = useState('pendiente');
@@ -28,19 +30,20 @@ export default function WorkOrdersList() {
   useEffect(() => { load(); }, [status]);
   useEffect(() => {
     api.get('/mechanics', { active: 'true' }).then(setMechanics);
+    api.get('/suppliers').then(setSuppliers).catch(() => {});
     api.get('/services', { active: 'true' }).then(setServices);
     api.get('/products', { active: 'true' }).then(setProducts).catch(() => {});
   }, []);
 
   function openEdit(wo) {
     setEditing(wo);
-    setWoMechanicId(wo.mechanic_id || '');
+    setWoMechanicId(assigneeValue(wo));
     setWoStatus(wo.status);
     setWoServices(wo.services.map((s) => ({ ...s, hours: s.hours ?? 0, hourlyRate: s.hourly_rate ?? 0, flatPrice: s.flat_price ?? 0, pricingType: s.pricing_type })));
     setWoNotes(wo.notes || '');
     setWoDiagnosis(wo.diagnosis || '');
     setWoResolution(wo.resolution || '');
-    setWoParts((wo.parts || []).map((p) => ({ ...p, productId: p.product_id || '', unitCost: p.unit_cost ?? 0, notes: p.notes || '' })));
+    setWoParts((wo.parts || []).map(partFromApi));
     setError('');
   }
 
@@ -82,16 +85,13 @@ export default function WorkOrdersList() {
   async function saveEdit(e) {
     e.preventDefault();
     const payload = {
-      mechanicId: woMechanicId || null, status: woStatus,
+      ...assigneePayload(woMechanicId), status: woStatus,
       notes: woNotes || null, diagnosis: woDiagnosis || null, resolution: woResolution || null,
       services: woServices.filter((s) => s.description).map((s) => ({
         serviceId: s.service_id || s.serviceId || null, description: s.description, pricingType: s.pricingType,
         hours: parseFloat(s.hours) || 0, hourlyRate: parseFloat(s.hourlyRate) || 0, flatPrice: parseFloat(s.flatPrice) || 0,
       })),
-      parts: woParts.filter((p) => p.description).map((p) => ({
-        productId: p.productId || null, description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
-        notes: p.notes || null,
-      })),
+      parts: woParts.filter((p) => p.description).map(partToApi),
     };
     try { await api.put(`/work-orders/${editing.id}`, payload); setEditing(null); load(); }
     catch (err) { setError(err.message); }
@@ -125,13 +125,13 @@ export default function WorkOrdersList() {
         <div className="card">
           {list.length === 0 ? <div className="empty-state">{t('No hay órdenes de trabajo todavía. Se crean desde la ficha del vehículo.')}</div> : (
             <table>
-              <thead><tr><th>{t('Número')}</th><th>{t('Vehículo')}</th><th>{t('Mecánico')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
+              <thead><tr><th>{t('Número')}</th><th>{t('Vehículo')}</th><th>{t('Asignado a')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
               <tbody>
                 {list.map((wo) => (
                   <tr key={wo.id}>
                     <td className="mono">{wo.number}</td>
                     <td><Link to={`/vehiculos/${wo.vehicle_id}`}>{wo.vin}</Link> <span className="muted">{wo.make} {wo.model}</span></td>
-                    <td>{wo.mechanic_name || '—'}</td>
+                    <td>{assigneeName(wo, t)}</td>
                     <td><strong>${Number(wo.total).toLocaleString()}</strong></td>
                     <td><Pill value={wo.status} /></td>
                     <td className="muted">{wo.created_at}</td>
@@ -159,11 +159,8 @@ export default function WorkOrdersList() {
           <form onSubmit={saveEdit}>
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
-              <div className="field"><label>{t('Mecánico')}</label>
-                <select value={woMechanicId} onChange={(e) => setWoMechanicId(e.target.value)}>
-                  <option value="">{t('— Sin asignar —')}</option>
-                  {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+              <div className="field"><label>{t('Asignado a (mecánico o proveedor)')}</label>
+                <AssigneeSelect value={woMechanicId} onChange={setWoMechanicId} mechanics={mechanics} suppliers={suppliers} />
               </div>
               <div className="field"><label>{t('Estado')}</label>
                 <select value={woStatus} onChange={(e) => setWoStatus(e.target.value)}>
@@ -217,7 +214,7 @@ export default function WorkOrdersList() {
             <div className="field"><label>{t('Solución / Reparación realizada')}</label><textarea rows={2} value={woResolution} onChange={(e) => setWoResolution(e.target.value)} /></div>
 
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes y productos')}</label>
-            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} />
+            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} defaultAction={String(woMechanicId).startsWith('s:') ? 'proveedor' : 'reemplazada'} />
 
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => setEditing(null)}>{t('Cancelar')}</button>
