@@ -277,7 +277,8 @@ function interestAccrued(l, txs, asOf) {
   // en el banco si es anterior (p. ej. un préstamo antiguo registrado hoy con su fecha real).
   const inDates = txs.filter((t) => t.direction === 'in').map((t) => String(t.tx_date).slice(0, 10));
   const start = [String(l.loan_date || '').slice(0, 10), ...inDates].filter(Boolean).sort()[0] || '';
-  const until = String(asOf || new Date().toISOString().slice(0, 10)).slice(0, 10);
+  // Solo se acepta una fecha AAAA-MM-DD como corte; cualquier otro valor usa hoy.
+  const until = /^\d{4}-\d{2}-\d{2}/.test(String(asOf || '')) ? String(asOf).slice(0, 10) : new Date().toISOString().slice(0, 10);
   if (!rate || !start || until <= start) return { accrued: 0, days: Math.max(0, dayDiff(start || until, until)), segments: [] };
   const caps = txs.filter((t) => t.category === 'abono_prestamo' && String(t.tx_date).slice(0, 10) <= until)
     .map((t) => ({ date: String(t.tx_date).slice(0, 10) < start ? start : String(t.tx_date).slice(0, 10), amount: t.amount })).sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -301,10 +302,10 @@ function loanFull(l, asOf) {
   const startDate = [String(l.loan_date || '').slice(0, 10), ...txs.filter((t) => t.direction === 'in').map((t) => String(t.tx_date).slice(0, 10))].filter(Boolean).sort()[0] || l.loan_date;
   return { ...l, interest_start: startDate, transactions: txs, received, repaid, interest_paid: interest, balance: round2(l.principal - repaid), status: l.principal - repaid <= 0.004 ? 'pagado' : 'vigente',
     interest_accrued: acc.accrued, interest_due: round2(Math.max(0, acc.accrued - interest)), interest_days: acc.days, interest_segments: acc.segments,
-    interest_as_of: String(asOf || new Date().toISOString().slice(0, 10)).slice(0, 10), last_interest_date: lastInt,
+    interest_as_of: /^\d{4}-\d{2}-\d{2}/.test(String(asOf || '')) ? String(asOf).slice(0, 10) : new Date().toISOString().slice(0, 10), last_interest_date: lastInt,
     daily_interest: round2((l.principal - repaid) * ((Number(l.interest_rate) || 0) / 100) / (Number(l.day_basis) || 365)) };
 }
-router.get('/loans', (req, res) => res.json(all('SELECT * FROM loans ORDER BY loan_date DESC, id DESC').map(loanFull)));
+router.get('/loans', (req, res) => res.json(all('SELECT * FROM loans ORDER BY loan_date DESC, id DESC').map((l) => loanFull(l))));
 router.get('/loans/:id', (req, res) => {
   const l = get('SELECT * FROM loans WHERE id = ?', [req.params.id]);
   if (!l) return res.status(404).json({ error: 'Préstamo no encontrado' });
