@@ -38,7 +38,16 @@ a { color: var(--orange); text-decoration: none; }
   display: flex;
   flex-direction: column;
   padding: 18px 0;
+  /* El menú se queda fijo y tiene su propia barra de desplazamiento, para que Finanzas y Administración nunca queden ocultas */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.25) transparent;
 }
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
 
 .brand {
   display: flex;
@@ -63,12 +72,12 @@ a { color: var(--orange); text-decoration: none; }
 .nav-group { margin-bottom: 4px; }
 .nav-label {
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-  color: #64748b; padding: 14px 18px 6px;
+  color: #64748b; padding: 10px 18px 4px;
 }
 
 .nav-link {
   display: flex; align-items: center; gap: 10px;
-  padding: 9px 18px;
+  padding: 7px 18px;
   color: #cbd5e1;
   font-size: 14px;
   border-left: 3px solid transparent;
