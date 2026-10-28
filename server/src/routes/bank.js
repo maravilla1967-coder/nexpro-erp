@@ -121,11 +121,37 @@ router.put('/accounts/:id', (req, res) => {
   if (b.isDefault) run('UPDATE bank_accounts SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END', [a.id]);
   res.json(accountWithBalance(get('SELECT * FROM bank_accounts WHERE id = ?', [a.id])));
 });
+// Borrar una cuenta. Si tiene movimientos, se pueden pasar todos a otra cuenta (?moveTo=<id>) antes de borrarla.
 router.delete('/accounts/:id', (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede borrar una cuenta.' });
-  if (movements(Number(req.params.id)).length) return res.status(400).json({ error: 'La cuenta tiene movimientos: desactívala en lugar de borrarla.' });
-  run('DELETE FROM bank_accounts WHERE id = ?', [req.params.id]);
-  res.status(204).end();
+  const a = get('SELECT * FROM bank_accounts WHERE id = ?', [req.params.id]);
+  if (!a) return res.status(404).json({ error: 'Cuenta no encontrada' });
+  const count = movements(a.id).length;
+  const moveTo = req.query.moveTo ? Number(req.query.moveTo) : null;
+  if (count && !moveTo) return res.status(400).json({ error: `La cuenta tiene ${count} movimiento(s): elige a qué cuenta pasarlos antes de borrarla.`, movements: count });
+  let target = null;
+  if (moveTo) {
+    target = get('SELECT * FROM bank_accounts WHERE id = ?', [moveTo]);
+    if (!target || target.id === a.id) return res.status(400).json({ error: 'Elige otra cuenta para pasar los movimientos.' });
+    const selfTransfer = get(`SELECT t1.transfer_group FROM bank_transactions t1 JOIN bank_transactions t2 ON t2.transfer_group = t1.transfer_group AND t2.id <> t1.id
+      WHERE t1.account_id = ? AND t2.account_id = ? AND t1.transfer_group IS NOT NULL LIMIT 1`, [a.id, target.id]);
+    if (selfTransfer) return res.status(400).json({ error: `Hay transferencias entre "${a.name}" y "${target.name}": bórralas primero o elige otra cuenta.` });
+  }
+  db.exec('BEGIN');
+  try {
+    if (target) {
+      run('UPDATE bank_transactions SET account_id = ? WHERE account_id = ?', [target.id, a.id]);
+      run('UPDATE invoice_payments SET bank_account_id = ? WHERE bank_account_id = ?', [target.id, a.id]);
+      run('UPDATE supplier_bill_payments SET bank_account_id = ? WHERE bank_account_id = ?', [target.id, a.id]);
+    }
+    run('DELETE FROM bank_accounts WHERE id = ?', [a.id]);
+    if (a.is_default) {
+      const next = target || get('SELECT id FROM bank_accounts WHERE active = 1 ORDER BY id LIMIT 1');
+      if (next) run('UPDATE bank_accounts SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END', [next.id]);
+    }
+    db.exec('COMMIT');
+  } catch (err) { db.exec('ROLLBACK'); return res.status(500).json({ error: err.message }); }
+  res.json({ ok: true, moved: target ? count : 0, movedTo: target ? target.name : null });
 });
 
 // Registro de una cuenta con saldo corrido (como la chequera / Money).

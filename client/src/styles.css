@@ -455,7 +455,13 @@ input[type="file"] { width: 100%; max-width: 100%; font-size: 13px; padding: 6px
 .bank-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .bank-card { display: flex; flex-direction: column; gap: 4px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; text-decoration: none; color: inherit; }
 a.bank-card:hover { border-color: var(--orange, #e8642c); box-shadow: 0 4px 14px rgba(0,0,0,.06); }
-.bank-card span { font-weight: 600; color: var(--navy); }
+.bank-card { position: relative; }
+.bank-card span { font-weight: 600; color: var(--navy); padding-right: 26px; }
+.bank-card-edit { position: absolute; top: 10px; right: 10px; border: none; background: transparent; cursor: pointer; font-size: 14px; opacity: .55; padding: 2px; }
+.bank-card-edit:hover { opacity: 1; }
+.bank-card.total .bank-card-edit { display: none; }
+.danger-zone { margin-top: 14px; padding: 10px 12px; border: 1px dashed #f1b4a8; border-radius: 8px; background: #fff8f6; }
+.link-btn.danger { color: #c0392b; }
 .bank-card strong { font-size: 22px; }
 .bank-card strong.neg { color: var(--red); }
 .bank-card em { font-style: normal; font-size: 12px; color: var(--text-muted); }

@@ -62,6 +62,7 @@ export default function FinancePage() {
             <div className="bank-card total"><span>{t('Total en cuentas')}</span><strong>{fmt$(total)}</strong><em>{active.length} {t('cuenta(s)')}</em></div>
             {active.map((a) => (
               <Link key={a.id} to={`/finanzas/cuenta/${a.id}`} className="bank-card">
+                <button type="button" className="bank-card-edit" title={t('Editar o borrar cuenta')} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setModal({ type: 'account', initial: a }); }}>✏️</button>
                 <span>{a.name}{a.is_default ? ' ★' : ''}</span>
                 <strong className={a.balance < 0 ? 'neg' : ''}>{fmt$(a.balance)}</strong>
                 <em>{[a.bank_name, t(ACCOUNT_TYPES[a.account_type] || a.account_type), a.account_masked].filter(Boolean).join(' · ')}</em>
@@ -121,7 +122,7 @@ export default function FinancePage() {
         )}
       </div>
 
-      {modal?.type === 'account' && <AccountModal onDone={done} onClose={() => setModal(null)} />}
+      {modal?.type === 'account' && <AccountModal initial={modal.initial} accounts={accounts || []} onDone={done} onClose={() => setModal(null)} />}
       {(modal?.type === 'in' || modal?.type === 'out') && <TxModal accounts={active} direction={modal.type} onDone={done} onClose={() => setModal(null)} />}
       {modal?.type === 'payroll' && <PayrollModal accounts={active} onDone={done} onClose={() => setModal(null)} />}
       {modal?.type === 'transfer' && <TransferModal accounts={active} onDone={done} onClose={() => setModal(null)} />}

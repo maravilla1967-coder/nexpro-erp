@@ -17,8 +17,10 @@ function withItems(so) {
 function applyUpdate(id, b) {
   const existing = get('SELECT * FROM sales_orders WHERE id = ?', [id]);
   if (!existing) throw new Error('Pedido no encontrado');
-  run(`UPDATE sales_orders SET status=?, notes=?, updated_at=? WHERE id=?`,
-    [b.status ?? existing.status, b.notes ?? existing.notes, nowIso(), id]);
+  // El cliente también se puede cambiar al editar (antes se ignoraba y el pedido conservaba el cliente original).
+  const customerId = b.customerId && get('SELECT id FROM customers WHERE id = ?', [b.customerId]) ? Number(b.customerId) : existing.customer_id;
+  run(`UPDATE sales_orders SET customer_id=?, status=?, notes=?, updated_at=? WHERE id=?`,
+    [customerId, b.status ?? existing.status, b.notes ?? existing.notes, nowIso(), id]);
 
   if (Array.isArray(b.items)) {
     run('DELETE FROM sales_order_items WHERE sales_order_id = ?', [id]);

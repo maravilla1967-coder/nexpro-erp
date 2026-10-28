@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport } from '../components/ListExport.jsx';
@@ -10,6 +10,7 @@ import { TxModal, PayrollModal, TransferModal, AccountModal, CATEGORY_LABELS, AC
 export default function AccountRegister() {
   const { t } = useI18n();
   const { id } = useParams();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [range, setRange] = useState({ from: '', to: '' });
@@ -114,7 +115,7 @@ export default function AccountRegister() {
           )}
         </div>
       </div>
-      {modal?.type === 'account' && <AccountModal initial={a} onDone={done} onClose={() => setModal(null)} />}
+      {modal?.type === 'account' && <AccountModal initial={a} accounts={accounts} onDone={done} onDeleted={() => navigate('/finanzas')} onClose={() => setModal(null)} />}
       {(modal?.type === 'in' || modal?.type === 'out') && <TxModal accounts={active} accountId={a.id} direction={modal.type} onDone={done} onClose={() => setModal(null)} />}
       {modal?.type === 'edit' && <TxModal accounts={active} initial={modal.tx} onDone={done} onClose={() => setModal(null)} />}
       {modal?.type === 'payroll' && <PayrollModal accounts={active} accountId={a.id} onDone={done} onClose={() => setModal(null)} />}

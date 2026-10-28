@@ -3,6 +3,7 @@ import Modal from './Modal.jsx';
 import { api } from '../api.js';
 import { useI18n } from '../i18n.jsx';
 import { readFilesNow } from './PaymentModal.jsx';
+import { useAuth } from '../auth.jsx';
 
 // Ventanas del módulo de Finanzas: ingreso, egreso, nómina, transferencia, préstamo recibido,
 // abono a préstamo y cuenta bancaria.
@@ -246,8 +247,19 @@ export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
   );
 }
 
-export function AccountModal({ initial, onDone, onClose }) {
+export function AccountModal({ initial, accounts = [], onDone, onClose, onDeleted }) {
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
+  const others = accounts.filter((a) => initial && a.id !== initial.id);
+  const [del, setDel] = useState({ open: false, moveTo: '', busy: false, error: '' });
+  async function removeAccount() {
+    if (!window.confirm(t('¿Borrar esta cuenta? Esta acción no se puede deshacer.'))) return;
+    setDel({ ...del, busy: true, error: '' });
+    try {
+      const r = await api.del(`/bank/accounts/${initial.id}${del.moveTo ? `?moveTo=${del.moveTo}` : ''}`);
+      (onDeleted || onDone)(r);
+    } catch (err) { setDel({ ...del, busy: false, error: err.message }); }
+  }
   const [f, setF] = useState(initial ? {
     name: initial.name, bankName: initial.bank_name || '', accountType: initial.account_type, accountNumber: initial.account_number || '', routingNumber: initial.routing_number || '',
     openingBalance: String(initial.opening_balance ?? 0), openingDate: initial.opening_date || '', notes: initial.notes || '', isDefault: !!initial.is_default, active: initial.active !== 0,
@@ -277,6 +289,30 @@ export function AccountModal({ initial, onDone, onClose }) {
         <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}><input type="checkbox" style={{ width: 'auto' }} checked={f.isDefault} onChange={(e) => setF({ ...f, isDefault: e.target.checked })} /> {t('Cuenta principal (se propone en todos los pagos)')}</label>
         {initial && <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 4 }}><input type="checkbox" style={{ width: 'auto' }} checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Activa')}</label>}
         <div className="field" style={{ marginTop: 8 }}><label>{t('Notas')}</label><input value={f.notes} onChange={set('notes')} /></div>
+        {initial && isAdmin && (
+          <div className="danger-zone">
+            {!del.open ? (
+              <button type="button" className="link-btn danger" onClick={() => setDel({ ...del, open: true })}>🗑 {t('Borrar esta cuenta')}</button>
+            ) : (
+              <>
+                <strong>{t('Borrar esta cuenta')}</strong>
+                <p className="hint" style={{ margin: '4px 0 8px' }}>{t('Si la cuenta tiene movimientos (cobros, pagos, préstamos, nómina), elige a qué cuenta pasarlos. Si no tiene, se borra directamente.')}</p>
+                {others.length > 0 ? (
+                  <div className="field"><label>{t('Pasar sus movimientos a')}</label>
+                    <select value={del.moveTo} onChange={(e) => setDel({ ...del, moveTo: e.target.value })}>
+                      <option value="">{t('— No tiene movimientos —')}</option>
+                      {others.map((a) => <option key={a.id} value={a.id}>{a.name}{a.account_masked ? ` ${a.account_masked}` : ''}</option>)}
+                    </select></div>
+                ) : <p className="hint">{t('Es tu única cuenta: si tiene movimientos, primero crea la cuenta correcta del banco o simplemente cámbiale el nombre aquí arriba.')}</p>}
+                {del.error && <div className="error-banner" style={{ margin: '6px 0' }}>{del.error}</div>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn" onClick={() => setDel({ open: false, moveTo: '', busy: false, error: '' })}>{t('Cancelar')}</button>
+                  <button type="button" className="btn btn-danger" disabled={del.busy} onClick={removeAccount}>{del.busy ? t('Borrando…') : t('Borrar cuenta')}</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
         <Footer error={error} saving={saving} onClose={onClose} />
       </form>
     </Modal>

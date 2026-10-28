@@ -114,6 +114,7 @@ export default function SalesOrdersList() {
                         <option value="aprobado">{t('aprobado')}</option>
                         <option value="en_proceso">{t('en_proceso')}</option>
                         <option value="cancelado">{t('cancelado')}</option>
+                        {so.status === 'facturado' && <option value="facturado" disabled>{t('facturado')}</option>}
                       </select>
                     </td>
                     <td className="muted">{so.created_at}</td>
