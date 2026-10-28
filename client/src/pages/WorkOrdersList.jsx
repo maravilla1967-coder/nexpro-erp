@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
+import WorkOrderPartsEditor, { partsTotal } from '../components/WorkOrderPartsEditor.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
 export default function WorkOrdersList() {
@@ -12,6 +13,7 @@ export default function WorkOrdersList() {
   const [status, setStatus] = useState('');
   const [mechanics, setMechanics] = useState([]);
   const [services, setServices] = useState([]);
+  const [products, setProducts] = useState([]);
   const [editing, setEditing] = useState(null);
   const [woMechanicId, setWoMechanicId] = useState('');
   const [woStatus, setWoStatus] = useState('pendiente');
@@ -27,6 +29,7 @@ export default function WorkOrdersList() {
   useEffect(() => {
     api.get('/mechanics', { active: 'true' }).then(setMechanics);
     api.get('/services', { active: 'true' }).then(setServices);
+    api.get('/products', { active: 'true' }).then(setProducts).catch(() => {});
   }, []);
 
   function openEdit(wo) {
@@ -37,7 +40,7 @@ export default function WorkOrdersList() {
     setWoNotes(wo.notes || '');
     setWoDiagnosis(wo.diagnosis || '');
     setWoResolution(wo.resolution || '');
-    setWoParts((wo.parts || []).map((p) => ({ ...p, unitCost: p.unit_cost ?? 0, notes: p.notes || '' })));
+    setWoParts((wo.parts || []).map((p) => ({ ...p, productId: p.product_id || '', unitCost: p.unit_cost ?? 0, notes: p.notes || '' })));
     setError('');
   }
 
@@ -76,14 +79,6 @@ export default function WorkOrdersList() {
     } catch (err) { setError(err.message); }
   }
 
-  function updatePart(idx, field, value) {
-    const copy = [...woParts];
-    copy[idx] = { ...copy[idx], [field]: value };
-    setWoParts(copy);
-  }
-  function addPartRow() { setWoParts([...woParts, { description: '', action: 'reemplazada', quantity: 1, unitCost: 0, notes: '' }]); }
-  function removePartRow(idx) { setWoParts(woParts.filter((_, i) => i !== idx)); }
-
   async function saveEdit(e) {
     e.preventDefault();
     const payload = {
@@ -94,7 +89,7 @@ export default function WorkOrdersList() {
         hours: parseFloat(s.hours) || 0, hourlyRate: parseFloat(s.hourlyRate) || 0, flatPrice: parseFloat(s.flatPrice) || 0,
       })),
       parts: woParts.filter((p) => p.description).map((p) => ({
-        description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
+        productId: p.productId || null, description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
         notes: p.notes || null,
       })),
     };
@@ -110,7 +105,7 @@ export default function WorkOrdersList() {
     } catch (err) { alert(err.message); }
   }
 
-  const total = woServices.reduce((sum, s) => sum + (s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0)), 0);
+  const total = partsTotal(woParts) + woServices.reduce((sum, s) => sum + (s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0)), 0);
 
   return (
     <>
@@ -221,30 +216,8 @@ export default function WorkOrdersList() {
             <div className="field"><label>{t('Diagnóstico')}</label><textarea rows={2} value={woDiagnosis} onChange={(e) => setWoDiagnosis(e.target.value)} /></div>
             <div className="field"><label>{t('Solución / Reparación realizada')}</label><textarea rows={2} value={woResolution} onChange={(e) => setWoResolution(e.target.value)} /></div>
 
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes reemplazadas o reparadas')}</label>
-            <table className="line-items-table" style={{ marginTop: 6 }}>
-              <thead><tr><th>{t('Descripción')}</th><th style={{ width: 150 }}>{t('Acción')}</th><th style={{ width: 80 }}>{t('Cant.')}</th><th style={{ width: 110 }}>{t('Costo unit.')}</th><th style={{ width: 200 }}>{t('Nota (opcional)')}</th><th></th></tr></thead>
-              <tbody>
-                {woParts.map((p, idx) => (
-                  <tr key={idx}>
-                    <td><input value={p.description} onChange={(e) => updatePart(idx, 'description', e.target.value)} /></td>
-                    <td>
-                      <select value={p.action} onChange={(e) => updatePart(idx, 'action', e.target.value)}>
-                        <option value="reemplazada">{t('Reemplazada')}</option>
-                        <option value="reparada">{t('Reparada')}</option>
-                        <option value="garantia">{t('Garantía')}</option>
-                        <option value="cliente">{t('Suministrada por el cliente')}</option>
-                      </select>
-                    </td>
-                    <td><input type="number" step="1" value={p.quantity} onChange={(e) => updatePart(idx, 'quantity', e.target.value)} /></td>
-                    <td><input type="number" step="0.01" value={p.unitCost} onChange={(e) => updatePart(idx, 'unitCost', e.target.value)} /></td>
-                    <td><input placeholder={t('Nota sobre la parte (ej. garantía, quién la suministró, etc.)')} value={p.notes || ''} onChange={(e) => updatePart(idx, 'notes', e.target.value)} /></td>
-                    <td><button type="button" className="link-btn" onClick={() => removePartRow(idx)}>✕</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addPartRow}>{t('+ Agregar parte')}</button>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes y productos')}</label>
+            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} />
 
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => setEditing(null)}>{t('Cancelar')}</button>

@@ -31,7 +31,8 @@ function withDetails(wo) {
     [wo.id]
   );
   const parts = all(
-    `SELECT * FROM work_order_parts WHERE work_order_id = ? ORDER BY id`,
+    `SELECT wop.*, pr.sku AS product_sku, pr.name AS product_name FROM work_order_parts wop
+     LEFT JOIN products pr ON pr.id = wop.product_id WHERE wop.work_order_id = ? ORDER BY wop.id`,
     [wo.id]
   );
   wo.services = services;
@@ -49,9 +50,9 @@ function insertParts(workOrderId, parts) {
     if (!p.description) continue;
     const total = calcPartTotal(p);
     run(
-      `INSERT INTO work_order_parts (work_order_id, description, action, quantity, unit_cost, total, notes)
-       VALUES (?,?,?,?,?,?,?)`,
-      [workOrderId, p.description, p.action || 'reemplazada', Number(p.quantity ?? 1), Number(p.unitCost ?? p.unit_cost ?? 0), total, p.notes || null]
+      `INSERT INTO work_order_parts (work_order_id, product_id, description, action, quantity, unit_cost, total, notes)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [workOrderId, p.productId || p.product_id || null, p.description, p.action || 'reemplazada', Number(p.quantity ?? 1), Number(p.unitCost ?? p.unit_cost ?? 0), total, p.notes || null]
     );
   }
 }

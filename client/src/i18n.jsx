@@ -1095,6 +1095,8 @@ const DICT = {
   '✓ En catálogo': '✓ In catalog',
   'Servicio guardado en el catálogo.': 'Service saved to the catalog.',
   '+ Agregar parte': '+ Add part',
+  '+ Agregar parte o producto': '+ Add part or product',
+  'Partes y productos': 'Parts & products',
   'Mano de obra y servicios': 'Labor & services',
   'Sin servicios registrados.': 'No services recorded.',
   'Mano de obra / servicios': 'Labor / services',

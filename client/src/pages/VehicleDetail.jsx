@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
+import WorkOrderPartsEditor, { partsTotal } from '../components/WorkOrderPartsEditor.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
 const EQUIP_EMPTY = { typeName: '', serialNumber: '', manufacturer: '', model: '', notes: '' };
@@ -17,6 +18,7 @@ export default function VehicleDetail() {
   const [equipTypes, setEquipTypes] = useState([]);
   const [mechanics, setMechanics] = useState([]);
   const [services, setServices] = useState([]);
+  const [products, setProducts] = useState([]);
 
   const [equipModalOpen, setEquipModalOpen] = useState(false);
   const [equipForm, setEquipForm] = useState(EQUIP_EMPTY);
@@ -57,6 +59,7 @@ export default function VehicleDetail() {
     api.get('/customers').then(setCustomers).catch(() => {});
     api.get('/mechanics', { active: 'true' }).then(setMechanics);
     api.get('/services', { active: 'true' }).then(setServices);
+    api.get('/products', { active: 'true' }).then(setProducts).catch(() => {});
   }, []);
 
   async function remove() {
@@ -143,7 +146,7 @@ export default function VehicleDetail() {
         : [{ serviceId: '', description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 }]
     );
     setWoNotes(wo.notes || ''); setWoDiagnosis(wo.diagnosis || ''); setWoResolution(wo.resolution || '');
-    setWoParts((wo.parts || []).map((p) => ({ description: p.description, action: p.action, quantity: p.quantity, unitCost: p.unit_cost, notes: p.notes || '' })));
+    setWoParts((wo.parts || []).map((p) => ({ productId: p.product_id || '', description: p.description, action: p.action, quantity: p.quantity, unitCost: p.unit_cost, notes: p.notes || '' })));
     setError(''); setWoModalOpen(true);
   }
   function updateWoService(idx, field, value) {
@@ -151,13 +154,6 @@ export default function VehicleDetail() {
     copy[idx] = { ...copy[idx], [field]: value };
     setWoServices(copy);
   }
-  function updateWoPart(idx, field, value) {
-    const copy = [...woParts];
-    copy[idx] = { ...copy[idx], [field]: value };
-    setWoParts(copy);
-  }
-  function addWoPartRow() { setWoParts([...woParts, { description: '', action: 'reemplazada', quantity: 1, unitCost: 0, notes: '' }]); }
-  function removeWoPartRow(idx) { setWoParts(woParts.filter((_, i) => i !== idx)); }
   async function saveServiceToCatalog(idx) {
     const row = woServices[idx];
     if (!row.description) return;
@@ -197,7 +193,7 @@ export default function VehicleDetail() {
         hours: parseFloat(s.hours) || 0, hourlyRate: parseFloat(s.hourlyRate) || 0, flatPrice: parseFloat(s.flatPrice) || 0,
       })),
       parts: woParts.filter((p) => p.description).map((p) => ({
-        description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
+        productId: p.productId || null, description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
         notes: p.notes || null,
       })),
     };
@@ -255,7 +251,7 @@ export default function VehicleDetail() {
 
   if (!vehicle) return <div className="content">{t('Cargando…')}</div>;
 
-  const woTotalPreview = woServices.reduce((sum, s) => {
+  const woTotalPreview = partsTotal(woParts) + woServices.reduce((sum, s) => {
     if (s.pricingType === 'servicio_completo') return sum + (parseFloat(s.flatPrice) || 0);
     return sum + (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0);
   }, 0);
@@ -561,30 +557,8 @@ export default function VehicleDetail() {
             <div className="field"><label>{t('Diagnóstico')}</label><textarea rows={2} value={woDiagnosis} onChange={(e) => setWoDiagnosis(e.target.value)} /></div>
             <div className="field"><label>{t('Solución / Reparación realizada')}</label><textarea rows={2} value={woResolution} onChange={(e) => setWoResolution(e.target.value)} /></div>
 
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes reemplazadas o reparadas')}</label>
-            <table className="line-items-table" style={{ marginTop: 6 }}>
-              <thead><tr><th>{t('Descripción')}</th><th style={{ width: 150 }}>{t('Acción')}</th><th style={{ width: 80 }}>{t('Cant.')}</th><th style={{ width: 110 }}>{t('Costo unit.')}</th><th style={{ width: 200 }}>{t('Nota (opcional)')}</th><th></th></tr></thead>
-              <tbody>
-                {woParts.map((p, idx) => (
-                  <tr key={idx}>
-                    <td><input value={p.description} onChange={(e) => updateWoPart(idx, 'description', e.target.value)} /></td>
-                    <td>
-                      <select value={p.action} onChange={(e) => updateWoPart(idx, 'action', e.target.value)}>
-                        <option value="reemplazada">{t('Reemplazada')}</option>
-                        <option value="reparada">{t('Reparada')}</option>
-                        <option value="garantia">{t('Garantía')}</option>
-                        <option value="cliente">{t('Suministrada por el cliente')}</option>
-                      </select>
-                    </td>
-                    <td><input type="number" step="1" value={p.quantity} onChange={(e) => updateWoPart(idx, 'quantity', e.target.value)} /></td>
-                    <td><input type="number" step="0.01" value={p.unitCost} onChange={(e) => updateWoPart(idx, 'unitCost', e.target.value)} /></td>
-                    <td><input placeholder={t('Nota sobre la parte (ej. garantía, quién la suministró, etc.)')} value={p.notes || ''} onChange={(e) => updateWoPart(idx, 'notes', e.target.value)} /></td>
-                    <td><button type="button" className="link-btn" onClick={() => removeWoPartRow(idx)}>✕</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addWoPartRow}>{t('+ Agregar parte')}</button>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes y productos')}</label>
+            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} />
 
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)', marginTop: 16, display: 'block' }}>{t('Fotos')}</label>
             {editingWo ? (

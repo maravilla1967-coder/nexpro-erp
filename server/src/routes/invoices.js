@@ -264,6 +264,7 @@ router.post('/from-work-orders', (req, res) => {
         description: `${wo.number} — ${p.description}`,
         quantity: Number(p.quantity || 1),
         unitPrice: Number(p.unit_cost || 0),
+        productId: p.product_id || null,
       });
     }
   }
@@ -284,8 +285,8 @@ router.post('/from-work-orders', (req, res) => {
   const invId = result.lastInsertRowid;
   for (const item of items) {
     run(
-      `INSERT INTO invoice_items (invoice_id, description, quantity, unit_price) VALUES (?,?,?,?)`,
-      [invId, item.description, item.quantity, item.unitPrice]
+      `INSERT INTO invoice_items (invoice_id, product_id, description, quantity, unit_price) VALUES (?,?,?,?,?)`,
+      [invId, item.productId || null, item.description, item.quantity, item.unitPrice]
     );
   }
   for (const wo of workOrders) {
@@ -329,6 +330,7 @@ router.post('/:id/sync-work-orders', (req, res) => {
         description: `${wo.number} — ${p.description}`,
         quantity: Number(p.quantity || 1),
         unitPrice: Number(p.unit_cost || 0),
+        productId: p.product_id || null,
       });
     }
   }
