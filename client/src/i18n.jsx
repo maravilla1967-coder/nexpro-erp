@@ -1108,6 +1108,7 @@ const DICT = {
   'Instalada': 'Installed',
   'Suministrada e instalada por proveedor': 'Supplied & installed by vendor',
   'Realizado por:': 'Performed by:',
+  'Buscar mecánico o proveedor…': 'Search mechanic or vendor…',
   'Partes y productos': 'Parts & products',
   'Mano de obra y servicios': 'Labor & services',
   'Sin servicios registrados.': 'No services recorded.',

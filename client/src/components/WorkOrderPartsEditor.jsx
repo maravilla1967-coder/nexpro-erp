@@ -94,7 +94,8 @@ export default function WorkOrderPartsEditor({ parts, setParts, products, defaul
 
   return (
     <>
-      <table className="line-items-table" style={{ marginTop: 6 }}>
+      <div style={{ overflowX: 'auto' }}>
+      <table className="line-items-table" style={{ marginTop: 6, minWidth: 1080 }}>
         <thead>
           <tr>
             <th style={{ width: 210 }}>{t('Producto')}</th><th>{t('Descripción')}</th>
@@ -121,7 +122,7 @@ export default function WorkOrderPartsEditor({ parts, setParts, products, defaul
                     <datalist id={listId}>{options.map((o) => <option key={o.id} value={o.serial} />)}</datalist>
                   )}
                   {p.productSerialId ? <div className="muted" style={{ fontSize: 11 }}>✓ {t('Del inventario')}</div>
-                    : (prod && prod.track_serials && options.length > 0 && <div className="muted" style={{ fontSize: 11 }}>{options.length} {t('disponibles')}</div>)}
+                    : (options.length > 0 ? <div className="muted" style={{ fontSize: 11 }}>{options.length} {t('disponibles')}</div> : null)}
                 </td>
                 <td>
                   <select value={p.action} onChange={(e) => update(idx, 'action', e.target.value)}>
@@ -138,6 +139,7 @@ export default function WorkOrderPartsEditor({ parts, setParts, products, defaul
           })}
         </tbody>
       </table>
+      </div>
       <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addRow}>{t('+ Agregar parte o producto')}</button>
     </>
   );

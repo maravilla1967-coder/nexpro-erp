@@ -155,7 +155,7 @@ export default function WorkOrdersList() {
       </div>
 
       {editing && (
-        <Modal title={`${t('Orden de trabajo')} ${editing.number}`} onClose={() => setEditing(null)} wide>
+        <Modal title={`${t('Orden de trabajo')} ${editing.number}`} onClose={() => setEditing(null)} xwide>
           <form onSubmit={saveEdit}>
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">

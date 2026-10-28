@@ -491,7 +491,7 @@ export default function VehicleDetail() {
       )}
 
       {woModalOpen && (
-        <Modal title={editingWo ? `${t('Editar orden de trabajo')} ${editingWo.number}` : t('Nueva orden de trabajo')} onClose={() => { setWoModalOpen(false); setEditingWo(null); }} wide>
+        <Modal title={editingWo ? `${t('Editar orden de trabajo')} ${editingWo.number}` : t('Nueva orden de trabajo')} onClose={() => { setWoModalOpen(false); setEditingWo(null); }} xwide>
           <form onSubmit={saveWorkOrder}>
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
