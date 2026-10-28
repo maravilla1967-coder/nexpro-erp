@@ -24,6 +24,7 @@ export default function SalesOrdersList() {
   const ex = useListExport({ rows: list, getDate: soDate, getNumber: soNumber });
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [services, setServices] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [customerId, setCustomerId] = useState('');
@@ -36,6 +37,7 @@ export default function SalesOrdersList() {
     load();
     api.get('/customers').then(setCustomers);
     api.get('/products').then(setProducts);
+    api.get('/services').then(setServices).catch(() => {});
   }, []);
 
   function openNew() {
@@ -141,7 +143,7 @@ export default function SalesOrdersList() {
             <div className="field"><label>{t('Cliente *')}</label>
               <CustomerPicker required customers={customers} value={customerId} onChange={setCustomerId} />
             </div>
-            <LineItemsEditor items={items} setItems={setItems} products={products} priceLabel="Precio unit." priceSourceField="selling_price" />
+            <LineItemsEditor items={items} setItems={setItems} products={products} services={services} priceLabel="Precio unit." priceSourceField="selling_price" />
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => setModalOpen(false)}>{t('Cancelar')}</button>
               <button type="submit" className="btn btn-primary">{t('Guardar')}</button>

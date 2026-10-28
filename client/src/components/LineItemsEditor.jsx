@@ -1,22 +1,42 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useI18n } from '../i18n.jsx';
 import ProductPicker from './ProductPicker.jsx';
 
 // items: [{ productId, description, quantity, unitPrice }]
 // priceLabel: etiqueta de la columna de precio ("Costo unit." o "Precio unit.")
-export default function LineItemsEditor({ items, setItems, products, priceLabel = 'Precio unit.', priceSourceField = 'selling_price' }) {
+// services (opcional): catálogo de servicios del taller; aparecen en el mismo buscador que los
+// productos y llenan la línea con su descripción y precio (tarifa por hora o precio de servicio completo).
+export default function LineItemsEditor({ items, setItems, products, services = [], priceLabel = 'Precio unit.', priceSourceField = 'selling_price' }) {
   const { t } = useI18n();
+  const catalog = useMemo(() => [
+    ...services.filter((s) => s.active !== 0).map((s) => {
+      const hourly = s.pricing_type === 'hora';
+      const price = hourly ? Number(s.hourly_rate) || 0 : Number(s.flat_price) || 0;
+      return { id: `svc:${s.id}`, _service: s, name: s.name, sku: hourly ? t('SERVICIO · por hora') : t('SERVICIO'),
+        description: s.description || '', product_type_name: t('Servicio'), [priceSourceField]: price };
+    }),
+    ...products,
+  ], [services, products, priceSourceField, t]);
   function update(idx, field, value) {
     const copy = [...items];
     copy[idx] = { ...copy[idx], [field]: value };
     setItems(copy);
   }
   function pickProduct(idx, productId) {
+    if (String(productId).startsWith('svc:')) {
+      const svc = catalog.find((c) => c.id === productId);
+      const copy = [...items];
+      copy[idx] = { ...copy[idx], productId: '', serviceId: svc ? svc._service.id : '',
+        description: svc ? (svc.description && svc.description !== svc.name ? `${svc.name} — ${svc.description}` : svc.name) : copy[idx].description,
+        unitPrice: svc ? svc[priceSourceField] : copy[idx].unitPrice };
+      setItems(copy);
+      return;
+    }
     const product = products.find((p) => String(p.id) === String(productId));
     const copy = [...items];
     copy[idx] = {
       ...copy[idx],
-      productId: productId || '',
+      productId: productId || '', serviceId: '',
       description: product ? (product.description && product.description !== product.name ? `${product.name} — ${product.description}` : product.name) : copy[idx].description,
       unitPrice: product ? product[priceSourceField] : copy[idx].unitPrice,
     };
@@ -37,7 +57,7 @@ export default function LineItemsEditor({ items, setItems, products, priceLabel 
           {items.map((it, idx) => (
             <tr key={idx}>
               <td>
-                <ProductPicker products={products} value={it.productId || ''} priceField={priceSourceField} onChange={(id) => pickProduct(idx, id)} />
+                <ProductPicker products={catalog} placeholder={services.length ? t('Buscar producto o servicio…') : undefined} value={it.productId || (it.serviceId ? `svc:${it.serviceId}` : '')} priceField={priceSourceField} onChange={(id) => pickProduct(idx, id)} />
               </td>
               <td><input value={it.description} onChange={(e) => update(idx, 'description', e.target.value)} /></td>
               <td><input type="number" step="0.01" value={it.quantity} onChange={(e) => update(idx, 'quantity', e.target.value)} /></td>
