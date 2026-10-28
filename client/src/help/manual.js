@@ -368,6 +368,7 @@ export const MANUAL = [
     summary: L('Los cambios que un usuario (no administrador) hace a facturas y pedidos ya creados quedan esperando que el administrador los apruebe.', 'Changes a user (not administrator) makes to existing invoices and orders wait for the administrator\'s approval.'),
     tasks: [
       { title: L('Aprobar o rechazar', 'Approve or reject'), steps: [
+        L('Regla general: los usuarios que no son administradores crean documentos y hacen los movimientos del día (registrar, recibir, cobrar, pagar, cambiar el estado), pero modificar o borrar un documento ya creado (órdenes de compra y de trabajo, garantías, cuentas por pagar, pagos sin factura, vehículos, productos, bancos y préstamos) o borrar cualquier registro queda como solicitud aquí.', 'General rule: non-admin users create documents and do the daily movements (record, receive, collect, pay, change status), but editing or deleting an existing document (purchase and work orders, warranties, bills, payments without invoice, vehicles, products, banks and loans) or deleting any record becomes a request here.'),
         L('Administrador: Aprobaciones → Pendientes, revisa el detalle y pulsa "Aprobar" o "Rechazar" (con motivo opcional).', 'Administrator: Approvals → Pending, review the detail and press "Approve" or "Reject" (optional reason).'),
         L('Usuarios: aquí ven el estado de sus solicitudes.', 'Users: see the status of their requests here.'),
       ] },

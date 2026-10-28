@@ -77,6 +77,8 @@ app.post('/api/client-log', (req, res) => {
 // A partir de aquí, toda la API requiere una sesión válida.
 const { requireAuth, requireAdmin } = require('./middleware/auth');
 app.use('/api', requireAuth);
+// Usuarios que no son administradores: modificar o borrar documentos requiere autorización.
+app.use('/api', require('./middleware/changeControl').changeControl);
 
 app.use('/api/users', requireAdmin, require('./routes/users'));
 app.use('/api/approvals', require('./routes/approvals'));

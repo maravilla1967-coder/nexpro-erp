@@ -4,7 +4,12 @@ import Pill from '../components/Pill.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 
-const ENTITY_LABEL = { invoice: 'Factura', sales_order: 'Pedido' };
+const ENTITY_LABEL = {
+  invoice: 'Factura', sales_order: 'Pedido', purchase_order: 'Orden de compra', work_order: 'Orden de trabajo', warranty: 'Garantía',
+  payable: 'Cuenta por pagar', service_voucher: 'Pago sin factura', vehicle: 'Vehículo', product: 'Producto', bank_transaction: 'Movimiento bancario',
+  loan: 'Préstamo', bank_account: 'Cuenta bancaria', customer: 'Cliente', supplier: 'Proveedor', service: 'Servicio', mechanic: 'Mecánico',
+  serial: 'Número de serie', otro: 'Documento',
+};
 const ACTION_LABEL = { update: 'Editar', delete: 'Eliminar' };
 
 export default function ApprovalsList() {
