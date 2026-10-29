@@ -4,6 +4,9 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Mostrando': 'Showing',
+  'Mostrar 300 más': 'Show 300 more',
+  'Mostrar todos': 'Show all',
   'Nombre del tipo nuevo': 'New type name',
   '＋ Crear tipo nuevo…': '＋ Create new type…',
   'Crear producto nuevo': 'Create new product',

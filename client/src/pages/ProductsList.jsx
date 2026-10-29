@@ -92,14 +92,22 @@ export default function ProductsList() {
   const [imp, setImp] = useState({ rows: [], fileName: '', supplierName: 'Reading Truck', productTypeName: 'Reading Bodies', marginPercent: '30', preview: null, done: null, error: '', busy: false });
 
   function loadAll() {
-    api.get('/products', { q, typeId }).then(setList).catch(console.error);
+    api.get('/products', { q: qDebounced, typeId }).then(setList).catch(console.error);
   }
   function loadLookups() {
     api.get('/products/types').then(setTypes).catch(console.error);
     api.get('/suppliers').then(setSuppliers).catch(console.error);
   }
   useEffect(() => { loadLookups(); }, []);
-  useEffect(() => { loadAll(); }, [q, typeId]);
+  // La búsqueda espera a que se deje de escribir (250 ms) para no recargar y redibujar
+  // el catálogo completo en cada tecla.
+  const [qDebounced, setQDebounced] = useState(q);
+  useEffect(() => { const h = setTimeout(() => setQDebounced(q), 250); return () => clearTimeout(h); }, [q]);
+  useEffect(() => { loadAll(); }, [qDebounced, typeId]);
+  // Se dibujan los productos de a 100 (el catálogo tiene miles); "Mostrar más" carga los siguientes.
+  const PAGE = 100;
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => { setLimit(PAGE); }, [qDebounced, typeId]);
 
   function openNew() {
     setEditing(null); setForm(EMPTY); setBodyOpen(false); setPhotoFile(null); setOverridePrice(false); setError(''); setModalOpen(true);
@@ -206,10 +214,10 @@ export default function ProductsList() {
                 <tr><th><SelectAllBox ex={ex} /></th><th></th><th>{t('Nombre')}</th><th>{t('SKU')}</th><th>{t('Tipo')}</th>{showBody && <th>{t('CA / GVWR / Peso')}</th>}<th>{t('Costo+Flete')}</th>{showInst && <th>{t('Instalación')}</th>}<th>{t('Margen')}</th><th>{t('Precio venta')}</th><th>{t('Stock')}</th><th></th></tr>
               </thead>
               <tbody>
-                {ex.visible.map((p) => (
+                {ex.visible.slice(0, limit).map((p) => (
                   <tr key={p.id}>
                     <td><RowBox ex={ex} row={p} /></td>
-                    <td>{p.photo_url ? <img className="thumb" src={p.photo_url} /> : <div className="thumb" />}</td>
+                    <td>{p.photo_url ? <img className="thumb" loading="lazy" src={p.photo_url} /> : <div className="thumb" />}</td>
                     <td onClick={() => openEdit(p)} className="clickable"><strong>{p.name}</strong>{p.description ? <div className="muted" style={{ fontSize: 12 }}>{p.description}</div> : null}{p.vendor_stocked ? <div className="muted" style={{ fontSize: 12 }}>✓ {t('Configuración fija')}</div> : null}</td>
                     <td className="mono muted">{p.sku || '—'}</td>
                     <td className="muted">{p.product_type_name || '—'}</td>
@@ -228,7 +236,14 @@ export default function ProductsList() {
                   </tr>
                 ))}
               </tbody>
-            </table></>
+            </table>
+            {ex.visible.length > limit && (
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center', padding: '14px 0 4px' }}>
+                <span className="muted">{t('Mostrando')} {limit.toLocaleString()} {t('de')} {ex.visible.length.toLocaleString()}</span>
+                <button type="button" className="btn btn-sm" onClick={() => setLimit((l) => l + 300)}>{t('Mostrar 300 más')}</button>
+                <button type="button" className="btn btn-sm" onClick={() => setLimit(ex.visible.length)}>{t('Mostrar todos')}</button>
+              </div>
+            )}</>
           )}
         </div>
       </div>
