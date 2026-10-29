@@ -214,7 +214,7 @@ export default function WorkOrdersList() {
             <div className="field"><label>{t('Solución / Reparación realizada')}</label><textarea rows={2} value={woResolution} onChange={(e) => setWoResolution(e.target.value)} /></div>
 
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes y productos')}</label>
-            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} defaultAction={String(woMechanicId).startsWith('s:') ? 'proveedor' : 'reemplazada'} />
+            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} defaultAction={String(woMechanicId).startsWith('s:') ? 'proveedor' : 'reemplazada'} supplierId={assigneePayload(woMechanicId).supplierId || ''} />
 
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => setEditing(null)}>{t('Cancelar')}</button>

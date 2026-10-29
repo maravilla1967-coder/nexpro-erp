@@ -4,6 +4,17 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Nombre del tipo nuevo': 'New type name',
+  '＋ Crear tipo nuevo…': '＋ Create new type…',
+  'Crear producto nuevo': 'Create new product',
+  'Buscar proveedor…': 'Search vendor…',
+  'Poner precio de venta manual': 'Set selling price manually',
+  'Controla números de serie': 'Tracks serial numbers',
+  'Se crea con existencia 0. Las existencias entran con la recepción de compras o desde Inventario.': 'Created with 0 in stock. Stock comes in through purchase receiving or from Inventory.',
+  'Crear y agregar a la orden': 'Create and add to order',
+  'El nombre es obligatorio': 'Name is required',
+  'Precio de venta': 'Selling price',
+  'Unidad': 'Unit',
   'Intereses pendientes al': 'Interest due as of',
   'Monto total pagado (primero intereses, luego capital)': 'Total amount paid (interest first, then principal)',
   'Separar capital e intereses a mano': 'Split principal and interest manually',

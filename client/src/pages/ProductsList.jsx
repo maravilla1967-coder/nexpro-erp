@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
+import ProductTypeSelect from '../components/ProductTypeSelect.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
 const PRODUCT_COLUMNS = [
@@ -164,9 +165,8 @@ export default function ProductsList() {
   async function saveType(e) {
     e.preventDefault();
     if (!newType.trim()) return;
-    await api.post('/products/types', { name: newType.trim() });
-    setNewType('');
-    loadLookups();
+    try { await api.post('/products/types', { name: newType.trim() }); setNewType(''); loadLookups(); }
+    catch (err) { alert(err.message); }
   }
   async function deleteType(id) {
     if (!window.confirm(t('¿Eliminar este tipo de producto?'))) return;
@@ -242,10 +242,7 @@ export default function ProductsList() {
                 <div className="field"><label>{t('Nombre *')}</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div className="field"><label>{t('SKU')}</label><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></div>
                 <div className="field"><label>{t('Tipo de producto')}</label>
-                  <select value={form.productTypeId} onChange={(e) => setForm({ ...form, productTypeId: e.target.value })}>
-                    <option value="">{t('— Sin tipo —')}</option>
-                    {types.map((t2) => <option key={t2.id} value={t2.id}>{t2.name}</option>)}
-                  </select>
+                  <ProductTypeSelect types={types} setTypes={setTypes} value={form.productTypeId} onChange={(v) => setForm((x) => ({ ...x, productTypeId: v }))} />
                 </div>
                 <div className="field"><label>{t('Proveedor')}</label>
                   <select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}>

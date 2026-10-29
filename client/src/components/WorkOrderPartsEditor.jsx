@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useI18n } from '../i18n.jsx';
 import ProductPicker from './ProductPicker.jsx';
+import QuickProductModal from './QuickProductModal.jsx';
 
 export const EMPTY_PART = { productId: '', description: '', action: 'reemplazada', quantity: 1, unitCost: 0, serial: '', productSerialId: null, notes: '' };
 
@@ -36,8 +37,12 @@ export function partToApi(p) {
 // - Cada línea lleva número de serie. Si el producto controla seriales, se sugieren los
 //   disponibles en inventario; al guardar, esa unidad queda "instalada" en el vehículo.
 // defaultAction: acción con la que nacen las líneas nuevas (ej. 'proveedor' si la orden es de un proveedor).
-export default function WorkOrderPartsEditor({ parts, setParts, products, defaultAction = 'reemplazada' }) {
+export default function WorkOrderPartsEditor({ parts, setParts, products: baseProducts, defaultAction = 'reemplazada', supplierId = '' }) {
   const { t } = useI18n();
+  // Productos creados desde aquí (se suman al catálogo recibido sin tener que recargarlo).
+  const [created, setCreated] = useState([]);
+  const [creating, setCreating] = useState(null); // { idx, name }
+  const products = created.length ? [...created.filter((c) => !baseProducts.some((p) => p.id === c.id)), ...baseProducts] : baseProducts;
   const [serialsByProduct, setSerialsByProduct] = useState({});
 
   // Carga los seriales disponibles de los productos que tienen control de seriales.
@@ -112,7 +117,7 @@ export default function WorkOrderPartsEditor({ parts, setParts, products, defaul
             const listId = `wo-serials-${idx}`;
             return (
               <tr key={idx}>
-                <td><ProductPicker products={products} value={p.productId || ''} onChange={(id) => pickProduct(idx, id)} /></td>
+                <td><ProductPicker products={products} value={p.productId || ''} onChange={(id) => pickProduct(idx, id)} onCreate={(q) => setCreating({ idx, name: q || p.description || '' })} /></td>
                 <td><input value={p.description} onChange={(e) => update(idx, 'description', e.target.value)} /></td>
                 <td>
                   <input className="mono" list={options.length ? listId : undefined} value={p.serial || ''}
@@ -141,6 +146,19 @@ export default function WorkOrderPartsEditor({ parts, setParts, products, defaul
       </table>
       </div>
       <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addRow}>{t('+ Agregar parte o producto')}</button>
+      {creating && (
+        <QuickProductModal initialName={creating.name} defaultSupplierId={supplierId || ''}
+          onClose={() => setCreating(null)}
+          onCreated={(prod) => {
+            setCreated((c) => [prod, ...c]);
+            const copy = [...parts];
+            copy[creating.idx] = { ...copy[creating.idx], productId: String(prod.id), serial: '', productSerialId: null,
+              description: prod.description && prod.description !== prod.name ? `${prod.name} — ${prod.description}` : prod.name,
+              unitCost: Number(prod.selling_price) || 0 };
+            setParts(copy);
+            setCreating(null);
+          }} />
+      )}
     </>
   );
 }

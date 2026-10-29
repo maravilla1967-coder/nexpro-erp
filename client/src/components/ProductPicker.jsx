@@ -11,7 +11,7 @@ const MAX_RESULTS = 50;
 
 // Buscador de productos: se escribe y la lista se va filtrando (nombre, SKU, Item # del fabricante,
 // descripción). Flechas ↑/↓ para moverse, Enter para escoger, Esc para cerrar. Vacío = línea manual.
-export default function ProductPicker({ products, value, onChange, priceField = 'selling_price', placeholder }) {
+export default function ProductPicker({ products, value, onChange, priceField = 'selling_price', placeholder, onCreate }) {
   const { t } = useI18n();
   const selected = useMemo(() => products.find((p) => String(p.id) === String(value)) || null, [products, value]);
   const [query, setQuery] = useState('');
@@ -123,6 +123,12 @@ export default function ProductPicker({ products, value, onChange, priceField = 
             </div>
           ))}
           {results.length === MAX_RESULTS && <div className="muted" style={{ padding: '6px 12px', fontSize: 11 }}>{t('Mostrando los primeros 50 — escribe más para afinar')}</div>}
+          {onCreate && (
+            <div onClick={() => { const q = query.trim(); setOpen(false); setQuery(''); inputRef.current && inputRef.current.blur(); onCreate(q); }}
+              style={{ position: 'sticky', bottom: 0, padding: '9px 12px', cursor: 'pointer', background: '#fff7f2', borderTop: '1px solid #fde0cf', color: '#c2410c', fontWeight: 600, fontSize: 13 }}>
+              ＋ {t('Crear producto nuevo')}{query.trim() ? ` «${query.trim()}»` : ''}
+            </div>
+          )}
         </div>,
         document.body,
       )}
