@@ -490,3 +490,9 @@ table.register tr.cleared td { background: #f8fafc; }
   .loan-report .signature-block { margin-top: 26px !important; }
   .loan-report-detail { page-break-inside: auto; }
 }
+
+.loan-pay-owed, .loan-pay-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.loan-pay-owed > div, .loan-pay-split > div { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+.loan-pay-split { margin-top: 8px; margin-bottom: 0; }
+.loan-pay-owed span, .loan-pay-split span { display: block; font-size: 11px; color: var(--text-muted); }
+.loan-pay-owed strong, .loan-pay-split strong { font-size: 15px; color: var(--navy); }

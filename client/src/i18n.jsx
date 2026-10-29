@@ -4,6 +4,16 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Intereses pendientes al': 'Interest due as of',
+  'Monto total pagado (primero intereses, luego capital)': 'Total amount paid (interest first, then principal)',
+  'Separar capital e intereses a mano': 'Split principal and interest manually',
+  'Monto total pagado': 'Total amount paid',
+  'Pagar todo': 'Pay in full',
+  'Aplicado a intereses': 'Applied to interest',
+  'Aplicado a capital': 'Applied to principal',
+  'Saldo de capital después': 'Principal balance after',
+  'Intereses pendientes después': 'Interest due after',
+  'El pago es mayor que el total adeudado': 'The payment is more than the total owed',
   'Condiciones': 'Terms',
   'Desembolso': 'Disbursement',
   'ESTADO DE CUENTA DE PRÉSTAMO': 'LOAN STATEMENT',

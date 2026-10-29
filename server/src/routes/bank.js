@@ -375,11 +375,23 @@ router.post('/loans/:id/payments', upload.array('files', 10), (req, res) => {
   const b = req.body || {};
   const acc = get('SELECT id FROM bank_accounts WHERE id = ?', [b.accountId]);
   if (!acc) return res.status(400).json({ error: 'Elige la cuenta de donde sale el pago.' });
-  const capital = money(b.amount) || 0; const interest = money(b.interest) || 0;
-  if (!(capital > 0 || interest > 0)) return res.status(400).json({ error: 'Escribe el abono a capital y/o los intereses.' });
-  const full = loanFull(l);
-  if (capital - full.balance > 0.004) return res.status(400).json({ error: `El abono es mayor que el saldo del préstamo ($${full.balance.toLocaleString('en-US')}).` });
   const date = String(b.date || '').slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const full = loanFull(l, date);
+  let capital = money(b.amount) || 0; let interest = money(b.interest) || 0;
+  // Pago total: se aplica primero a los intereses pendientes a la fecha del pago y el resto a capital.
+  const total = money(b.total) || 0;
+  if (total > 0) {
+    interest = round2(Math.min(total, full.interest_due));
+    capital = round2(total - interest);
+  }
+  if (!(capital > 0 || interest > 0)) return res.status(400).json({ error: 'Escribe el monto pagado.' });
+  const fmtUsd = (v) => `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (capital - full.balance > 0.004) {
+    const owed = round2(full.balance + Math.max(0, full.interest_due - interest));
+    return res.status(400).json({ error: total > 0
+      ? `El pago es mayor que lo adeudado al ${date}: capital ${fmtUsd(full.balance)} + intereses ${fmtUsd(full.interest_due)} = ${fmtUsd(round2(full.balance + full.interest_due))}.`
+      : `El abono a capital es mayor que el saldo (${fmtUsd(full.balance)}). Si el pago incluye intereses pendientes (${fmtUsd(full.interest_due)}), usa "Monto total pagado" para que se apliquen primero a intereses. Total adeudado: ${fmtUsd(owed)}.` });
+  }
   let first = null;
   if (capital > 0) first = insertTx(acc.id, { direction: 'out', category: 'abono_prestamo', amount: capital, tx_date: date, payee: l.lender_name, description: `Abono a capital ${l.number}`, reference: b.reference || null, period: null }, { loanId: l.id }, req.user.id);
   if (interest > 0) { const i = insertTx(acc.id, { direction: 'out', category: 'intereses_prestamo', amount: interest, tx_date: date, payee: l.lender_name, description: `Intereses ${l.number}`, reference: b.reference || null, period: null }, { loanId: l.id }, req.user.id); first = first || i; }

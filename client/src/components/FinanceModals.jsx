@@ -33,13 +33,13 @@ function AccountSelect({ accounts, value, onChange, label }) {
     </div>
   );
 }
-function Footer({ error, saving, onClose, label }) {
+function Footer({ error, saving, onClose, label, disabled }) {
   const { t } = useI18n();
   return (
     <div className="modal-footer">
       {error && <div className="error-banner" style={{ margin: 0, flexBasis: '100%' }}>{error}</div>}
       <button type="button" className="btn" onClick={onClose}>{t('Cancelar')}</button>
-      <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? t('Guardando…') : (label || t('Guardar'))}</button>
+      <button type="submit" className="btn btn-primary" disabled={saving || disabled}>{saving ? t('Guardando…') : (label || t('Guardar'))}</button>
     </div>
   );
 }
@@ -210,38 +210,83 @@ export function LoanModal({ accounts, onDone, onClose }) {
 
 export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
   const { t } = useI18n();
-  const [f, setF] = useState({ accountId: defaultId(accounts), amount: '', interest: '', date: today(), reference: '' });
+  const hasRate = Number(loan.interest_rate) > 0;
+  // 'total': un solo monto, se aplica primero a intereses pendientes y el resto a capital.
+  // 'manual': capital e intereses por separado.
+  const [mode, setMode] = useState(hasRate ? 'total' : 'manual');
+  const [f, setF] = useState({ accountId: defaultId(accounts), total: '', amount: '', interest: '', date: today(), reference: '' });
   const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
   const [acc, setAcc] = useState(null);
   // Intereses causados hasta la fecha del pago (interés simple por días sobre el saldo).
   useEffect(() => { if (f.date) api.get(`/bank/loans/${loan.id}`, { asOf: f.date }).then(setAcc).catch(() => {}); }, [f.date, loan.id]);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const due = acc ? Number(acc.interest_due) || 0 : 0;
+  const balance = Number(loan.balance) || 0;
+  const owed = Math.round((balance + due) * 100) / 100;
+  const total = parse$(f.total);
+  const toInterest = Math.min(total, due);
+  const toCapital = Math.round((total - toInterest) * 100) / 100;
+  const over = mode === 'total' && toCapital - balance > 0.004;
   async function save(e) {
     e.preventDefault(); setError(''); setSaving(true);
-    try { await api.post(`/bank/loans/${loan.id}/payments`, { ...f, amount: parse$(f.amount), interest: parse$(f.interest) }); onDone(); }
+    const body = mode === 'total'
+      ? { accountId: f.accountId, date: f.date, reference: f.reference, total }
+      : { accountId: f.accountId, date: f.date, reference: f.reference, amount: parse$(f.amount), interest: parse$(f.interest) };
+    try { await api.post(`/bank/loans/${loan.id}/payments`, body); onDone(); }
     catch (err) { setError(err.message); setSaving(false); }
   }
   return (
     <Modal title={`${t('Abono a préstamo')} · ${loan.number} · ${loan.lender_name}`} onClose={onClose}>
       <form onSubmit={save} noValidate>
-        <div className="muted" style={{ marginBottom: 8 }}>{t('Saldo del préstamo:')} <strong>{fmt$(loan.balance)}</strong></div>
+        <div className="loan-pay-owed">
+          <div><span>{t('Saldo de capital')}</span><strong>{fmt$(balance)}</strong></div>
+          {hasRate && <div><span>{t('Intereses pendientes al')} {acc ? acc.interest_as_of : f.date}</span><strong>{fmt$(due)}</strong></div>}
+          {hasRate && <div><span>{t('Total adeudado')}</span><strong>{fmt$(owed)}</strong></div>}
+        </div>
+        {hasRate && (
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '4px 0 10px', fontSize: 13 }}>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0 }}><input type="radio" checked={mode === 'total'} onChange={() => setMode('total')} /> {t('Monto total pagado (primero intereses, luego capital)')}</label>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0 }}><input type="radio" checked={mode === 'manual'} onChange={() => setMode('manual')} /> {t('Separar capital e intereses a mano')}</label>
+          </div>
+        )}
         <div className="grid grid-2">
           <AccountSelect accounts={accounts} value={f.accountId} onChange={(v) => setF({ ...f, accountId: v })} label={t('Cuenta de donde sale el pago')} />
           <div className="field"><label>{t('Fecha')}</label><input type="date" value={f.date} onChange={set('date')} /></div>
-          <div className="field"><label>{t('Abono a capital')}</label><input inputMode="decimal" placeholder="0.00" value={f.amount} onChange={set('amount')} /></div>
-          <div className="field"><label>{t('Intereses (opcional)')}</label><input inputMode="decimal" placeholder="0.00" value={f.interest} onChange={set('interest')} />
-            {acc && Number(loan.interest_rate) > 0 && (
-              <div style={{ fontSize: 12, marginTop: 4 }}>
-                <span className="muted">{t('Pendientes al')} {acc.interest_as_of}: </span><strong>{fmt$(acc.interest_due)}</strong>{' '}
-                <span className="muted">({acc.interest_days} {t('días')}, {loan.interest_rate}% / {acc.day_basis || 365})</span>{' '}
-                {acc.interest_due > 0 && <button type="button" className="link-btn" onClick={() => setF({ ...f, interest: acc.interest_due.toFixed(2) })}>{t('Usar este valor')}</button>}
+          {mode === 'total' ? (
+            <div className="field" style={{ gridColumn: '1 / -1' }}>
+              <label>{t('Monto total pagado')}</label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input inputMode="decimal" placeholder="0.00" value={f.total} onChange={set('total')} style={{ maxWidth: 260 }} />
+                {owed > 0 && <button type="button" className="link-btn" onClick={() => setF({ ...f, total: owed.toFixed(2) })}>{t('Pagar todo')} ({fmt$(owed)})</button>}
               </div>
-            )}
-            {Number(loan.interest_rate) > 0 ? null : <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('El préstamo no tiene tasa de interés; si cobra intereses, ponle la tasa en el préstamo.')}</div>}
-          </div>
+              {total > 0 && (
+                <div className="loan-pay-split">
+                  <div><span>{t('Aplicado a intereses')}</span><strong>{fmt$(toInterest)}</strong></div>
+                  <div><span>{t('Aplicado a capital')}</span><strong>{fmt$(toCapital)}</strong></div>
+                  <div><span>{t('Saldo de capital después')}</span><strong>{fmt$(Math.max(0, balance - toCapital))}</strong></div>
+                  <div><span>{t('Intereses pendientes después')}</span><strong>{fmt$(Math.max(0, due - toInterest))}</strong></div>
+                </div>
+              )}
+              {over && <div className="error-banner" style={{ marginTop: 6, marginBottom: 0 }}>{t('El pago es mayor que el total adeudado')} ({fmt$(owed)}).</div>}
+            </div>
+          ) : (
+            <>
+              <div className="field"><label>{t('Abono a capital')}</label><input inputMode="decimal" placeholder="0.00" value={f.amount} onChange={set('amount')} /></div>
+              <div className="field"><label>{t('Intereses (opcional)')}</label><input inputMode="decimal" placeholder="0.00" value={f.interest} onChange={set('interest')} />
+                {acc && hasRate && (
+                  <div style={{ fontSize: 12, marginTop: 4 }}>
+                    <span className="muted">{t('Pendientes al')} {acc.interest_as_of}: </span><strong>{fmt$(acc.interest_due)}</strong>{' '}
+                    <span className="muted">({acc.interest_days} {t('días')}, {loan.interest_rate}% / {acc.day_basis || 365})</span>{' '}
+                    {acc.interest_due > 0 && <button type="button" className="link-btn" onClick={() => setF({ ...f, interest: acc.interest_due.toFixed(2) })}>{t('Usar este valor')}</button>}
+                  </div>
+                )}
+                {hasRate ? null : <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('El préstamo no tiene tasa de interés; si cobra intereses, ponle la tasa en el préstamo.')}</div>}
+              </div>
+            </>
+          )}
           <div className="field"><label>{t('Referencia')}</label><input value={f.reference} onChange={set('reference')} /></div>
         </div>
-        <Footer error={error} saving={saving} onClose={onClose} label={t('Registrar abono')} />
+        <Footer error={error} saving={saving} disabled={over} onClose={onClose} label={t('Registrar abono')} />
       </form>
     </Modal>
   );
