@@ -299,14 +299,17 @@ router.put('/:id', upload.single('photo'), (req, res) => {
     : calcSellingPrice(purchaseCost, freightCost, marginPercent);
   const photoUrl = req.file ? `/uploads/products/${req.file.filename}` : (b.photoUrl ?? existing.photo_url);
 
+  // Un selector vacío ("— Sin tipo —", "— Sin proveedor —") llega como "": se guarda como NULL,
+  // no como texto vacío (que rompe la llave foránea).
+  const fkOr = (v, prev) => (v === undefined ? prev : (v === '' || v === null || v === 'null' ? null : Number(v)));
   run(
     `UPDATE products SET sku=?, name=?, description=?, photo_url=?, product_type_id=?, purchase_cost=?, freight_cost=?,
        margin_percent=?, selling_price=?, stock_qty=?, unit=?, supplier_id=?, active=?, updated_at=?
      WHERE id=?`,
     [b.sku ?? existing.sku, b.name ?? existing.name, b.description ?? existing.description, photoUrl,
-     b.productTypeId ?? existing.product_type_id, purchaseCost, freightCost, marginPercent, sellingPrice,
+     fkOr(b.productTypeId, existing.product_type_id), purchaseCost, freightCost, marginPercent, sellingPrice,
      b.stockQty !== undefined ? parseFloat(b.stockQty) : existing.stock_qty, b.unit ?? existing.unit,
-     b.supplierId ?? existing.supplier_id, b.active !== undefined ? (b.active === 'false' || b.active === false ? 0 : 1) : existing.active,
+     fkOr(b.supplierId, existing.supplier_id), b.active !== undefined ? (b.active === 'false' || b.active === false ? 0 : 1) : existing.active,
      nowIso(), req.params.id]
   );
   setTrackSerials(req.params.id, b.trackSerials);
