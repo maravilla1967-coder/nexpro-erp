@@ -219,7 +219,9 @@ export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
   const [payer, setPayer] = useState('nexpro');
   const [partner, setPartner] = useState({ name: '', rate: '' });
   const [partnerNames, setPartnerNames] = useState([]);
-  useEffect(() => { api.get('/bank/loans').then((ls) => setPartnerNames([...new Set(ls.filter((x) => x.lender_type === 'socio').map((x) => x.lender_name.trim()))])).catch(() => {}); }, []);
+  const [allLoans, setAllLoans] = useState([]);
+  useEffect(() => { api.get('/bank/loans').then(setAllLoans).catch(() => {}); }, []);
+  useEffect(() => { setPartnerNames([...new Set(allLoans.filter((x) => (payer === 'socio' ? x.lender_type === 'socio' : x.lender_type !== 'socio')).map((x) => x.lender_name.trim()))]); }, [allLoans, payer]);
   const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
   const [acc, setAcc] = useState(null);
   // Intereses causados hasta la fecha del pago (interés simple por días sobre el saldo).
@@ -234,8 +236,8 @@ export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
   const over = mode === 'total' && toCapital - balance > 0.004;
   async function save(e) {
     e.preventDefault(); setError(''); setSaving(true);
-    if (payer === 'socio' && !partner.name.trim()) { setError(t('Escribe qué socio hizo el pago.')); setSaving(false); return; }
-    const who = payer === 'socio' ? { paidByPartner: partner.name.trim(), partnerRate: partner.rate } : { accountId: f.accountId };
+    if (payer !== 'nexpro' && !partner.name.trim()) { setError(t('Escribe quién hizo el pago.')); setSaving(false); return; }
+    const who = payer !== 'nexpro' ? { paidByPartner: partner.name.trim(), paidByType: payer, partnerRate: partner.rate } : { accountId: f.accountId };
     const body = mode === 'total'
       ? { ...who, date: f.date, reference: f.reference, total }
       : { ...who, date: f.date, reference: f.reference, amount: parse$(f.amount), interest: parse$(f.interest) };
@@ -262,17 +264,18 @@ export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13 }}>
               <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0, fontWeight: 400 }}><input type="radio" style={{ width: 'auto' }} checked={payer === 'nexpro'} onChange={() => setPayer('nexpro')} /> {t('Nexpro, desde una cuenta del banco')}</label>
               <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0, fontWeight: 400 }}><input type="radio" style={{ width: 'auto' }} checked={payer === 'socio'} onChange={() => setPayer('socio')} /> {t('Un socio pagó directamente')}</label>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0, fontWeight: 400 }}><input type="radio" style={{ width: 'auto' }} checked={payer === 'tercero'} onChange={() => setPayer('tercero')} /> {t('Un tercero pagó directamente')}</label>
             </div>
           </div>
           {payer === 'nexpro'
             ? <AccountSelect accounts={accounts.filter((a) => !a.is_direct)} value={f.accountId} onChange={(v) => setF({ ...f, accountId: v })} label={t('Cuenta de donde sale el pago')} />
             : (
               <div className="field">
-                <label>{t('Socio que pagó')}</label>
-                <input list="partner-names" value={partner.name} onChange={(e) => setPartner({ ...partner, name: e.target.value })} placeholder={t('Nombre del socio')} />
+                <label>{payer === 'socio' ? t('Socio que pagó') : t('Tercero que pagó')}</label>
+                <input list="partner-names" value={partner.name} onChange={(e) => setPartner({ ...partner, name: e.target.value })} placeholder={payer === 'socio' ? t('Nombre del socio') : t('Nombre del tercero')} />
                 <datalist id="partner-names">{partnerNames.map((n) => <option key={n} value={n} />)}</datalist>
-                <input inputMode="decimal" style={{ marginTop: 6 }} value={partner.rate} onChange={(e) => setPartner({ ...partner, rate: e.target.value })} placeholder={t('Interés anual del préstamo del socio (%) — opcional')} />
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('No sale de ningún banco: se crea un préstamo nuevo de este socio por el mismo monto, y el abono queda registrado.')}</div>
+                <input inputMode="decimal" style={{ marginTop: 6 }} value={partner.rate} onChange={(e) => setPartner({ ...partner, rate: e.target.value })} placeholder={t('Interés anual que se le reconoce (%) — opcional')} />
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('No sale de ningún banco de Nexpro: el abono queda registrado y se crea automáticamente la deuda con quien pagó (un préstamo a su nombre por el mismo monto), que aparece en Préstamos para pagársela después.')}</div>
               </div>
             )}
           <div className="field"><label>{t('Fecha')}</label><input type="date" value={f.date} onChange={set('date')} /></div>
@@ -416,7 +419,7 @@ export function LoanTxEditModal({ accounts, tx, loan, onDone, onClose }) {
             <select value={f.accountId} onChange={set('accountId')}>
               {list.filter((a) => a.active !== 0 || String(a.id) === f.accountId).map((a) => <option key={a.id} value={a.id}>{a.name}{a.account_masked ? ` ${a.account_masked}` : ''}</option>)}
             </select>
-            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('Si lo pagó o lo puso un socio directamente (sin pasar por el banco), elige "Pagos directos de socios (sin banco)".')}</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('Si lo pagó o lo puso un socio o un tercero directamente (sin pasar por el banco), elige "Pagos directos de socios o terceros (sin banco)".')}</div>
           </div>
           <div className="field"><label>{t('Fecha')}</label><input type="date" value={f.date} onChange={set('date')} /></div>
           <div className="field"><label>{t('Monto')}</label><input inputMode="decimal" value={f.amount} onChange={set('amount')} />

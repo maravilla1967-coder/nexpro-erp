@@ -208,7 +208,7 @@ function adminOnly(req, res) {
 // Cuenta "sin banco" para lo que un socio paga directamente por Nexpro: el préstamo del socio
 // entra ahí y el pago sale de ahí el mismo día, así que su saldo siempre queda en cero y no
 // afecta ningún banco real.
-const DIRECT_NAME = 'Pagos directos de socios (sin banco)';
+const DIRECT_NAME = 'Pagos directos de socios o terceros (sin banco)';
 function directAccount() {
   let a = get('SELECT * FROM bank_accounts WHERE is_direct = 1 ORDER BY id LIMIT 1');
   if (!a) {
@@ -431,10 +431,11 @@ router.post('/loans/:id/payments', upload.array('files', 10), (req, res) => {
   try {
   if (partner) {
     const number = nextDocNumber('loans', 'PR');
+    const ptype = ['tercero', 'banco'].includes(b.paidByType) ? b.paidByType : 'socio';
     const pid = run('INSERT INTO loans (number, lender_name, lender_type, principal, loan_date, interest_rate, notes, created_by, day_basis) VALUES (?,?,?,?,?,?,?,?,?)',
-      [number, partner, 'socio', round2(capital + interest), date, b.partnerRate ? parseFloat(b.partnerRate) : null,
+      [number, partner, ptype, round2(capital + interest), date, b.partnerRate ? parseFloat(b.partnerRate) : null,
        `Pagó directamente a ${l.lender_name} (${l.number})`, req.user.id, 365]).lastInsertRowid;
-    insertTx(acc.id, { direction: 'in', category: 'prestamo_socio', amount: round2(capital + interest), tx_date: date, payee: partner,
+    insertTx(acc.id, { direction: 'in', category: ptype === 'socio' ? 'prestamo_socio' : 'prestamo_tercero', amount: round2(capital + interest), tx_date: date, payee: partner,
       description: `Préstamo ${number} — pagó directamente a ${l.lender_name} (${l.number})`, reference: b.reference || null, period: null }, { loanId: pid }, req.user.id);
   }
   if (capital > 0) first = insertTx(acc.id, { direction: 'out', category: 'abono_prestamo', amount: capital, tx_date: date, payee: l.lender_name, description: `Abono a capital ${l.number}`, reference: b.reference || null, period: null }, { loanId: l.id }, req.user.id);

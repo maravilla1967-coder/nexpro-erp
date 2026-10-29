@@ -4,6 +4,13 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Un tercero pagó directamente': 'A third party paid directly',
+  'Tercero que pagó': 'Third party who paid',
+  'Nombre del tercero': 'Third-party name',
+  'Escribe quién hizo el pago.': 'Enter who made the payment.',
+  'Interés anual que se le reconoce (%) — opcional': 'Annual interest owed to them (%) — optional',
+  'No sale de ningún banco de Nexpro: el abono queda registrado y se crea automáticamente la deuda con quien pagó (un préstamo a su nombre por el mismo monto), que aparece en Préstamos para pagársela después.': "Doesn't come out of any Nexpro bank: the repayment is recorded and the debt to whoever paid is created automatically (a loan in their name for the same amount), shown in Loans so you can pay it back later.",
+  'Si lo pagó o lo puso un socio o un tercero directamente (sin pasar por el banco), elige "Pagos directos de socios o terceros (sin banco)".': 'If a partner or third party paid or put it in directly (without going through the bank), choose "Pagos directos de socios o terceros (sin banco)".',
   '¿Quién hizo el pago?': 'Who made the payment?',
   'Nexpro, desde una cuenta del banco': 'Nexpro, from a bank account',
   'Un socio pagó directamente': 'A partner paid directly',
