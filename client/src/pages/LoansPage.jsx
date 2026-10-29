@@ -38,6 +38,7 @@ export default function LoansPage() {
       <div className="topbar">
         <div><h1>{t('Préstamos')}</h1><div className="sub">{t('Dinero recibido de socios y terceros, abonos y saldo pendiente')}</div></div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {loans.length > 0 && <Link className="btn" to="/finanzas/prestamos/informe?ver=todos&tipo=socio">{t('🖨️ Préstamos de socios')}</Link>}
           {loans.length > 0 && <Link className="btn" to="/finanzas/prestamos/informe">{t('🖨️ Informe de préstamos')}</Link>}
           {accounts.length > 0 && <button className="btn btn-primary" onClick={() => setModal({ type: 'loan' })}>{t('+ Préstamo recibido')}</button>}
         </div>

@@ -190,6 +190,8 @@ export function LoansReportDocument() {
   const [error, setError] = useState('');
   const scope = params.get('ver') || 'vigentes';
   const detail = params.get('detalle') === '1';
+  const kind = params.get('tipo') || 'todos'; // todos / socio / tercero (terceros + bancos)
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(params.get('desde') || '') ? params.get('desde') : '';
   const setParam = (k, v) => { const p = new URLSearchParams(params); p.set(k, v); setParams(p, { replace: true }); };
   useEffect(() => { api.get('/bank/loans', { asOf }).then(setLoans).catch((e) => setError(e.message)); }, [asOf]);
   if (!loans) return <div className="content">{error || t('Cargando…')}</div>;
@@ -198,6 +200,8 @@ export function LoansReportDocument() {
     .map((l) => ({ l, r: loanAsOf(l, asOf) }))
     .filter(({ l, r }) => r.principal > 0 || r.txs.length > 0)
     .filter(({ r }) => scope === 'todos' || r.balance > 0.004 || r.interestDue > 0.004)
+    .filter(({ l }) => kind === 'todos' || (kind === 'socio' ? l.lender_type === 'socio' : l.lender_type !== 'socio'))
+    .filter(({ l }) => !from || d10(l.interest_start || l.loan_date) >= from)
     .sort((a, b) => (d10(a.l.interest_start || a.l.loan_date) < d10(b.l.interest_start || b.l.loan_date) ? -1 : 1));
   const tot = (k) => rows.reduce((s, x) => s + x.r[k], 0);
   const totAccrued = rows.reduce((s, x) => s + (Number(x.l.interest_accrued) || 0), 0);
@@ -209,6 +213,13 @@ export function LoansReportDocument() {
           <option value="vigentes">{t('Solo préstamos vigentes')}</option>
           <option value="todos">{t('Todos los préstamos')}</option>
         </select>
+        <select style={{ width: 170 }} value={kind} onChange={(e) => setParam('tipo', e.target.value)}>
+          <option value="todos">{t('Socios y terceros')}</option>
+          <option value="socio">{t('Solo socios')}</option>
+          <option value="tercero">{t('Solo terceros / bancos')}</option>
+        </select>
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0 }}>{t('Préstamos desde')}
+          <input type="date" style={{ width: 150 }} value={from} onChange={(e) => setParam('desde', e.target.value)} /></label>
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0 }}>
           <input type="checkbox" checked={detail} onChange={(e) => setParam('detalle', e.target.checked ? '1' : '0')} /> {t('Incluir movimientos de cada préstamo')}
         </label>
@@ -220,7 +231,7 @@ export function LoansReportDocument() {
             <div className="invoice-meta">
               <h2>{t('INFORME DE PRÉSTAMOS E INTERESES')}</h2>
               <div><strong>{t('Fecha de corte:')}</strong> {asOf}</div>
-              <div className="muted">{t(scope === 'todos' ? 'Todos los préstamos' : 'Solo préstamos vigentes')}</div>
+              <div className="muted">{t(scope === 'todos' ? 'Todos los préstamos' : 'Solo préstamos vigentes')}{kind !== 'todos' ? ` · ${t(kind === 'socio' ? 'Solo socios' : 'Solo terceros / bancos')}` : ''}{from ? ` · ${t('desde')} ${from}` : ''}</div>
               <div className="muted" style={{ fontSize: 11 }}>{t('Generado el')} {new Date().toLocaleString()}</div>
             </div>
           </div>

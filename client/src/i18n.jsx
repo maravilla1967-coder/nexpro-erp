@@ -4,6 +4,11 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  'Socios y terceros': 'Partners & third parties',
+  'Solo socios': 'Partners only',
+  'Solo terceros / bancos': 'Third parties / banks only',
+  'Préstamos desde': 'Loans from',
+  '🖨️ Préstamos de socios': '🖨️ Partner loans',
   'Mostrando': 'Showing',
   'Mostrar 300 más': 'Show 300 more',
   'Mostrar todos': 'Show all',
