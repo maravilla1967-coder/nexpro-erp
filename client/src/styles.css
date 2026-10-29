@@ -469,3 +469,24 @@ a.bank-card:hover { border-color: var(--orange, #e8642c); box-shadow: 0 4px 14px
 .bank-card.total { background: var(--navy, #0f2742); color: #fff; }
 .bank-card.total span, .bank-card.total em { color: rgba(255,255,255,.8); }
 table.register tr.cleared td { background: #f8fafc; }
+
+/* Informes de préstamos (estado de cuenta e informe general) */
+.loan-report-wide { max-width: 1060px; }
+.loan-report-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-top: 14px; }
+.loan-report-kpis > div { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.loan-report-kpis span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.loan-report-kpis strong { font-size: 15px; color: var(--navy); }
+.loan-report-table { width: 100%; font-size: 12.5px; }
+.loan-report-table th, .loan-report-table td { padding: 5px 6px; }
+.loan-report-total td { border-top: 2px solid var(--navy); }
+@media print {
+  .loan-report-wide { max-width: 100%; }
+  .loan-report-table { font-size: 10.5px; }
+  .loan-report-table th, .loan-report-table td { padding: 3px 4px; }
+  .loan-report-kpis { gap: 6px; margin-top: 8px; }
+  .loan-report-kpis > div { padding: 5px 8px; }
+  .loan-report-kpis strong { font-size: 12px; }
+  .loan-report-kpis span { font-size: 9px; }
+  .loan-report .signature-block { margin-top: 26px !important; }
+  .loan-report-detail { page-break-inside: auto; }
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
 import Modal from '../components/Modal.jsx';
@@ -37,7 +37,10 @@ export default function LoansPage() {
     <>
       <div className="topbar">
         <div><h1>{t('Préstamos')}</h1><div className="sub">{t('Dinero recibido de socios y terceros, abonos y saldo pendiente')}</div></div>
-        {accounts.length > 0 && <button className="btn btn-primary" onClick={() => setModal({ type: 'loan' })}>{t('+ Préstamo recibido')}</button>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {loans.length > 0 && <Link className="btn" to="/finanzas/prestamos/informe">{t('🖨️ Informe de préstamos')}</Link>}
+          {accounts.length > 0 && <button className="btn btn-primary" onClick={() => setModal({ type: 'loan' })}>{t('+ Préstamo recibido')}</button>}
+        </div>
       </div>
       <div className="content">
         <div className="chain-summary">
@@ -103,6 +106,7 @@ export default function LoansPage() {
           </table>
           <div className="modal-footer">
             {isAdmin && <button className="btn btn-danger" onClick={() => del(viewing)}>{t('Eliminar')}</button>}
+            <Link className="btn" to={`/finanzas/prestamos/${viewing.id}/estado?al=${asOf}`}>{t('🖨️ Imprimir estado de cuenta')}</Link>
             <button className="btn" onClick={() => setModal({ type: 'terms', loan: viewing })}>{t('✏️ Condiciones / interés')}</button>
             {viewing.balance > 0.004 && <button className="btn btn-primary" onClick={() => setModal({ type: 'pay', loan: viewing })}>{t('Registrar abono')}</button>}
           </div>

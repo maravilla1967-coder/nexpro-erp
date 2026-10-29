@@ -31,6 +31,7 @@ import HelpPage from './pages/HelpPage.jsx';
 import FinancePage from './pages/FinancePage.jsx';
 import AccountRegister from './pages/AccountRegister.jsx';
 import LoansPage from './pages/LoansPage.jsx';
+import { LoanStatementDocument, LoansReportDocument } from './pages/LoanReports.jsx';
 import HelpButton from './components/HelpButton.jsx';
 import ServiceVouchersList from './pages/ServiceVouchersList.jsx';
 import ServiceVoucherDocument from './pages/ServiceVoucherDocument.jsx';
@@ -238,6 +239,8 @@ function MainShell() {
           <Route path="/finanzas" element={<FinancePage />} />
           <Route path="/finanzas/cuenta/:id" element={<AccountRegister />} />
           <Route path="/finanzas/prestamos" element={<LoansPage />} />
+          <Route path="/finanzas/prestamos/informe" element={<LoansReportDocument />} />
+          <Route path="/finanzas/prestamos/:id/estado" element={<LoanStatementDocument />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/clientes" element={<CustomersList />} />
           <Route path="/clientes/:id" element={<CustomerDetail />} />

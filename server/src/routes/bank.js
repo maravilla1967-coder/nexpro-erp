@@ -331,7 +331,7 @@ function loanFull(l, asOf) {
     interest_as_of: /^\d{4}-\d{2}-\d{2}/.test(String(asOf || '')) ? String(asOf).slice(0, 10) : new Date().toISOString().slice(0, 10), last_interest_date: lastInt,
     daily_interest: round2((l.principal - repaid) * ((Number(l.interest_rate) || 0) / 100) / (Number(l.day_basis) || 365)) };
 }
-router.get('/loans', (req, res) => res.json(all('SELECT * FROM loans ORDER BY loan_date DESC, id DESC').map((l) => loanFull(l))));
+router.get('/loans', (req, res) => res.json(all('SELECT * FROM loans ORDER BY loan_date DESC, id DESC').map((l) => loanFull(l, req.query.asOf))));
 router.get('/loans/:id', (req, res) => {
   const l = get('SELECT * FROM loans WHERE id = ?', [req.params.id]);
   if (!l) return res.status(404).json({ error: 'Préstamo no encontrado' });
