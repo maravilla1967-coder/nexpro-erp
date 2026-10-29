@@ -214,7 +214,12 @@ export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
   // 'total': un solo monto, se aplica primero a intereses pendientes y el resto a capital.
   // 'manual': capital e intereses por separado.
   const [mode, setMode] = useState(hasRate ? 'total' : 'manual');
-  const [f, setF] = useState({ accountId: defaultId(accounts), total: '', amount: '', interest: '', date: today(), reference: '' });
+  const [f, setF] = useState({ accountId: defaultId(accounts.filter((a) => !a.is_direct)), total: '', amount: '', interest: '', date: today(), reference: '' });
+  // ¿Quién pagó? Nexpro desde un banco, o un socio directamente (queda como préstamo nuevo de ese socio).
+  const [payer, setPayer] = useState('nexpro');
+  const [partner, setPartner] = useState({ name: '', rate: '' });
+  const [partnerNames, setPartnerNames] = useState([]);
+  useEffect(() => { api.get('/bank/loans').then((ls) => setPartnerNames([...new Set(ls.filter((x) => x.lender_type === 'socio').map((x) => x.lender_name.trim()))])).catch(() => {}); }, []);
   const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
   const [acc, setAcc] = useState(null);
   // Intereses causados hasta la fecha del pago (interés simple por días sobre el saldo).
@@ -229,9 +234,11 @@ export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
   const over = mode === 'total' && toCapital - balance > 0.004;
   async function save(e) {
     e.preventDefault(); setError(''); setSaving(true);
+    if (payer === 'socio' && !partner.name.trim()) { setError(t('Escribe qué socio hizo el pago.')); setSaving(false); return; }
+    const who = payer === 'socio' ? { paidByPartner: partner.name.trim(), partnerRate: partner.rate } : { accountId: f.accountId };
     const body = mode === 'total'
-      ? { accountId: f.accountId, date: f.date, reference: f.reference, total }
-      : { accountId: f.accountId, date: f.date, reference: f.reference, amount: parse$(f.amount), interest: parse$(f.interest) };
+      ? { ...who, date: f.date, reference: f.reference, total }
+      : { ...who, date: f.date, reference: f.reference, amount: parse$(f.amount), interest: parse$(f.interest) };
     try { await api.post(`/bank/loans/${loan.id}/payments`, body); onDone(); }
     catch (err) { setError(err.message); setSaving(false); }
   }
@@ -245,12 +252,29 @@ export function LoanPaymentModal({ accounts, loan, onDone, onClose }) {
         </div>
         {hasRate && (
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '4px 0 10px', fontSize: 13 }}>
-            <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0 }}><input type="radio" checked={mode === 'total'} onChange={() => setMode('total')} /> {t('Monto total pagado (primero intereses, luego capital)')}</label>
-            <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0 }}><input type="radio" checked={mode === 'manual'} onChange={() => setMode('manual')} /> {t('Separar capital e intereses a mano')}</label>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0, fontWeight: 400 }}><input type="radio" style={{ width: 'auto' }} checked={mode === 'total'} onChange={() => setMode('total')} /> {t('Monto total pagado (primero intereses, luego capital)')}</label>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0, fontWeight: 400 }}><input type="radio" style={{ width: 'auto' }} checked={mode === 'manual'} onChange={() => setMode('manual')} /> {t('Separar capital e intereses a mano')}</label>
           </div>
         )}
         <div className="grid grid-2">
-          <AccountSelect accounts={accounts} value={f.accountId} onChange={(v) => setF({ ...f, accountId: v })} label={t('Cuenta de donde sale el pago')} />
+          <div className="field" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
+            <label>{t('¿Quién hizo el pago?')}</label>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13 }}>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0, fontWeight: 400 }}><input type="radio" style={{ width: 'auto' }} checked={payer === 'nexpro'} onChange={() => setPayer('nexpro')} /> {t('Nexpro, desde una cuenta del banco')}</label>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center', margin: 0, fontWeight: 400 }}><input type="radio" style={{ width: 'auto' }} checked={payer === 'socio'} onChange={() => setPayer('socio')} /> {t('Un socio pagó directamente')}</label>
+            </div>
+          </div>
+          {payer === 'nexpro'
+            ? <AccountSelect accounts={accounts.filter((a) => !a.is_direct)} value={f.accountId} onChange={(v) => setF({ ...f, accountId: v })} label={t('Cuenta de donde sale el pago')} />
+            : (
+              <div className="field">
+                <label>{t('Socio que pagó')}</label>
+                <input list="partner-names" value={partner.name} onChange={(e) => setPartner({ ...partner, name: e.target.value })} placeholder={t('Nombre del socio')} />
+                <datalist id="partner-names">{partnerNames.map((n) => <option key={n} value={n} />)}</datalist>
+                <input inputMode="decimal" style={{ marginTop: 6 }} value={partner.rate} onChange={(e) => setPartner({ ...partner, rate: e.target.value })} placeholder={t('Interés anual del préstamo del socio (%) — opcional')} />
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('No sale de ningún banco: se crea un préstamo nuevo de este socio por el mismo monto, y el abono queda registrado.')}</div>
+              </div>
+            )}
           <div className="field"><label>{t('Fecha')}</label><input type="date" value={f.date} onChange={set('date')} /></div>
           {mode === 'total' ? (
             <div className="field" style={{ gridColumn: '1 / -1' }}>
@@ -358,6 +382,48 @@ export function AccountModal({ initial, accounts = [], onDone, onClose, onDelete
             )}
           </div>
         )}
+        <Footer error={error} saving={saving} onClose={onClose} />
+      </form>
+    </Modal>
+  );
+}
+
+// Editar un movimiento de un préstamo (desembolso o abono): cuenta, fecha, monto y referencia.
+// Solo el administrador. Para un pago hecho directamente por un socio, se elige la cuenta
+// "Pagos directos de socios (sin banco)".
+export function LoanTxEditModal({ accounts, tx, loan, onDone, onClose }) {
+  const { t } = useI18n();
+  const [list, setList] = useState(accounts);
+  useEffect(() => { if (!accounts.some((a) => a.is_direct)) api.get('/bank/direct-account').then((d) => setList([...accounts, d])).catch(() => {}); }, [accounts]);
+  const [f, setF] = useState({ accountId: String(tx.account_id), date: String(tx.tx_date).slice(0, 10), amount: String(tx.amount), reference: tx.reference || '', description: tx.description || '' });
+  const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const isIn = tx.direction === 'in';
+  async function save(e) {
+    e.preventDefault(); setError('');
+    if (!(parse$(f.amount) > 0)) { setError(t('Escribe el monto.')); return; }
+    setSaving(true);
+    const fd = new FormData();
+    Object.entries({ accountId: f.accountId, date: f.date, amount: parse$(f.amount), reference: f.reference, description: f.description, direction: tx.direction, category: tx.category, payee: tx.payee || '' })
+      .forEach(([k, v]) => fd.append(k, String(v ?? '')));
+    try { await api.putForm(`/bank/transactions/${tx.id}`, fd); onDone(); } catch (err) { setError(err.message); setSaving(false); }
+  }
+  return (
+    <Modal title={`${t('Editar movimiento')} · ${t(CATEGORY_LABELS[tx.category] || tx.category)} · ${loan.number}`} onClose={onClose}>
+      <form onSubmit={save} noValidate>
+        <div className="grid grid-2">
+          <div className="field"><label>{isIn ? t('Cuenta donde entró el dinero') : t('Cuenta de donde salió el pago')}</label>
+            <select value={f.accountId} onChange={set('accountId')}>
+              {list.filter((a) => a.active !== 0 || String(a.id) === f.accountId).map((a) => <option key={a.id} value={a.id}>{a.name}{a.account_masked ? ` ${a.account_masked}` : ''}</option>)}
+            </select>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('Si lo pagó o lo puso un socio directamente (sin pasar por el banco), elige "Pagos directos de socios (sin banco)".')}</div>
+          </div>
+          <div className="field"><label>{t('Fecha')}</label><input type="date" value={f.date} onChange={set('date')} /></div>
+          <div className="field"><label>{t('Monto')}</label><input inputMode="decimal" value={f.amount} onChange={set('amount')} />
+            {isIn && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('Es el desembolso: cambiar el monto o la fecha cambia el monto y la fecha del préstamo.')}</div>}</div>
+          <div className="field"><label>{t('Referencia')}</label><input value={f.reference} onChange={set('reference')} /></div>
+        </div>
+        <div className="field"><label>{t('Descripción')}</label><input value={f.description} onChange={set('description')} /></div>
         <Footer error={error} saving={saving} onClose={onClose} />
       </form>
     </Modal>

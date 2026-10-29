@@ -199,6 +199,27 @@ router.post('/assign', (req, res) => {
 });
 
 // ---- Movimientos propios del banco ----
+// Préstamos, desembolsos y abonos: solo un administrador los puede modificar o borrar.
+function adminOnly(req, res) {
+  if (req.user && req.user.role === 'admin') return false;
+  res.status(403).json({ error: 'Solo el administrador puede modificar préstamos, desembolsos y abonos.' });
+  return true;
+}
+// Cuenta "sin banco" para lo que un socio paga directamente por Nexpro: el préstamo del socio
+// entra ahí y el pago sale de ahí el mismo día, así que su saldo siempre queda en cero y no
+// afecta ningún banco real.
+const DIRECT_NAME = 'Pagos directos de socios (sin banco)';
+function directAccount() {
+  let a = get('SELECT * FROM bank_accounts WHERE is_direct = 1 ORDER BY id LIMIT 1');
+  if (!a) {
+    const id = run('INSERT INTO bank_accounts (name, account_type, notes, is_direct) VALUES (?,?,?,1)',
+      [DIRECT_NAME, 'otra', 'Pagos que un socio hizo directamente por Nexpro: no pasan por ningún banco.']).lastInsertRowid;
+    a = get('SELECT * FROM bank_accounts WHERE id = ?', [id]);
+  }
+  return a;
+}
+router.get('/direct-account', (req, res) => res.json(accountWithBalance(directAccount())));
+
 function txFields(b) {
   const direction = b.direction === 'in' ? 'in' : 'out';
   const category = String(b.category || (direction === 'in' ? 'otro_ingreso' : 'otro_egreso'));
@@ -249,14 +270,17 @@ router.get('/transactions/:id', (req, res) => {
 router.put('/transactions/:id', upload.array('files', 10), (req, res) => {
   const t = get('SELECT * FROM bank_transactions WHERE id = ?', [req.params.id]);
   if (!t) return res.status(404).json({ error: 'Movimiento no encontrado' });
+  if (t.loan_id && adminOnly(req, res)) return;
   const b = req.body || {};
+  if (b.accountId && !get('SELECT id FROM bank_accounts WHERE id = ?', [b.accountId])) return res.status(400).json({ error: 'Cuenta no encontrada.' });
   const f = txFields({ direction: t.direction, category: t.category, amount: t.amount, date: t.tx_date, payee: t.payee, description: t.description, reference: t.reference, period: t.period, ...b });
   if (!(f.amount > 0)) return res.status(400).json({ error: 'El monto debe ser mayor que cero.' });
   if (t.transfer_group) f.direction = t.direction; // una transferencia no cambia de sentido
   run(`UPDATE bank_transactions SET account_id=?, tx_date=?, direction=?, category=?, amount=?, payee=?, description=?, reference=?, period=? WHERE id=?`,
     [b.accountId || t.account_id, f.tx_date, f.direction, f.category, f.amount, f.payee, f.description, f.reference, f.period, t.id]);
   if (t.transfer_group) run('UPDATE bank_transactions SET amount = ?, tx_date = ? WHERE transfer_group = ? AND id != ?', [f.amount, f.tx_date, t.transfer_group, t.id]);
-  if (t.loan_id && t.direction === 'in') run('UPDATE loans SET loan_date = ? WHERE id = ?', [f.tx_date, t.loan_id]);
+  // El desembolso es el préstamo mismo: su fecha y monto son los del préstamo.
+  if (t.loan_id && t.direction === 'in') run('UPDATE loans SET loan_date = ?, principal = ? WHERE id = ?', [f.tx_date, f.amount, t.loan_id]);
   saveTxFiles(t.id, req.files);
   res.json({ ok: true });
 });
@@ -267,6 +291,7 @@ router.delete('/transactions/:id/files/:fid', (req, res) => {
 router.delete('/transactions/:id', (req, res) => {
   const t = get('SELECT * FROM bank_transactions WHERE id = ?', [req.params.id]);
   if (!t) return res.status(404).json({ error: 'Movimiento no encontrado' });
+  if (t.loan_id && adminOnly(req, res)) return;
   if (t.loan_id && ['prestamo_socio', 'prestamo_tercero'].includes(t.category)) return res.status(400).json({ error: 'Este es el desembolso del préstamo: bórralo desde Préstamos.' });
   if (t.transfer_group) run('DELETE FROM bank_transactions WHERE transfer_group = ?', [t.transfer_group]);
   else run('DELETE FROM bank_transactions WHERE id = ?', [t.id]);
@@ -360,11 +385,17 @@ router.post('/loans', upload.array('files', 10), (req, res) => {
   } catch (err) { db.exec('ROLLBACK'); res.status(500).json({ error: err.message }); }
 });
 router.put('/loans/:id', (req, res) => {
+  if (adminOnly(req, res)) return;
   const l = get('SELECT * FROM loans WHERE id = ?', [req.params.id]);
   if (!l) return res.status(404).json({ error: 'Préstamo no encontrado' });
   const b = req.body || {};
+  // Si cambia quién prestó o su tipo, el desembolso en el banco cambia con él.
+  const newType = ['socio', 'tercero', 'banco'].includes(b.lenderType) ? b.lenderType : l.lender_type;
+  const newName = String(b.lenderName || l.lender_name).trim();
+  run(`UPDATE bank_transactions SET category = ?, payee = ? WHERE loan_id = ? AND direction = 'in'`, [newType === 'socio' ? 'prestamo_socio' : 'prestamo_tercero', newName, l.id]);
+  run(`UPDATE bank_transactions SET payee = ? WHERE loan_id = ? AND direction = 'out'`, [newName, l.id]);
   run('UPDATE loans SET lender_name=?, lender_type=?, interest_rate=?, due_date=?, notes=?, day_basis=?, loan_date=? WHERE id=?',
-    [b.lenderName || l.lender_name, b.lenderType || l.lender_type, b.interestRate !== undefined && b.interestRate !== '' ? parseFloat(b.interestRate) : l.interest_rate, b.dueDate ?? l.due_date, b.notes ?? l.notes,
+    [newName, newType, b.interestRate !== undefined && b.interestRate !== '' ? parseFloat(b.interestRate) : l.interest_rate, b.dueDate ?? l.due_date, b.notes ?? l.notes,
      b.dayBasis !== undefined ? (String(b.dayBasis) === '360' ? 360 : 365) : l.day_basis, b.loanDate || l.loan_date, l.id]);
   res.json(loanFull(get('SELECT * FROM loans WHERE id = ?', [l.id])));
 });
@@ -373,7 +404,10 @@ router.post('/loans/:id/payments', upload.array('files', 10), (req, res) => {
   const l = get('SELECT * FROM loans WHERE id = ?', [req.params.id]);
   if (!l) return res.status(404).json({ error: 'Préstamo no encontrado' });
   const b = req.body || {};
-  const acc = get('SELECT id FROM bank_accounts WHERE id = ?', [b.accountId]);
+  // Pago hecho directamente por un socio: no sale de ningún banco de Nexpro; se registra un
+  // préstamo nuevo de ese socio por el mismo monto y el abono, ambos en la cuenta sin banco.
+  const partner = String(b.paidByPartner || '').trim();
+  const acc = partner ? directAccount() : get('SELECT id FROM bank_accounts WHERE id = ?', [b.accountId]);
   if (!acc) return res.status(400).json({ error: 'Elige la cuenta de donde sale el pago.' });
   const date = String(b.date || '').slice(0, 10) || new Date().toISOString().slice(0, 10);
   const full = loanFull(l, date);
@@ -393,12 +427,25 @@ router.post('/loans/:id/payments', upload.array('files', 10), (req, res) => {
       : `El abono a capital es mayor que el saldo (${fmtUsd(full.balance)}). Si el pago incluye intereses pendientes (${fmtUsd(full.interest_due)}), usa "Monto total pagado" para que se apliquen primero a intereses. Total adeudado: ${fmtUsd(owed)}.` });
   }
   let first = null;
+  db.exec('BEGIN');
+  try {
+  if (partner) {
+    const number = nextDocNumber('loans', 'PR');
+    const pid = run('INSERT INTO loans (number, lender_name, lender_type, principal, loan_date, interest_rate, notes, created_by, day_basis) VALUES (?,?,?,?,?,?,?,?,?)',
+      [number, partner, 'socio', round2(capital + interest), date, b.partnerRate ? parseFloat(b.partnerRate) : null,
+       `Pagó directamente a ${l.lender_name} (${l.number})`, req.user.id, 365]).lastInsertRowid;
+    insertTx(acc.id, { direction: 'in', category: 'prestamo_socio', amount: round2(capital + interest), tx_date: date, payee: partner,
+      description: `Préstamo ${number} — pagó directamente a ${l.lender_name} (${l.number})`, reference: b.reference || null, period: null }, { loanId: pid }, req.user.id);
+  }
   if (capital > 0) first = insertTx(acc.id, { direction: 'out', category: 'abono_prestamo', amount: capital, tx_date: date, payee: l.lender_name, description: `Abono a capital ${l.number}`, reference: b.reference || null, period: null }, { loanId: l.id }, req.user.id);
   if (interest > 0) { const i = insertTx(acc.id, { direction: 'out', category: 'intereses_prestamo', amount: interest, tx_date: date, payee: l.lender_name, description: `Intereses ${l.number}`, reference: b.reference || null, period: null }, { loanId: l.id }, req.user.id); first = first || i; }
   saveTxFiles(first, req.files);
+  db.exec('COMMIT');
+  } catch (err) { db.exec('ROLLBACK'); return res.status(500).json({ error: err.message }); }
   res.status(201).json(loanFull(get('SELECT * FROM loans WHERE id = ?', [l.id])));
 });
 router.delete('/loans/:id', (req, res) => {
+  if (adminOnly(req, res)) return;
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede borrar un préstamo.' });
   run('DELETE FROM bank_transactions WHERE loan_id = ?', [req.params.id]);
   run('DELETE FROM loans WHERE id = ?', [req.params.id]);

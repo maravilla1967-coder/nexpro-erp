@@ -63,6 +63,12 @@ function changeControl(req, res, next) {
   if (!['PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
   const path = req.path; // relativo a /api
   if (SKIP.some((re) => re.test(path))) return next();
+  // Préstamos y sus movimientos (desembolsos, abonos): solo el administrador los modifica;
+  // no se mandan a aprobación.
+  const txm = path.match(/^\/bank\/transactions\/(\d+)/);
+  if (/^\/bank\/loans\/\d+/.test(path) || (txm && get('SELECT loan_id FROM bank_transactions WHERE id = ? AND loan_id IS NOT NULL', [txm[1]]))) {
+    return res.status(403).json({ error: 'Solo el administrador puede modificar préstamos, desembolsos y abonos.' });
+  }
 
   let entity; let label; let entityId; let action;
   if (req.method === 'DELETE') {

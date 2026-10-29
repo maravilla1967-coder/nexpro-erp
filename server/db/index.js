@@ -69,6 +69,8 @@ tryAlter('ALTER TABLE purchase_order_items ADD COLUMN short_qty REAL NOT NULL DE
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN short_note TEXT');
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN payment_terms_days INTEGER'); // vacío = las del proveedor
 // Finanzas: cada cobro / pago puede quedar en una cuenta bancaria (y conciliado).
+// Cuenta especial sin banco: pagos que un socio hizo directamente por Nexpro (no pasan por ningún banco).
+tryAlter('ALTER TABLE bank_accounts ADD COLUMN is_direct INTEGER NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE invoice_payments ADD COLUMN bank_account_id INTEGER REFERENCES bank_accounts(id) ON DELETE SET NULL');
 tryAlter('ALTER TABLE invoice_payments ADD COLUMN bank_cleared INTEGER NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE supplier_bill_payments ADD COLUMN bank_account_id INTEGER REFERENCES bank_accounts(id) ON DELETE SET NULL');

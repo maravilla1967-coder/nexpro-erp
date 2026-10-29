@@ -5,7 +5,7 @@ import Pill from '../components/Pill.jsx';
 import Modal from '../components/Modal.jsx';
 import { useI18n } from '../i18n.jsx';
 import { useAuth } from '../auth.jsx';
-import { LoanModal, LoanPaymentModal, LoanTermsModal, CATEGORY_LABELS, fmt$ } from '../components/FinanceModals.jsx';
+import { LoanModal, LoanPaymentModal, LoanTermsModal, LoanTxEditModal, CATEGORY_LABELS, fmt$ } from '../components/FinanceModals.jsx';
 
 // Préstamos recibidos de socios y terceros: cuánto entró, cuánto se ha abonado y el saldo.
 export default function LoansPage() {
@@ -99,22 +99,24 @@ export default function LoansPage() {
             {viewing.notes && <span>{viewing.notes}</span>}
           </div>
           <table>
-            <thead><tr><th>{t('Fecha')}</th><th>{t('Movimiento')}</th><th>{t('Cuenta')}</th><th>{t('Referencia')}</th><th className="text-right">{t('Monto')}</th></tr></thead>
+            <thead><tr><th>{t('Fecha')}</th><th>{t('Movimiento')}</th><th>{t('Cuenta')}</th><th>{t('Referencia')}</th><th className="text-right">{t('Monto')}</th>{isAdmin && <th></th>}</tr></thead>
             <tbody>{viewing.transactions.map((x) => (
               <tr key={x.id}><td className="muted">{x.tx_date}</td><td>{t(CATEGORY_LABELS[x.category] || x.category)}</td><td>{x.account_name}</td><td>{x.reference || '—'}</td>
-                <td className="text-right" style={{ color: x.direction === 'in' ? '#15803d' : 'var(--red)' }}>{x.direction === 'in' ? '+' : '−'}{fmt$(x.amount)}</td></tr>
+                <td className="text-right" style={{ color: x.direction === 'in' ? '#15803d' : 'var(--red)' }}>{x.direction === 'in' ? '+' : '−'}{fmt$(x.amount)}</td>
+                {isAdmin && <td><button className="link-btn" title={t('Editar movimiento')} onClick={() => setModal({ type: 'tx', loan: viewing, tx: x })}>✏️</button></td>}</tr>
             ))}</tbody>
           </table>
           <div className="modal-footer">
             {isAdmin && <button className="btn btn-danger" onClick={() => del(viewing)}>{t('Eliminar')}</button>}
             <Link className="btn" to={`/finanzas/prestamos/${viewing.id}/estado?al=${asOf}`}>{t('🖨️ Imprimir estado de cuenta')}</Link>
-            <button className="btn" onClick={() => setModal({ type: 'terms', loan: viewing })}>{t('✏️ Condiciones / interés')}</button>
+            {isAdmin && <button className="btn" onClick={() => setModal({ type: 'terms', loan: viewing })}>{t('✏️ Condiciones / interés')}</button>}
             {viewing.balance > 0.004 && <button className="btn btn-primary" onClick={() => setModal({ type: 'pay', loan: viewing })}>{t('Registrar abono')}</button>}
           </div>
         </Modal>
       )}
       {modal?.type === 'loan' && <LoanModal accounts={accounts} onDone={done} onClose={() => setModal(null)} />}
       {modal?.type === 'terms' && <LoanTermsModal loan={modal.loan} onDone={done} onClose={() => setModal(null)} />}
+      {modal?.type === 'tx' && <LoanTxEditModal accounts={accounts} tx={modal.tx} loan={modal.loan} onDone={done} onClose={() => setModal(null)} />}
       {modal?.type === 'pay' && <LoanPaymentModal accounts={accounts} loan={modal.loan} onDone={done} onClose={() => setModal(null)} />}
     </>
   );

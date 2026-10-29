@@ -4,6 +4,17 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  '¿Quién hizo el pago?': 'Who made the payment?',
+  'Nexpro, desde una cuenta del banco': 'Nexpro, from a bank account',
+  'Un socio pagó directamente': 'A partner paid directly',
+  'Socio que pagó': 'Partner who paid',
+  'Nombre del socio': 'Partner name',
+  'Interés anual del préstamo del socio (%) — opcional': "Annual interest on the partner's loan (%) — optional",
+  'No sale de ningún banco: se crea un préstamo nuevo de este socio por el mismo monto, y el abono queda registrado.': "Doesn't come out of any bank: a new loan from this partner is created for the same amount, and the repayment is recorded.",
+  'Escribe qué socio hizo el pago.': 'Enter which partner made the payment.',
+  'Cuenta de donde salió el pago': 'Account the payment came from',
+  'Si lo pagó o lo puso un socio directamente (sin pasar por el banco), elige "Pagos directos de socios (sin banco)".': 'If a partner paid or put it in directly (without going through the bank), choose "Pagos directos de socios (sin banco)".',
+  'Es el desembolso: cambiar el monto o la fecha cambia el monto y la fecha del préstamo.': "This is the disbursement: changing the amount or date changes the loan's amount and date.",
   'Socios y terceros': 'Partners & third parties',
   'Solo socios': 'Partners only',
   'Solo terceros / bancos': 'Third parties / banks only',
