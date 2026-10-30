@@ -125,6 +125,14 @@ router.put('/:id', (req, res) => {
     }
     return res.json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id])));
   }
+  // Cambiar el número de la orden (p. ej. dejar "241" cuando la versión vieja se eliminó).
+  if (b.number !== undefined && String(b.number).trim() && String(b.number).trim() !== existing.number) {
+    const num = String(b.number).trim();
+    if (get('SELECT id FROM purchase_orders WHERE number = ? AND id != ?', [num, req.params.id])) {
+      return res.status(400).json({ error: `Ya existe otra orden de compra con el número ${num}` });
+    }
+    run('UPDATE purchase_orders SET number = ? WHERE id = ?', [num, req.params.id]);
+  }
   run(
     `UPDATE purchase_orders SET status=?, order_date=?, notes=?, payment_terms_days=? WHERE id=?`,
     [b.status ?? existing.status, b.orderDate ?? existing.order_date, b.notes ?? existing.notes,
