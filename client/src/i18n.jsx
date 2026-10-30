@@ -899,6 +899,8 @@ const DICT = {
   'Todo lo que se puede vender o comprar: costos y precios. Lo que hay en bodega está en Inventario.': 'Everything you can sell or buy: costs and prices. What is on hand is in Inventory.',
   'Boleta de entrega': 'Delivery ticket',
   'BOLETA DE ENTREGA': 'DELIVERY TICKET',
+  'ORDEN DE COMPRA': 'PURCHASE ORDER',
+  'FACTURA': 'INVOICE',
   'Crear boleta de entrega': 'Create delivery ticket',
   '← Volver a la factura': '← Back to invoice',
   'Guarda la boleta primero para asignarle número': 'Save the ticket first to assign its number',
