@@ -199,7 +199,7 @@ export default function PurchaseOrdersList() {
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
               <div className="field"><label>{t('Proveedor *')}</label>
-                <select required disabled={!!editingPo} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+                <select required disabled={!!editingPo && ((editingPo.receipts || []).length > 0 || (editingPo.bills || []).length > 0)} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
                   <option value="">{t('— Seleccionar —')}</option>
                   {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>

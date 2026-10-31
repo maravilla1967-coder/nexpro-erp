@@ -125,6 +125,14 @@ router.put('/:id', (req, res) => {
     }
     return res.json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id])));
   }
+  // Cambiar el proveedor: solo mientras la orden no tenga recepciones ni cuentas por pagar
+  // (p. ej. corregir una orden importada con el proveedor equivocado).
+  if (b.supplierId !== undefined && String(b.supplierId) !== String(existing.supplier_id)) {
+    const hasDocs = get('SELECT 1 FROM goods_receipts WHERE purchase_order_id = ? UNION SELECT 1 FROM supplier_bills WHERE purchase_order_id = ? LIMIT 1', [req.params.id, req.params.id]);
+    if (hasDocs) return res.status(400).json({ error: 'No se puede cambiar el proveedor: la orden ya tiene recepciones o cuentas por pagar.' });
+    if (!get('SELECT id FROM suppliers WHERE id = ?', [b.supplierId])) return res.status(400).json({ error: 'Proveedor no encontrado' });
+    run('UPDATE purchase_orders SET supplier_id = ? WHERE id = ?', [b.supplierId, req.params.id]);
+  }
   // Cambiar el número de la orden (p. ej. dejar "241" cuando la versión vieja se eliminó).
   if (b.number !== undefined && String(b.number).trim() && String(b.number).trim() !== existing.number) {
     const num = String(b.number).trim();
