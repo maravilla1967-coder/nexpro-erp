@@ -167,6 +167,10 @@ router.put('/:id', (req, res) => {
   const b = req.body;
   const existing = get('SELECT * FROM work_orders WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Orden de trabajo no encontrada' });
+  if (b.status === 'cancelado' && existing.status !== 'cancelado') {
+    const inv = woInvoiced(existing.id);
+    if (inv) return res.status(400).json({ error: `La orden ya está facturada (${inv.number}). Elimina o anula esa factura primero.` });
+  }
   run(
     `UPDATE work_orders SET mechanic_id=?, supplier_id=?, status=?, notes=?, diagnosis=?, resolution=?, updated_at=? WHERE id=?`,
     [b.supplierId ? null : (b.mechanicId !== undefined ? b.mechanicId : existing.mechanic_id),
@@ -196,7 +200,15 @@ router.put('/:id', (req, res) => {
   res.json(withDetails(get('SELECT * FROM work_orders WHERE id = ?', [req.params.id])));
 });
 
+// Una orden de trabajo facturada no se borra ni se anula: primero se elimina o anula la factura.
+function woInvoiced(id) {
+  return get(`SELECT i.number FROM work_orders w JOIN invoices i ON i.id = w.invoice_id
+              WHERE w.id = ? AND i.status NOT IN ('anulada','cancelado')`, [id]);
+}
+
 router.delete('/:id', (req, res) => {
+  const inv = woInvoiced(req.params.id);
+  if (inv) return res.status(400).json({ error: `La orden ya está facturada (${inv.number}). Elimina o anula esa factura primero.` });
   const before = serialIdsOf(req.params.id);
   run('DELETE FROM work_order_parts WHERE work_order_id = ?', [req.params.id]);
   syncPartSerials(Number(req.params.id), before, req.user && req.user.id);

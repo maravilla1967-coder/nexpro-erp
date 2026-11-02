@@ -123,9 +123,21 @@ export default function PurchaseOrdersList() {
   const [receiving, setReceiving] = useState(null);
   async function openReceive(po) { setReceiving(await api.get(`/purchase-orders/${po.id}`)); }
   async function markStatus(po, status) {
-    await api.put(`/purchase-orders/${po.id}`, { status });
+    try {
+      await api.put(`/purchase-orders/${po.id}`, { status });
+    } catch (err) { if (!err.pendingApproval) window.alert(err.message); }
     load();
     if (viewing && viewing.id === po.id) openView(po.id);
+  }
+  async function voidPo(po) {
+    if (!window.confirm(`${t('¿Anular la orden de compra')} ${po.number}? ${t('Queda en el historial como anulada y ya no se puede recibir.')}`)) return;
+    markStatus(po, 'cancelado');
+  }
+  async function deletePo(po) {
+    if (!window.confirm(`${t('¿Eliminar la orden de compra')} ${po.number}?\n\n${t('Esto no se puede deshacer.')}`)) return;
+    try { await api.del(`/purchase-orders/${po.id}`); if (viewing && viewing.id === po.id) setViewing(null); }
+    catch (err) { if (!err.pendingApproval) window.alert(err.message); }
+    load();
   }
   async function openView(id) {
     const po = await api.get(`/purchase-orders/${id}`);
@@ -184,6 +196,9 @@ export default function PurchaseOrdersList() {
                       {po.status !== 'cancelado' && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
                       {po.status === 'borrador' && <button className="link-btn" onClick={() => markStatus(po, 'enviada')}>{t('Marcar enviada')}</button>}
                       {!['recibida', 'cancelado', 'cerrada'].includes(po.status) && <button className="link-btn" onClick={() => openReceive(po)}>{po.status === 'parcial' ? t('Recibir resto') : t('Recibir')}</button>}
+                      {['borrador', 'enviada'].includes(po.status) && <button className="link-btn" style={{ color: 'var(--amber)' }} onClick={() => voidPo(po)}>{t('Anular')}</button>}
+                      {po.status === 'cancelado' && <button className="link-btn" onClick={() => markStatus(po, 'borrador')}>{t('Reactivar')}</button>}
+                      {['borrador', 'enviada', 'cancelado'].includes(po.status) && <button className="link-btn" style={{ color: 'var(--red)' }} onClick={() => deletePo(po)}>{t('Eliminar')}</button>}
                     </td>
                   </tr>
                 ))}

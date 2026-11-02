@@ -5,6 +5,19 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
   // ===== CRM =====
+  '¿Anular la orden de compra': 'Void purchase order',
+  'Queda en el historial como anulada y ya no se puede recibir.': 'It stays in the history as void and can no longer be received.',
+  '¿Eliminar la orden de compra': 'Delete purchase order',
+  'Reactivar': 'Reactivate',
+  '¿Eliminar el pedido': 'Delete sales order',
+  'Anulado (cancelado)': 'Void (cancelled)',
+  'Anular factura': 'Void invoice',
+  '¿Anular la factura': 'Void invoice',
+  'Queda en el historial como anulada, deja de contar en la cartera y lo que tenía (órdenes de trabajo, pedido) queda libre para volver a facturar.': 'It stays in the history as void, no longer counts in receivables, and what it covered (work orders, sales order) is freed to be invoiced again.',
+  'Anulada': 'Void',
+  '¿Anular la orden de trabajo': 'Void work order',
+  'Queda en el historial como anulada.': 'It stays in the history as void.',
+  '¿Eliminar la orden de trabajo': 'Delete work order',
   '¿No está en la lista? Escríbelo aquí…': 'Not on the list? Type it here…',
   'Si lo guardas en la lista, la próxima vez aparece para escogerlo con un clic': 'If you save it to the list, next time it appears to pick with one click',
   'Solo para esta solicitud': 'Only for this request',

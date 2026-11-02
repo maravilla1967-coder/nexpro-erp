@@ -34,7 +34,15 @@ function applyUpdate(id, b) {
   return get('SELECT * FROM sales_orders WHERE id = ?', [id]);
 }
 
+// Un pedido ya facturado no se borra: primero se elimina o anula la factura.
+function assertCanDelete(id) {
+  const inv = get(`SELECT number FROM invoices WHERE sales_order_id = ? AND status NOT IN ('anulada','cancelado')`, [id]);
+  if (inv) throw Object.assign(new Error(`El pedido ya se facturó (${inv.number}). Elimina o anula esa factura primero.`), { status: 400 });
+}
+
 function applyDelete(id) {
+  assertCanDelete(id);
+  run(`UPDATE invoices SET sales_order_id = NULL WHERE sales_order_id = ?`, [id]);
   run('DELETE FROM sales_orders WHERE id = ?', [id]);
 }
 
@@ -109,10 +117,13 @@ router.delete('/:id', (req, res) => {
   const existing = get('SELECT * FROM sales_orders WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Pedido no encontrado' });
 
-  if (req.user.role === 'admin') {
-    applyDelete(req.params.id);
-    return res.status(204).end();
-  }
+  try {
+    assertCanDelete(req.params.id);
+    if (req.user.role === 'admin') {
+      applyDelete(req.params.id);
+      return res.status(204).end();
+    }
+  } catch (err) { return res.status(err.status || 500).json({ error: err.message }); }
   const result = run(
     `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
      VALUES ('sales_order', ?, 'delete', NULL, ?, ?)`,

@@ -77,6 +77,10 @@ function applyUpdate(id, b) {
     subtotal = totals.subtotal; taxAmount = totals.taxAmount; total = totals.total;
   }
 
+  if (b.status === 'anulada' && existing.status !== 'anulada') {
+    assertCanVoid(id);
+    releaseInvoiceLinks(id, `Factura ${existing.number} anulada`);
+  }
   const includeWireInfo = b.includeWireInfo !== undefined ? (b.includeWireInfo ? 1 : 0) : existing.include_wire_info;
   run(
     `UPDATE invoices SET status=?, due_date=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, notes=?, include_wire_info=? WHERE id=?`,
@@ -91,18 +95,30 @@ function applyUpdate(id, b) {
 // facturado: las órdenes de trabajo vuelven a "completado" (se pueden facturar de nuevo),
 // el pedido de origen vuelve a "aprobado" y los seriales vendidos con ella vuelven a
 // "disponible". Sus líneas y pagos se borran con ella.
+// Suelta todo lo que la factura tenía amarrado (órdenes de trabajo, pedido, seriales vendidos),
+// para que se pueda volver a facturar. Se usa al eliminarla y al anularla.
+function releaseInvoiceLinks(id, note) {
+  run(`UPDATE work_orders SET invoice_id = NULL, status = 'completado' WHERE invoice_id = ?`, [id]);
+  const inv = get('SELECT sales_order_id FROM invoices WHERE id = ?', [id]);
+  if (inv && inv.sales_order_id) run(`UPDATE sales_orders SET status = 'aprobado' WHERE id = ? AND status = 'facturado'`, [inv.sales_order_id]);
+  const sold = all(`SELECT id FROM product_serials WHERE invoice_id = ?`, [id]);
+  for (const sr of sold) {
+    run(`UPDATE product_serials SET invoice_id = NULL, customer_id = CASE WHEN vehicle_id IS NULL THEN NULL ELSE customer_id END,
+           status = CASE WHEN status = 'vendido' THEN 'disponible' ELSE status END WHERE id = ?`, [sr.id]);
+    run(`INSERT INTO serial_events (serial_id, event, notes) VALUES (?, 'disponible', ?)`, [sr.id, note]);
+  }
+}
+
+// Anular exige que no tenga pagos (si los tiene, primero se eliminan o se devuelven).
+function assertCanVoid(id) {
+  const paid = get('SELECT COALESCE(SUM(amount),0) AS s FROM invoice_payments WHERE invoice_id = ?', [id]).s;
+  if (paid > 0.004) throw Object.assign(new Error('La factura tiene pagos registrados: elimina esos pagos antes de anularla.'), { status: 400 });
+}
+
 function applyDelete(id) {
   db.exec('BEGIN');
   try {
-    run(`UPDATE work_orders SET invoice_id = NULL, status = 'completado' WHERE invoice_id = ?`, [id]);
-    const inv = get('SELECT sales_order_id FROM invoices WHERE id = ?', [id]);
-    if (inv && inv.sales_order_id) run(`UPDATE sales_orders SET status = 'aprobado' WHERE id = ? AND status = 'facturado'`, [inv.sales_order_id]);
-    const sold = all(`SELECT id FROM product_serials WHERE invoice_id = ?`, [id]);
-    for (const sr of sold) {
-      run(`UPDATE product_serials SET invoice_id = NULL, customer_id = CASE WHEN vehicle_id IS NULL THEN NULL ELSE customer_id END,
-             status = CASE WHEN status = 'vendido' THEN 'disponible' ELSE status END WHERE id = ?`, [sr.id]);
-      run(`INSERT INTO serial_events (serial_id, event, notes) VALUES (?, 'disponible', 'Factura eliminada')`, [sr.id]);
-    }
+    releaseInvoiceLinks(id, 'Factura eliminada');
     run('DELETE FROM invoices WHERE id = ?', [id]);
     db.exec('COMMIT');
   } catch (err) {
@@ -411,10 +427,13 @@ router.put('/:id', (req, res) => {
   const existing = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Factura no encontrada' });
 
-  if (req.user.role === 'admin') {
-    applyUpdate(req.params.id, req.body);
-    return res.json(getFullInvoice(req.params.id));
-  }
+  try {
+    if (req.body && req.body.status === 'anulada' && existing.status !== 'anulada') assertCanVoid(req.params.id);
+    if (req.user.role === 'admin') {
+      applyUpdate(req.params.id, req.body);
+      return res.json(getFullInvoice(req.params.id));
+    }
+  } catch (err) { return res.status(err.status || 500).json({ error: err.message }); }
   const result = run(
     `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
      VALUES ('invoice', ?, 'update', ?, ?, ?)`,

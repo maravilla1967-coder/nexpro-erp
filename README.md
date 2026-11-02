@@ -176,6 +176,15 @@ cambios se enviaron para autorización del administrador." Un admin lo ve en **A
 puede aprobarlo (se aplica tal cual se solicitó) o rechazarlo (con motivo opcional). El resto de
 los módulos aplican los cambios de inmediato en cuanto el usuario tiene permiso de edición.
 
+### Anular y eliminar documentos
+- **Órdenes de compra:** "Anular" (queda como `cancelado`, se puede "Reactivar") y "Eliminar" solo si no
+  tiene mercancía recibida ni cuentas por pagar vigentes; si ya se recibió algo se usa "cerrar faltante".
+- **Órdenes de pedido:** anular = estado "cancelado"; "Eliminar" solo si no tiene una factura vigente.
+- **Facturas:** "Anular factura" (sin pagos registrados) la deja en el historial como `anulada` y libera
+  sus órdenes de trabajo, el pedido y los seriales para volver a facturar; "Eliminar factura" la borra.
+- **Órdenes de trabajo:** "Anular" (estado `cancelado`) y "Eliminar" solo si no están facturadas.
+- Para usuarios que no son administradores, anular o eliminar queda como solicitud en Aprobaciones.
+
 ## 8. Documentos imprimibles: marca, transferencia bancaria y sincronización
 
 - **Encabezado de marca:** los 4 documentos imprimibles (factura, pedido, recepción de vehículo,

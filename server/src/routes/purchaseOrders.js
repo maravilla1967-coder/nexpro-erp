@@ -113,6 +113,10 @@ router.put('/:id', (req, res) => {
   }
   // Marcar "recibida" de una sola vez = recibir todo lo que falte de cada línea (con el
   // mismo registro de recepción que la recepción parcial).
+  if (b.status === 'cancelado' && existing.status !== 'cancelado') {
+    const block = poBlocker(existing.id, 'anular');
+    if (block) return res.status(400).json({ error: block });
+  }
   if (b.status === 'recibida' && existing.status !== 'recibida') {
     const pending = all('SELECT id, quantity, received_qty, short_qty FROM purchase_order_items WHERE purchase_order_id = ?', [req.params.id])
       .map((i) => ({ itemId: i.id, quantity: Number(i.quantity) - Number(i.received_qty || 0) - Number(i.short_qty || 0) }))
@@ -159,8 +163,23 @@ router.put('/:id', (req, res) => {
   res.json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id])));
 });
 
+// Una orden con mercancía recibida o con cuentas por pagar no se borra (el inventario y las
+// cuentas quedarían descuadrados): se cierra el faltante o se anulan primero las cuentas.
+function poBlocker(id, action) {
+  const rec = get('SELECT COUNT(*) AS n FROM goods_receipts WHERE purchase_order_id = ?', [id]).n;
+  if (rec) return `No se puede ${action}: la orden ya tiene mercancía recibida (${rec} recepción${rec > 1 ? 'es' : ''}). Si no va a llegar el resto, usa "Recibir" → cerrar faltante.`;
+  const bills = get(`SELECT COUNT(*) AS n FROM supplier_bills WHERE purchase_order_id = ? AND status != 'anulada'`, [id]).n;
+  if (bills) return `No se puede ${action}: la orden tiene cuentas por pagar. Anúlalas primero en Cuentas por pagar.`;
+  return null;
+}
+
 router.delete('/:id', (req, res) => {
-  run('DELETE FROM purchase_orders WHERE id = ?', [req.params.id]);
+  const po = get('SELECT id FROM purchase_orders WHERE id = ?', [req.params.id]);
+  if (!po) return res.status(404).json({ error: 'Orden de compra no encontrada' });
+  const block = poBlocker(po.id, 'eliminar');
+  if (block) return res.status(400).json({ error: block });
+  run('UPDATE supplier_bills SET purchase_order_id = NULL WHERE purchase_order_id = ?', [po.id]);
+  run('DELETE FROM purchase_orders WHERE id = ?', [po.id]);
   res.status(204).end();
 });
 

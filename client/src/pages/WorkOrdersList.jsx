@@ -107,6 +107,17 @@ export default function WorkOrdersList() {
 
   const total = partsTotal(woParts) + woServices.reduce((sum, s) => sum + (s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0)), 0);
 
+  async function voidWo(wo) {
+    if (!window.confirm(`${t('¿Anular la orden de trabajo')} ${wo.number}? ${t('Queda en el historial como anulada.')}`)) return;
+    try { await api.put(`/work-orders/${wo.id}`, { status: 'cancelado' }); } catch (err) { if (!err.pendingApproval) window.alert(err.message); }
+    load();
+  }
+  async function deleteWo(wo) {
+    if (!window.confirm(`${t('¿Eliminar la orden de trabajo')} ${wo.number}?\n\n${t('Esto no se puede deshacer.')}`)) return;
+    try { await api.del(`/work-orders/${wo.id}`); } catch (err) { if (!err.pendingApproval) window.alert(err.message); }
+    load();
+  }
+
   return (
     <>
       <div className="topbar">
@@ -120,6 +131,7 @@ export default function WorkOrdersList() {
             <option value="en_proceso">{t('En proceso')}</option>
             <option value="completado">{t('Completado')}</option>
             <option value="facturado">{t('Facturado')}</option>
+            <option value="cancelado">{t('Anulada')}</option>
           </select>
         </div>
         <div className="card">
@@ -143,6 +155,8 @@ export default function WorkOrdersList() {
                         ) : (
                           wo.status === 'completado' && <button className="btn-row-action" onClick={() => invoiceWorkOrder(wo)}>{t('Facturar')}</button>
                         )}
+                        {!wo.invoice_id && wo.status !== 'cancelado' && <button className="btn-row-action" style={{ color: 'var(--amber)' }} onClick={() => voidWo(wo)}>{t('Anular')}</button>}
+                        {!wo.invoice_id && <button className="btn-row-action delete" onClick={() => deleteWo(wo)}>{t('Eliminar')}</button>}
                       </div>
                     </td>
                     <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
@@ -168,6 +182,7 @@ export default function WorkOrdersList() {
                   <option value="en_proceso">{t('En proceso')}</option>
                   <option value="completado">{t('Completado')}</option>
                   <option value="facturado">{t('Facturado')}</option>
+                  <option value="cancelado">{t('Anulada')}</option>
                 </select>
               </div>
             </div>

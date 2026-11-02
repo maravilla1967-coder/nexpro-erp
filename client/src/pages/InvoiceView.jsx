@@ -46,6 +46,17 @@ export default function InvoiceView() {
   }
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
+  // Anular: la factura queda en el historial (con su número) pero sin valor; las órdenes de trabajo,
+  // el pedido y los seriales quedan libres para volver a facturar. No se puede si tiene pagos.
+  async function voidInvoice() {
+    if (!window.confirm(`${t('¿Anular la factura')} ${invoice.number}? ${t('Queda en el historial como anulada, deja de contar en la cartera y lo que tenía (órdenes de trabajo, pedido) queda libre para volver a facturar.')}`)) return;
+    try {
+      const r = await api.put(`/invoices/${id}`, { status: 'anulada' });
+      if (r && r.pending) { window.alert(r.message); return; }
+      setInvoice(await api.get(`/invoices/${id}`));
+    } catch (err) { window.alert(err.message); }
+  }
+
   async function deleteInvoice() {
     const extra = invoice.paid > 0 ? `\n\n${t('Tiene pagos registrados por')} ${money(invoice.paid)}; ${t('también se borrarán.')}` : '';
     if (!window.confirm(`${t('¿Eliminar la factura')} ${invoice.number}?${extra}\n\n${t('Esto no se puede deshacer.')}`)) return;
@@ -136,6 +147,7 @@ export default function InvoiceView() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/facturas" className="btn">{t('← Volver')}</Link>
+          {!['anulada', 'cancelado'].includes(invoice.status) && <button type="button" className="btn" style={{ color: 'var(--amber)' }} onClick={voidInvoice}>{t('Anular factura')}</button>}
           <button type="button" className="btn btn-danger" onClick={deleteInvoice}>{t('Eliminar factura')}</button>
           {invoice.workOrders && invoice.workOrders.length > 0 && (
             <button type="button" className="btn" disabled={syncing} onClick={syncWorkOrders}>

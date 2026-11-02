@@ -90,6 +90,15 @@ export default function SalesOrdersList() {
     navigate(`/facturas/${invoice.id}`);
   }
 
+  async function deleteSo(so) {
+    if (!window.confirm(`${t('¿Eliminar el pedido')} ${so.number}?\n\n${t('Esto no se puede deshacer.')}`)) return;
+    try {
+      const result = await api.del(`/sales-orders/${so.id}`);
+      if (result && result.pending) setNotice(result.message || t('Los cambios se enviaron para autorización del administrador.'));
+    } catch (err) { window.alert(err.message); }
+    load();
+  }
+
   async function updateStatus(id, status) {
     const result = await api.put(`/sales-orders/${id}`, { status });
     if (result && result.pending) {
@@ -123,7 +132,7 @@ export default function SalesOrdersList() {
                         <option value="pendiente">{t('pendiente')}</option>
                         <option value="aprobado">{t('aprobado')}</option>
                         <option value="en_proceso">{t('en_proceso')}</option>
-                        <option value="cancelado">{t('cancelado')}</option>
+                        <option value="cancelado">{t('Anulado (cancelado)')}</option>
                         {so.status === 'facturado' && <option value="facturado" disabled>{t('facturado')}</option>}
                       </select>
                     </td>
@@ -134,6 +143,7 @@ export default function SalesOrdersList() {
                         <Link className="btn-row-action" to={`/pedidos/${so.id}/documento`}>{t('Imprimir')}</Link>
                         {so.status !== 'facturado' && <button className="btn-row-action" onClick={() => convertToInvoice(so)}>{t('Facturar')}</button>}
                         {so.status === 'facturado' && <Pill value="facturado" />}
+                        {so.status !== 'facturado' && <button className="btn-row-action delete" onClick={() => deleteSo(so)}>{t('Eliminar')}</button>}
                       </div>
                     </td>
                   </tr>
