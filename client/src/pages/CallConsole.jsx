@@ -32,7 +32,7 @@ export default function CallConsole() {
   const timer = useRef(null);
 
   // Formulario de la solicitud
-  const blank = { contactId: params.get('contacto') || '', channel: 'llamada', items: [], notes: '', priority: 'normal', vehicleId: '', replyTo: '', createQuote: true };
+  const blank = { contactId: params.get('contacto') || '', channel: 'llamada', items: [], notes: '', priority: 'normal', vehicleId: '', replyTo: '' };
   const [rq, setRq] = useState(blank);
   const [newPerson, setNewPerson] = useState(null); // datos de una persona nueva que llama
   const [pendingFiles, setPendingFiles] = useState([]);
@@ -109,7 +109,7 @@ export default function CallConsole() {
       }
       let r = await api.post('/crm/requests', {
         customerId, contactId: contactId || null, channel: rq.channel, notes: rq.notes, priority: rq.priority,
-        vehicleId: rq.vehicleId || null, replyTo: rq.replyTo, createQuote: rq.createQuote && rq.items.length > 0,
+        vehicleId: rq.vehicleId || null, replyTo: rq.replyTo,
         items: rq.items.map((i) => ({ ...i, quantity: parseFloat(i.quantity) || 1 })),
       });
       if (pendingFiles.length) {
@@ -183,7 +183,7 @@ export default function CallConsole() {
               {done && (
                 <div className="notice-banner" style={{ background: '#dcfce7', color: '#166534' }}>
                   ✓ {t('Solicitud')} <Link to={`/crm/solicitudes?abrir=${done.id}`} className="mono">{done.number}</Link> {t('registrada')}
-                  {done.sales_order_id && <> · {t('orden de pedido')} <Link to={`/pedidos?abrir=${done.sales_order_id}`} className="mono">{done.sales_order_number}</Link> {t('lista para revisar y cotizar')}</>}
+                  {' · '}<Link to={`/crm/solicitudes?abrir=${done.id}`}>{t('Crear cotización o facturar desde la solicitud')}</Link>
                   . <button type="button" className="link-btn" onClick={() => setComposer(done)}>{t('Enviar acuse')}</button>
                 </div>
               )}
@@ -244,10 +244,9 @@ export default function CallConsole() {
                     <input value={rq.replyTo} onChange={(e) => setRq({ ...rq, replyTo: e.target.value })} />
                   </div>
                 </div>
-                <label className="check-line">
-                  <input type="checkbox" checked={rq.createQuote} onChange={(e) => setRq({ ...rq, createQuote: e.target.checked })} />
-                  {t('Pide precio: crear la orden de pedido para revisarla y cotizar')}
-                </label>
+                <div className="muted" style={{ fontSize: 12.5, margin: '4px 0' }}>
+                  {t('Se guarda la información para cotizar. La cotización (orden de pedido) solo se crea cuando alguien pulsa "Crear cotización" o "Facturar" en la solicitud.')}
+                </div>
                 <div className="modal-footer">
                   <button type="button" className="btn" onClick={() => navigate(`/clientes/${customerId}`)}>{t('Abrir ficha')}</button>
                   <button type="submit" className="btn btn-primary">{t('Guardar solicitud y preparar correo')}</button>

@@ -333,8 +333,8 @@ En cuanto estén esos registros, Railway emite el certificado solo y la direcci�
   sin "Inc/LLC/City of…", contenido uno en otro, errores de tipeo, siglas, alias; teléfono/correo/Tax
   ID iguales = 95-100). El formulario de cliente lo consulta mientras se escribe.
 - Solicitud (`crm_requests`, número `NX-RQ-AAAAMMDD-NN`): al crearla se registra la interacción
-  entrante en `activities`; un cliente en `lead` pasa a `prospecto`; con `createQuote` se crea la
-  orden de pedido en estado `borrador` (`sales_orders.request_id`, `contact_id`). Productos y servicios
+  entrante en `activities`; un cliente en `lead` pasa a `prospecto`. La solicitud NO crea la orden de pedido: solo se crea
+  (estado `borrador`) cuando alguien pulsa "Crear cotización" o "Facturar" en la solicitud (`sales_orders.request_id`, `contact_id`). Productos y servicios
   van con precio de lista; categorías/equipos/texto libre van en $0 "(por cotizar)". "Traer ítems
   nuevos" solo agrega líneas mientras la orden siga en borrador, nunca borra.
 - Mensajes (`POST /api/crm/requests/:id/messages`, kind `acuse` | `cotizacion` | `seguimiento`):

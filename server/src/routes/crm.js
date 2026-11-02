@@ -198,6 +198,9 @@ function requestsFor(where, params) {
   const reqs = all(`SELECT r.*, c.name AS customer_name, k.name AS contact_name, k.contact_type, k.email AS contact_email,
                            k.phone AS contact_phone, k.mobile AS contact_mobile, so.number AS sales_order_number, so.status AS sales_order_status,
                            (SELECT COALESCE(SUM(i.quantity * i.unit_price),0) FROM sales_order_items i WHERE i.sales_order_id = so.id) AS sales_order_total,
+                           (SELECT COUNT(*) FROM sales_order_items i WHERE i.sales_order_id = so.id AND i.unit_price <= 0) AS sales_order_unpriced,
+                           (SELECT inv.id FROM invoices inv WHERE inv.sales_order_id = so.id AND inv.status NOT IN ('anulada','cancelado')) AS invoice_id,
+                           (SELECT inv.number FROM invoices inv WHERE inv.sales_order_id = so.id AND inv.status NOT IN ('anulada','cancelado')) AS invoice_number,
                            u.name AS created_by_name, au.name AS assigned_name, v.vin AS vehicle_vin
                     FROM crm_requests r
                     JOIN customers c ON c.id = r.customer_id
@@ -421,9 +424,8 @@ router.post('/requests', (req, res) => {
   [customer.id, CHANNEL_TO_ACTIVITY[channel], `${number}: ${subject}`, b.notes || null, b.contactId || null, id, req.user ? req.user.id : null, nowIso()]);
   // Un cliente potencial que pide algo pasa de "lead" a "prospecto"
   run("UPDATE customers SET status = 'prospecto', updated_at = ? WHERE id = ? AND status = 'lead'", [nowIso(), customer.id]);
-  try {
-    if (b.createQuote && items.length) quoteFromRequest(id);
-  } catch (e) { /* sin ítems: no hay pedido */ }
+  // La solicitud solo guarda la información para cotizar: la orden de pedido (y su número) se
+  // crea únicamente cuando alguien pulsa "Crear cotización" o "Facturar" en la solicitud.
   res.status(201).json(getRequest(id));
 });
 

@@ -5,6 +5,14 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
   // ===== CRM =====
+  'Se guarda la información para cotizar. La cotización (orden de pedido) solo se crea cuando alguien pulsa "Crear cotización" o "Facturar" en la solicitud.': 'The quoting information is saved. The quote (sales order) is only created when someone clicks "Create quote" or "Invoice" on the request.',
+  'Crear cotización o facturar desde la solicitud': 'Create a quote or invoice from the request',
+  'Hay líneas sin precio en la cotización. Ponles el precio y luego pulsa "Facturar" en Órdenes de Pedido.': 'Some quote lines have no price. Price them, then click "Invoice" in Sales Orders.',
+  '¿Generar la factura de': 'Generate the invoice for',
+  'por': 'for',
+  '💵 Facturar': '💵 Invoice',
+  '📝 Crear cotización': '📝 Create quote',
+  'Todavía no hay cotización: la información queda guardada aquí hasta que decidas cotizar o facturar.': 'No quote yet: the information stays saved here until you decide to quote or invoice.',
   'Ya está facturado: el estado no se puede cambiar mientras la factura exista.': 'Already invoiced: the status cannot be changed while the invoice exists.',
   '¿Anular la orden de compra': 'Void purchase order',
   'Queda en el historial como anulada y ya no se puede recibir.': 'It stays in the history as void and can no longer be received.',
