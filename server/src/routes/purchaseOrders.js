@@ -175,6 +175,17 @@ router.post('/:id/receipts', (req, res) => {
   }
 });
 
+// Corregir la fecha / notas de una recepción ya hecha (no cambia cantidades ni inventario).
+router.put('/:id/receipts/:receiptId', (req, res) => {
+  const gr = get('SELECT * FROM goods_receipts WHERE id = ? AND purchase_order_id = ?', [req.params.receiptId, req.params.id]);
+  if (!gr) return res.status(404).json({ error: 'Recepción no encontrada' });
+  const b = req.body || {};
+  const date = b.receiptDate && /^\d{4}-\d{2}-\d{2}$/.test(b.receiptDate) ? b.receiptDate : gr.receipt_date;
+  run('UPDATE goods_receipts SET receipt_date = ?, notes = ? WHERE id = ?', [date, b.notes !== undefined ? b.notes : gr.notes, gr.id]);
+  run('UPDATE product_serials SET received_date = ? WHERE goods_receipt_id = ?', [date, gr.id]);
+  res.json(get('SELECT * FROM goods_receipts WHERE id = ?', [gr.id]));
+});
+
 // ---- Faltantes: cerrar lo que ya no va a llegar / reabrirlo ----
 router.post('/:id/close-short', (req, res) => {
   try { closeShort(req.params.id, (req.body || {}).note); res.json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id]))); }
