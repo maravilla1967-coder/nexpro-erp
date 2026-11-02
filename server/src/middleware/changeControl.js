@@ -35,6 +35,7 @@ const DELETE_LABELS = [
   [/^\/bank\/loans/, 'loan', 'Préstamo'], [/^\/bank\/accounts/, 'bank_account', 'Cuenta bancaria'],
   [/^\/customers/, 'customer', 'Cliente'], [/^\/suppliers/, 'supplier', 'Proveedor'], [/^\/services/, 'service', 'Servicio'],
   [/^\/mechanics/, 'mechanic', 'Mecánico'], [/^\/serials/, 'serial', 'Número de serie'],
+  [/^\/crm\/requests/, 'crm_request', 'Solicitud del CRM'],
 ];
 
 // Cambiar solo el estado es un movimiento normal, salvo anular o cancelar (equivale a borrar).
@@ -53,6 +54,7 @@ function docName(entity, id) {
     vehicle: 'SELECT vin AS n FROM vehicles WHERE id = ?', product: "SELECT COALESCE(sku, name) AS n FROM products WHERE id = ?",
     loan: 'SELECT number AS n FROM loans WHERE id = ?', bank_account: 'SELECT name AS n FROM bank_accounts WHERE id = ?',
     customer: 'SELECT name AS n FROM customers WHERE id = ?', supplier: 'SELECT name AS n FROM suppliers WHERE id = ?',
+    crm_request: 'SELECT number AS n FROM crm_requests WHERE id = ?',
   }[entity];
   if (!q || !id) return id ? `#${id}` : '';
   try { const r = get(q, [id]); return r && r.n ? r.n : `#${id}`; } catch (_) { return `#${id}`; }
@@ -74,7 +76,7 @@ function changeControl(req, res, next) {
   if (req.method === 'DELETE') {
     const hit = DELETE_LABELS.find(([re]) => re.test(path));
     entity = hit ? hit[1] : 'otro'; label = hit ? hit[2] : 'Documento';
-    const m = path.match(/^\/[a-z-]+(?:\/(?:transactions|loans|accounts))?\/(\d+)/);
+    const m = path.match(/^\/[a-z-]+(?:\/(?:transactions|loans|accounts|requests))?\/(\d+)/);
     entityId = m ? Number(m[1]) : 0;
     action = 'delete';
   } else {
@@ -87,7 +89,7 @@ function changeControl(req, res, next) {
     const body = { ...(req.body || {}) };
     if (action === 'update' && isPlainStatusChange(body)) return next();
     const droppedFiles = (req.files || []).length;
-    const isSub = action === 'delete' && !/^\/[a-z-]+(?:\/(?:transactions|loans|accounts))?\/\d+$/.test(path);
+    const isSub = action === 'delete' && !/^\/[a-z-]+(?:\/(?:transactions|loans|accounts|requests))?\/\d+$/.test(path);
     const what = isSub ? 'Borrar un elemento de' : action === 'delete' ? 'Eliminar' : 'Cambios en';
     const summary = `${what} ${label.toLowerCase()} ${docName(entity, entityId)}`.trim() + (droppedFiles ? ' (los archivos adjuntos se deben volver a subir después)' : '');
     const result = run(

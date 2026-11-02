@@ -55,6 +55,45 @@ CREATE TABLE IF NOT EXISTS activities (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ===================== CRM: SOLICITUDES =====================
+-- Cada vez que un cliente llama, escribe o manda un texto pidiendo algo queda una solicitud
+-- (NX-RQ-AAAAMMDD-NN) con lo que busca (productos, servicios o tipos de equipo escogidos de la
+-- lista). Un mismo cliente puede tener muchas solicitudes; si pide precio, la solicitud genera
+-- una orden de pedido borrador (sales_orders) para revisarla y cotizarla con exactitud.
+CREATE TABLE IF NOT EXISTS crm_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+  channel TEXT NOT NULL DEFAULT 'llamada', -- llamada / email / texto / whatsapp / web / visita
+  subject TEXT,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'nueva', -- nueva / en_proceso / cotizada / ganada / perdida / cerrada
+  priority TEXT NOT NULL DEFAULT 'normal', -- baja / normal / alta / urgente
+  vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL,
+  sales_order_id INTEGER REFERENCES sales_orders(id) ON DELETE SET NULL,
+  assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  reply_to TEXT, -- correo o teléfono por donde llegó (para responder por el mismo medio)
+  ack_sent_at TEXT,
+  quote_sent_at TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS crm_request_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL REFERENCES crm_requests(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'producto', -- producto / servicio / categoria / equipo / libre
+  product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+  service_id INTEGER REFERENCES services(id) ON DELETE SET NULL,
+  product_type_id INTEGER REFERENCES product_types(id) ON DELETE SET NULL,
+  equipment_type_id INTEGER REFERENCES equipment_types(id) ON DELETE SET NULL,
+  description TEXT NOT NULL,
+  quantity REAL NOT NULL DEFAULT 1,
+  unit_price REAL,
+  notes TEXT
+);
+
 -- ===================== INVENTARIO =====================
 CREATE TABLE IF NOT EXISTS product_types (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

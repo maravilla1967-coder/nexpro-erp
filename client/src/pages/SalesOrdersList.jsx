@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import CustomerPicker from '../components/CustomerPicker.jsx';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
@@ -20,6 +20,7 @@ const SO_COLUMNS = [
 export default function SalesOrdersList() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [list, setList] = useState([]);
   const ex = useListExport({ rows: list, getDate: soDate, getNumber: soNumber });
   const [customers, setCustomers] = useState([]);
@@ -54,6 +55,12 @@ export default function SalesOrdersList() {
       : [{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
     setError(''); setModalOpen(true);
   }
+
+  // Abrir directo un pedido desde otra pantalla (p. ej. una solicitud del CRM): /pedidos?abrir=ID
+  useEffect(() => {
+    const id = params.get('abrir');
+    if (id) { openEdit(id).catch(() => {}); setParams({}, { replace: true }); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save(e) {
     e.preventDefault();
@@ -112,6 +119,7 @@ export default function SalesOrdersList() {
                     <td>{so.customer_name}</td>
                     <td>
                       <select value={so.status} onChange={(e) => updateStatus(so.id, e.target.value)} style={{ width: 140, display: 'inline-block' }}>
+                        <option value="borrador">{t('borrador')}</option>
                         <option value="pendiente">{t('pendiente')}</option>
                         <option value="aprobado">{t('aprobado')}</option>
                         <option value="en_proceso">{t('en_proceso')}</option>

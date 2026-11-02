@@ -7,6 +7,9 @@ import Modal from './components/Modal.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import CustomersList from './pages/CustomersList.jsx';
 import CustomerDetail from './pages/CustomerDetail.jsx';
+import CustomerReport from './pages/CustomerReport.jsx';
+import CallConsole from './pages/CallConsole.jsx';
+import RequestsList from './pages/RequestsList.jsx';
 import ProductsList from './pages/ProductsList.jsx';
 import InventoryStockPage from './pages/InventoryStockPage.jsx';
 import SuppliersList from './pages/SuppliersList.jsx';
@@ -46,7 +49,11 @@ const NAV = [
   { label: 'General', links: [{ to: '/', text: 'Dashboard', icon: '📊' }] },
   {
     label: 'CRM',
-    links: [{ to: '/clientes', text: 'Clientes', icon: '🤝' }],
+    links: [
+      { to: '/crm/llamada', text: 'Atender llamada', icon: '📞' },
+      { to: '/crm/solicitudes', text: 'Solicitudes', icon: '📥' },
+      { to: '/clientes', text: 'Clientes y contactos', icon: '🤝' },
+    ],
   },
   {
     label: 'Taller',
@@ -244,6 +251,9 @@ function MainShell() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/clientes" element={<CustomersList />} />
           <Route path="/clientes/:id" element={<CustomerDetail />} />
+          <Route path="/clientes/:id/informe" element={<CustomerReport />} />
+          <Route path="/crm/llamada" element={<CallConsole />} />
+          <Route path="/crm/solicitudes" element={<RequestsList />} />
           <Route path="/inventario" element={<InventoryStockPage />} />
           <Route path="/productos" element={<ProductsList />} />
           <Route path="/proveedores" element={<SuppliersList />} />

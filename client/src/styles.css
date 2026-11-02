@@ -496,3 +496,68 @@ table.register tr.cleared td { background: #f8fafc; }
 .loan-pay-split { margin-top: 8px; margin-bottom: 0; }
 .loan-pay-owed span, .loan-pay-split span { display: block; font-size: 11px; color: var(--text-muted); }
 .loan-pay-owed strong, .loan-pay-split strong { font-size: 15px; color: var(--navy); }
+
+/* ===================== CRM ===================== */
+.kpi-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi-row .kpi .value { font-size: 21px; }
+@media (max-width: 1200px) { .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.call-search { padding: 14px; position: relative; }
+.call-input { font-size: 18px !important; padding: 14px 16px !important; border: 2px solid var(--orange) !important; border-radius: 10px !important; }
+.call-hits { margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; max-height: 420px; overflow-y: auto; }
+.call-hit { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+.call-hit:hover { background: #fff3ec; }
+.call-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .call-grid { grid-template-columns: 1fr; } }
+.snap-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.snap-kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; }
+.snap-kpis > div { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; }
+.snap-kpis span { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.snap-kpis strong { font-size: 17px; color: var(--navy); }
+.snap-kpis strong.alert { color: var(--orange-dark); }
+.snap-kpis em { font-style: normal; font-size: 11.5px; color: var(--red); }
+.snap-sec { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--navy); margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--border); }
+.snap-contact { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; cursor: pointer; }
+.snap-contact:hover { border-color: var(--orange); }
+.snap-contact.on { border-color: var(--orange); background: #fff3ec; }
+.snap-line { padding: 6px 0; border-bottom: 1px dashed #e5e7eb; font-size: 13px; }
+.sub-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px 0; margin-bottom: 12px; }
+.check-line { display: flex; align-items: center; gap: 8px; font-size: 13.5px; margin: 6px 0; cursor: pointer; }
+.check-line input { width: auto; }
+.qp { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #fff; }
+.qp-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+.qp-tab { border: 1px solid var(--border); background: #f8fafc; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; color: var(--steel); }
+.qp-tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.qp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.qp-chip { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--text); }
+.qp-chip:hover { border-color: var(--orange); }
+.qp-chip.on { background: var(--orange); border-color: var(--orange); color: #fff; }
+.qp-chip.on .muted { color: #ffe4d6; }
+.qp-chip.cat.on { background: var(--navy); border-color: var(--navy); }
+.qp-list { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+.qp-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #f1f5f9; cursor: pointer; font-size: 13px; }
+.qp-row:hover { background: #fff3ec; }
+.qp-row.on { background: #ffedd5; }
+.qp-check { width: 20px; text-align: center; font-weight: 700; color: var(--orange-dark); }
+.qp-sel-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+.qp-kind { font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; background: #eef2f7; color: var(--steel); border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
+.dup-box { border: 2px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; background: #fffaf5; }
+.dup-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid #f1e5da; }
+.dup-row:first-of-type { border-top: 0; }
+.req-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.contact-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.contact-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: #fff; }
+.timeline { display: flex; flex-direction: column; }
+.tl-item { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid #f1f5f9; }
+.tl-icon { width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tl-body { flex: 1; min-width: 0; font-size: 13.5px; }
+.tl-top { display: flex; gap: 8px; align-items: center; font-size: 12px; margin-bottom: 2px; flex-wrap: wrap; }
+.tl-kind { font-weight: 700; color: var(--navy); text-transform: uppercase; font-size: 11px; letter-spacing: .03em; }
+.report-h { font-size: 14px; color: var(--navy); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 6px; border-bottom: 2px solid var(--navy); padding-bottom: 3px; }
+.report-kv { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+.report-vehicle { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 13px; page-break-inside: avoid; }
+.report-sheet table { font-size: 12px; }
+
+.tl-detail { font-size: 12.5px; white-space: pre-wrap; max-height: 3.2em; overflow: hidden; cursor: pointer; position: relative; }
+.tl-detail.open { max-height: none; }
+.report-sheet td.nw, .report-sheet td.mono { white-space: nowrap; }
+.contact-card .row-actions { flex-wrap: nowrap; flex-shrink: 0; align-self: flex-start; }

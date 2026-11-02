@@ -78,6 +78,41 @@ tryAlter('ALTER TABLE supplier_bill_payments ADD COLUMN bank_cleared INTEGER NOT
 // Préstamos: base de días para el interés (365 = actual/365, 360 = comercial).
 tryAlter('ALTER TABLE loans ADD COLUMN day_basis INTEGER NOT NULL DEFAULT 365');
 
+// ===== CRM completo =====
+// Clientes: a qué se dedica la relación (cliente, potencial, proveedor, dealer — puede ser varias,
+// separadas por coma), otros nombres con los que se le conoce (para encontrarlo aunque escriban
+// solo una parte), enlace a su ficha de proveedor, idioma preferido para correos, etc.
+tryAlter("ALTER TABLE customers ADD COLUMN roles TEXT");
+tryAlter('ALTER TABLE customers ADD COLUMN aliases TEXT');
+tryAlter('ALTER TABLE customers ADD COLUMN supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL');
+tryAlter('ALTER TABLE customers ADD COLUMN state TEXT');
+tryAlter('ALTER TABLE customers ADD COLUMN phone2 TEXT');
+tryAlter('ALTER TABLE customers ADD COLUMN website TEXT');
+tryAlter("ALTER TABLE customers ADD COLUMN preferred_language TEXT NOT NULL DEFAULT 'en'");
+// Contactos: tipo de cargo (dueño, gerente, mecánico…), cargo exacto, celular, contacto principal.
+tryAlter('ALTER TABLE contacts ADD COLUMN contact_type TEXT');
+tryAlter('ALTER TABLE contacts ADD COLUMN mobile TEXT');
+tryAlter('ALTER TABLE contacts ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0');
+tryAlter('ALTER TABLE contacts ADD COLUMN preferred_channel TEXT');
+tryAlter('ALTER TABLE contacts ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
+// Interacciones (tabla activities): con quién se habló, de qué solicitud, por qué medio y quién la registró.
+tryAlter('ALTER TABLE activities ADD COLUMN contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL');
+tryAlter('ALTER TABLE activities ADD COLUMN request_id INTEGER REFERENCES crm_requests(id) ON DELETE SET NULL');
+tryAlter('ALTER TABLE activities ADD COLUMN direction TEXT');
+tryAlter('ALTER TABLE activities ADD COLUMN created_by INTEGER REFERENCES users(id)');
+tryAlter('ALTER TABLE activities ADD COLUMN occurred_at TEXT');
+// Cada vehículo (y sus equipos) puede pertenecer a una persona concreta del cliente.
+tryAlter('ALTER TABLE vehicles ADD COLUMN contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL');
+// Orden de pedido nacida de una solicitud del CRM, a la atención de un contacto.
+tryAlter('ALTER TABLE sales_orders ADD COLUMN contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL');
+tryAlter('ALTER TABLE sales_orders ADD COLUMN request_id INTEGER REFERENCES crm_requests(id) ON DELETE SET NULL');
+try {
+  db.exec("UPDATE customers SET roles = CASE WHEN status IN ('lead','prospecto') THEN 'potencial' ELSE 'cliente' END WHERE roles IS NULL OR roles = ''");
+} catch (e) { console.error('CRM roles:', e.message); }
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_activities_customer ON activities(customer_id)'); } catch (e) {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_requests_customer ON crm_requests(customer_id)'); } catch (e) {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_contacts_customer ON contacts(customer_id)'); } catch (e) {}
+
 function all(sql, params = []) {
   const stmt = db.prepare(sql);
   return stmt.all(...params);

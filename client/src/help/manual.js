@@ -52,24 +52,44 @@ export const MANUAL = [
     ],
   },
   {
-    id: 'clientes', icon: '🤝', routes: ['/clientes'],
-    title: L('Clientes (CRM)', 'Customers (CRM)'),
-    summary: L('Empresas, municipios y personas: sus datos, contactos, oportunidades de venta, actividades (llamadas, visitas, correos) y los vehículos que han traído.', 'Companies, municipalities and people: their details, contacts, sales opportunities, activities (calls, visits, emails) and the vehicles they have brought in.'),
+    id: 'clientes', icon: '🤝', routes: ['/clientes', '/crm/llamada', '/crm/solicitudes'],
+    title: L('CRM: llamadas, solicitudes y clientes', 'CRM: calls, requests and customers'),
+    summary: L(
+      'Todo lo de cada cliente en un solo lugar: sus personas (dueño, gerente, mecánico…), cada llamada o correo, lo que ha pedido, sus cotizaciones, facturas, pagos, vehículos y equipos con número de serie y todo el servicio que se les ha hecho. Maneja clientes, clientes potenciales, proveedores y dealers.',
+      'Everything about each customer in one place: their people (owner, manager, mechanic…), every call or email, what they asked for, their quotes, invoices, payments, vehicles and serialized equipment and all the service done. Handles customers, prospects, suppliers and dealers.'),
     tasks: [
-      { title: L('Crear un cliente', 'Create a customer'), steps: [
-        L('Clientes → "+ Nuevo cliente".', 'Customers → "+ New customer".'),
-        L('Elige si es Empresa / Municipio o Persona y escribe el nombre (obligatorio).', 'Choose Company / Municipality or Person and enter the name (required).'),
-        L('Llena NIT/ID, email, teléfono, dirección, industria y la fuente (referido, web, llamada…).', 'Fill in tax ID, email, phone, address, industry and the source (referral, web, call…).'),
-        L('Estado: Lead (contacto nuevo), Prospecto (interesado), Cliente (ya compró) o Inactivo. Guarda.', 'Status: Lead (new contact), Prospect (interested), Customer (has bought) or Inactive. Save.'),
+      { title: L('Atender una llamada (o un correo / texto)', 'Take a call (or an email / text)'), steps: [
+        L('CRM → "Atender llamada". Escribe el teléfono (en cualquier formato), el nombre de la empresa o de la persona, un VIN, una placa o un número de serie.', 'CRM → "Take a call". Type the phone (any format), the company or person name, a VIN, a plate or a serial number.'),
+        L('Escoge el resultado: a la izquierda aparece todo lo del cliente — saldo por cobrar, personas, solicitudes abiertas, vehículos y equipos, último servicio y últimas conversaciones.', 'Pick the result: on the left you see everything about the customer — balance due, people, open requests, vehicles and equipment, last service and latest conversations.'),
+        L('Marca quién está llamando (o "＋ Persona nueva" si es alguien que no estaba) y por dónde llegó (llamada, email, texto, WhatsApp…).', 'Mark who is calling (or "＋ New person" if they were not on file) and how it came in (call, email, text, WhatsApp…).'),
+        L('En "¿Qué está buscando?" escoge con clics: Equipos (grúa, bucket lift, compresor…), Servicios, o Productos por categoría. "Buscar" va directo a un producto; "Otra cosa" para lo que no esté en la lista.', 'Under "What are they looking for?" pick with clicks: Equipment (crane, bucket lift, compressor…), Services, or Products by category. "Search" goes straight to a product; "Something else" for anything not listed.'),
+        L('Escribe los detalles de la conversación. Si pide precio deja marcado "Pide precio": se crea la orden de pedido en borrador con esos ítems.', 'Write the conversation details. If they want pricing leave "Wants pricing" ticked: a draft sales order is created with those items.'),
+        L('"Guardar solicitud y preparar correo": se abre el correo de acuse ya escrito (inglés o español, correo, SMS o WhatsApp) diciendo que ya estamos buscando la solución. "Abrir en mi correo" lo abre listo para enviar y queda registrado en el historial.', '"Save request and prepare email": the acknowledgement is already written (English or Spanish, email, SMS or WhatsApp) saying we are already working on a solution. "Open in my email" opens it ready to send and it is logged in the history.'),
       ] },
-      { title: L('Registrar contactos, oportunidades y actividades', 'Add contacts, opportunities and activities'), steps: [
-        L('Abre el cliente y usa las pestañas Contactos, Oportunidades y Actividades.', 'Open the customer and use the Contacts, Opportunities and Activities tabs.'),
-        L('Actividad: elige el tipo (llamada, visita, correo, tarea), el asunto y la fecha; las pendientes aparecen en el Dashboard.', 'Activity: choose the type (call, visit, email, task), subject and date; pending ones show on the Dashboard.'),
-        L('La pestaña Vehículos muestra los camiones de ese cliente recibidos en el taller.', 'The Vehicles tab shows that customer\'s trucks received in the shop.'),
+      { title: L('Cotizar una solicitud', 'Quote a request'), steps: [
+        L('CRM → Solicitudes (o la pestaña Solicitudes del cliente) → abre la solicitud.', 'CRM → Requests (or the customer\'s Requests tab) → open the request.'),
+        L('"Revisar precios" abre la orden de pedido: los productos y servicios vienen con su precio de lista; lo que es una categoría o un equipo general viene "por cotizar" en $0 para ponerle el precio exacto.', '"Review prices" opens the sales order: products and services come with their list price; general categories or equipment come "por cotizar" at $0 so you can set the exact price.'),
+        L('"PDF de la cotización" → Imprimir / Guardar PDF. Luego "Enviar cotización": el mensaje sale por el mismo medio (correo o texto) por donde el cliente pidió; adjunta el PDF.', '"Quote PDF" → Print / Save PDF. Then "Send quote": the message goes out by the same channel (email or text) the customer used; attach the PDF.'),
+        L('Cambia el estado de la solicitud (en proceso, cotizada, ganada, perdida, cerrada). Ganada convierte al cliente potencial en cliente.', 'Change the request status (in progress, quoted, won, lost, closed). Won turns a prospect into a customer.'),
+      ] },
+      { title: L('Crear un cliente sin duplicarlo', 'Create a customer without duplicates'), steps: [
+        L('Clientes → "+ Nuevo cliente" (o desde Atender llamada cuando no aparece). Escribe el nombre COMPLETO.', 'Customers → "+ New customer" (or from Take a call when not found). Type the FULL name.'),
+        L('Mientras escribes, el ERP muestra los clientes parecidos que ya existen (por nombre, siglas, teléfono, correo o Tax ID). Si es uno de ellos, pulsa "Usar este".', 'As you type, the ERP shows similar customers that already exist (by name, acronym, phone, email or Tax ID). If it is one of them, press "Use this one".'),
+        L('Marca qué es para Nexpro: Cliente, Cliente potencial, Proveedor y/o Dealer (puede ser varias). Si es Proveedor queda enlazado a su ficha de Proveedores.', 'Mark what it is to Nexpro: Customer, Prospect, Supplier and/or Dealer (several allowed). If Supplier, it is linked to its Suppliers record.'),
+        L('En "Otros nombres / siglas" pon cómo lo llaman (WASD, MDWASD…) para encontrarlo aunque escriban solo una parte. Agrega de una vez la persona que llamó y su cargo.', 'In "Other names / acronyms" add what people call it (WASD, MDWASD…) so it is found even with partial names. Add the caller and their role right away.'),
+      ] },
+      { title: L('Ficha del cliente (todo junto)', 'Customer record (everything together)'), steps: [
+        L('Arriba: facturado, pagado, saldo por cobrar (y vencido), solicitudes abiertas, vehículos/equipos y última interacción.', 'Top: invoiced, paid, balance due (and overdue), open requests, vehicles/equipment and last interaction.'),
+        L('"Historial completo": todo en orden de fecha — llamadas, correos, solicitudes, cotizaciones, facturas, pagos, vehículos recibidos, órdenes de trabajo y garantías.', '"Full history": everything by date — calls, emails, requests, quotes, invoices, payments, vehicles received, work orders and warranties.'),
+        L('"Personas": cada persona con su cargo (dueño, gerente, mecánico, operador…), teléfonos y correo; cada una puede tener sus propios vehículos y solicitudes.', '"People": each person with their role (owner, manager, mechanic, operator…), phones and email; each can have their own vehicles and requests.'),
+        L('"Vehículos y equipos": cada camión con sus equipos y número de serie y todo el historial de servicio. Asigna la persona responsable de cada vehículo.', '"Vehicles & equipment": each truck with its equipment and serial numbers and all its service history. Assign the person responsible for each vehicle.'),
+        L('"Interacciones": registra llamadas, correos, visitas, notas o tareas con fecha, persona y tema. "🖨️ Informe del cliente" imprime todo en PDF.', '"Interactions": log calls, emails, visits, notes or tasks with date, person and topic. "🖨️ Customer report" prints everything to PDF.'),
       ] },
     ],
     problems: [
-      { q: L('El vehículo no aparece en la pestaña Vehículos del cliente', 'The vehicle does not appear in the customer\'s Vehicles tab'), a: L('El vehículo se recibió sin cliente. Abre el vehículo → "Editar recepción" y escribe o elige el cliente.', 'The vehicle was received without a customer. Open the vehicle → "Edit intake" and type or pick the customer.') },
+      { q: L('El vehículo no aparece en la ficha del cliente', 'The vehicle does not appear in the customer record'), a: L('El vehículo se recibió sin cliente. Abre el vehículo → "Editar recepción" y escribe o elige el cliente.', 'The vehicle was received without a customer. Open the vehicle → "Edit intake" and type or pick the customer.') },
+      { q: L('"Abrir en mi correo" no abre nada', '"Open in my email" does nothing'), a: L('El computador no tiene un programa de correo predeterminado. Usa "📋 Copiar texto", pégalo en Outlook/Gmail y luego "Ya lo envié" para dejarlo registrado.', 'The computer has no default email app. Use "📋 Copy text", paste it into Outlook/Gmail, then "I already sent it" to log it.') },
+      { q: L('Encontré un cliente duplicado que ya existía', 'I found a duplicate customer that already existed'), a: L('Agrega el nombre corto en "Otros nombres" del cliente correcto para que la próxima vez aparezca, y pide al administrador borrar el duplicado.', 'Add the short name under "Other names" on the correct customer so it shows next time, and ask the administrator to delete the duplicate.') },
     ],
   },
   {

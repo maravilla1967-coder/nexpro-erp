@@ -86,6 +86,7 @@ app.use('/api/approvals', require('./routes/approvals'));
 // Rutas API de negocio
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/customers', require('./routes/customers'));
+app.use('/api/crm', require('./routes/crm'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/purchase-orders', require('./routes/purchaseOrders'));
