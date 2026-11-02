@@ -561,3 +561,14 @@ table.register tr.cleared td { background: #f8fafc; }
 .tl-detail.open { max-height: none; }
 .report-sheet td.nw, .report-sheet td.mono { white-space: nowrap; }
 .contact-card .row-actions { flex-wrap: nowrap; flex-shrink: 0; align-self: flex-start; }
+
+.drop-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 14px; text-align: center; font-size: 13px; color: var(--text-muted); cursor: pointer; background: #fafbfc; }
+.drop-zone:hover, .drop-zone.over { border-color: var(--orange); background: #fff3ec; color: var(--orange-dark); }
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+.file-tile { position: relative; border: 1px solid var(--border); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 3px; background: #fff; min-width: 0; }
+.file-tile img { width: 100%; height: 90px; object-fit: cover; border-radius: 6px; background: #f1f5f9; }
+.file-link { display: flex; flex-direction: column; gap: 3px; color: var(--text); min-width: 0; }
+.file-ico { height: 90px; display: flex; align-items: center; justify-content: center; font-size: 36px; background: #f8fafc; border-radius: 6px; }
+.file-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-x { position: absolute; top: 4px; right: 4px; border: 0; background: rgba(255,255,255,.9); border-radius: 50%; width: 22px; height: 22px; cursor: pointer; color: var(--red); font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.qp-add { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }

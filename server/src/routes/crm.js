@@ -2,6 +2,9 @@ const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
 const { nextDocNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
+const { makeDocUploader } = require('../middleware/upload');
+
+const docUpload = makeDocUploader('crm-requests');
 
 // CRM: búsqueda instantánea cuando alguien llama, detección de clientes duplicados, ficha 360
 // del cliente (todo lo que se le ha hecho), solicitudes con productos/servicios escogidos de la
@@ -207,7 +210,12 @@ function requestsFor(where, params) {
   const ids = reqs.map((r) => r.id);
   const items = ids.length ? all(`SELECT i.*, s.name_en AS service_name_en FROM crm_request_items i LEFT JOIN services s ON s.id = i.service_id
                                   WHERE i.request_id IN (${ids.map(() => '?').join(',')}) ORDER BY i.id`, ids) : [];
-  for (const r of reqs) r.items = items.filter((i) => i.request_id === r.id);
+  const files = ids.length ? all(`SELECT f.*, u.name AS created_by_name FROM crm_request_files f LEFT JOIN users u ON u.id = f.created_by
+                                  WHERE f.request_id IN (${ids.map(() => '?').join(',')}) ORDER BY f.id`, ids) : [];
+  for (const r of reqs) {
+    r.items = items.filter((i) => i.request_id === r.id);
+    r.files = files.filter((f) => f.request_id === r.id);
+  }
   return reqs;
 }
 
@@ -472,6 +480,54 @@ router.post('/requests/:id/messages', (req, res) => {
     if (r.sales_order_id) run("UPDATE sales_orders SET status = 'pendiente', updated_at = ? WHERE id = ? AND status = 'borrador'", [nowIso(), r.sales_order_id]);
   }
   res.json(getRequest(r.id));
+});
+
+// ---------- Adjuntos de la solicitud (documentos, requerimientos, fotos) ----------
+router.post('/requests/:id/files', docUpload.array('files', 20), (req, res) => {
+  const r = get('SELECT id, customer_id, number FROM crm_requests WHERE id = ?', [req.params.id]);
+  if (!r) return res.status(404).json({ error: 'Solicitud no encontrada' });
+  const files = req.files || [];
+  if (!files.length) return res.status(400).json({ error: 'No llegó ningún archivo' });
+  for (const f of files) {
+    run(`INSERT INTO crm_request_files (request_id, file_url, original_name, mime_type, size, created_by) VALUES (?,?,?,?,?,?)`,
+      [r.id, `/uploads/crm-requests/${f.filename}`, f.originalname, f.mimetype, f.size, req.user ? req.user.id : null]);
+  }
+  run(`INSERT INTO activities (customer_id, type, subject, notes, done, request_id, created_by, occurred_at) VALUES (?, 'nota', ?, ?, 1, ?, ?, ?)`,
+    [r.customer_id, `${r.number}: ${files.length === 1 ? 'archivo adjunto' : `${files.length} archivos adjuntos`}`, files.map((f) => f.originalname).join(', '), r.id, req.user ? req.user.id : null, nowIso()]);
+  res.status(201).json(getRequest(r.id));
+});
+
+router.delete('/requests/:id/files/:fileId', (req, res) => {
+  run('DELETE FROM crm_request_files WHERE id = ? AND request_id = ?', [req.params.fileId, req.params.id]);
+  res.status(204).end();
+});
+
+// ---------- Agregar una opción nueva a la lista (para que quede la próxima vez) ----------
+// kind: 'equipo' → tipo de equipo; 'servicio' → servicio del catálogo (precio en 0 hasta que se
+// complete en Catálogo de Servicios); 'producto' → producto del inventario (costo/precio en 0,
+// se completa en Catálogo de productos). Si ya existe con el mismo nombre, se reutiliza.
+router.post('/catalog-item', (req, res) => {
+  const b = req.body || {};
+  const name = String(b.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Escribe el nombre' });
+  if (b.kind === 'equipo') {
+    const ex = get('SELECT id, name FROM equipment_types WHERE lower(name) = lower(?)', [name]);
+    const id = ex ? ex.id : run('INSERT INTO equipment_types (name) VALUES (?)', [name]).lastInsertRowid;
+    return res.status(ex ? 200 : 201).json({ kind: 'equipo', equipmentTypeId: id, description: ex ? ex.name : name, existed: !!ex });
+  }
+  if (b.kind === 'servicio') {
+    const ex = get('SELECT id, name FROM services WHERE lower(name) = lower(?) OR lower(name_en) = lower(?)', [name, name]);
+    const id = ex ? ex.id : run(`INSERT INTO services (name, pricing_type, hourly_rate, flat_price, active) VALUES (?, 'servicio_completo', 0, 0, 1)`, [name]).lastInsertRowid;
+    return res.status(ex ? 200 : 201).json({ kind: 'servicio', serviceId: id, description: ex ? ex.name : name, existed: !!ex });
+  }
+  if (b.kind === 'producto') {
+    const ex = get('SELECT id, name FROM products WHERE lower(name) = lower(?) AND active = 1', [name]);
+    const typeId = b.productTypeId && get('SELECT id FROM product_types WHERE id = ?', [b.productTypeId]) ? Number(b.productTypeId) : null;
+    const id = ex ? ex.id : run(`INSERT INTO products (name, description, product_type_id, purchase_cost, freight_cost, selling_price, stock_qty, active)
+                                 VALUES (?, ?, ?, 0, 0, 0, 0, 1)`, [name, 'Creado desde el CRM — completar costo y precio', typeId]).lastInsertRowid;
+    return res.status(ex ? 200 : 201).json({ kind: 'producto', productId: id, description: ex ? ex.name : name, existed: !!ex });
+  }
+  res.status(400).json({ error: 'Tipo no válido' });
 });
 
 // Asignar un vehículo (y sus equipos) a una persona concreta del cliente

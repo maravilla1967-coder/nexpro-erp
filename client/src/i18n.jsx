@@ -5,6 +5,23 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
   // ===== CRM =====
+  '¿No está en la lista? Escríbelo aquí…': 'Not on the list? Type it here…',
+  'Si lo guardas en la lista, la próxima vez aparece para escogerlo con un clic': 'If you save it to the list, next time it appears to pick with one click',
+  'Solo para esta solicitud': 'Only for this request',
+  'Agregar a la lista de Equipos': 'Add to the Equipment list',
+  'Agregar a la lista de Servicios': 'Add to the Services list',
+  'Agregar a Productos': 'Add to Products',
+  'Se crea en el inventario con costo y precio en $0: complétalo después en Catálogo de productos.': 'It\'s created in inventory with $0 cost and price: complete it later in the Product catalog.',
+  'Tip: escoge primero la categoría en la pestaña Productos.': 'Tip: pick the category in the Products tab first.',
+  'Se crea con precio $0: ponle la tarifa después en Catálogo de Servicios.': 'It\'s created at $0: set the rate later in the Service catalog.',
+  'pesa más de 20 MB': 'is larger than 20 MB',
+  '¿Quitar el archivo': 'Remove file',
+  'Subiendo…': 'Uploading…',
+  '📎 Arrastra aquí documentos o fotos que mandó el cliente, o haz clic para escogerlos': '📎 Drop documents or photos the customer sent here, or click to choose them',
+  'se sube al guardar': 'uploads on save',
+  'La solicitud se guardó, pero no se pudieron subir los archivos:': 'The request was saved, but the files could not be uploaded:',
+  'Documentos y fotos del cliente': 'Customer documents & photos',
+  'Documentos y fotos': 'Documents & photos',
   'Clic para ver todo': 'Click to see all',
   'Equipos': 'Equipment',
   'Servicios': 'Services',

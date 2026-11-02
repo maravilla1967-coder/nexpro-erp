@@ -193,7 +193,7 @@ export default function CustomerDetail() {
                   {filteredReqs.map((r) => (
                     <tr key={r.id} className="clickable" onClick={() => setParams({ tab: 'solicitudes', solicitud: r.id })}>
                       <td className="mono">{channelIcon(r.channel)} {r.number}</td><td className="muted">{shortDate(r.created_at)}</td>
-                      <td>{r.contact_name || '—'}</td><td>{r.items.map((i) => i.description).join(', ') || r.subject}</td>
+                      <td>{r.contact_name || '—'}</td><td>{r.items.map((i) => i.description).join(', ') || r.subject}{r.files && r.files.length > 0 && <span className="muted" style={{ fontSize: 12 }}> · 📎 {r.files.length}</span>}</td>
                       <td><Pill value={r.status} /></td><td>{r.sales_order_number ? `${r.sales_order_number} · ${money(r.sales_order_total)}` : '—'}</td>
                     </tr>
                   ))}

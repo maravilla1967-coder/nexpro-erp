@@ -59,7 +59,7 @@ export default function RequestsList() {
                       <td className="muted">{shortDate(r.created_at)}</td>
                       <td><Link to={`/clientes/${r.customer_id}`} onClick={(e) => e.stopPropagation()}>{r.customer_name}</Link></td>
                       <td>{r.contact_name || '—'}{r.contact_type && <div className="muted" style={{ fontSize: 11.5 }}>{t(contactTypeLabel(r.contact_type))}</div>}</td>
-                      <td style={{ maxWidth: 340 }}>{r.items.map((i) => i.description).join(', ') || r.subject}</td>
+                      <td style={{ maxWidth: 340 }}>{r.items.map((i) => i.description).join(', ') || r.subject}{r.files && r.files.length > 0 && <span className="muted" style={{ fontSize: 12 }}> · 📎 {r.files.length}</span>}</td>
                       <td><Pill value={r.status} /></td>
                       <td>{r.sales_order_id ? <><span className="mono">{r.sales_order_number}</span><div className="muted" style={{ fontSize: 12 }}>{money(r.sales_order_total)}</div></> : '—'}</td>
                       <td>{r.ack_sent_at ? '✓' : <span className="muted">—</span>}</td>

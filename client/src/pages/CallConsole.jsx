@@ -5,6 +5,7 @@ import { useI18n } from '../i18n.jsx';
 import CustomerSnapshot, { RolePills } from '../crm/CustomerSnapshot.jsx';
 import CatalogQuickPick from '../crm/CatalogQuickPick.jsx';
 import MessageComposer from '../crm/MessageComposer.jsx';
+import RequestFiles from '../crm/RequestFiles.jsx';
 import CustomerForm, { EMPTY_CUSTOMER, EMPTY_CONTACT, ContactFields } from '../crm/CustomerForm.jsx';
 import { CHANNELS, PRIORITIES, contactTypeLabel, digits } from '../crm/constants.js';
 
@@ -34,8 +35,10 @@ export default function CallConsole() {
   const blank = { contactId: params.get('contacto') || '', channel: 'llamada', items: [], notes: '', priority: 'normal', vehicleId: '', replyTo: '', createQuote: true };
   const [rq, setRq] = useState(blank);
   const [newPerson, setNewPerson] = useState(null); // datos de una persona nueva que llama
+  const [pendingFiles, setPendingFiles] = useState([]);
 
-  useEffect(() => { api.get('/crm/catalog').then(setCatalog).catch(() => {}); }, []);
+  const loadCatalog = () => api.get('/crm/catalog').then(setCatalog).catch(() => {});
+  useEffect(() => { loadCatalog(); }, []);
 
   function load360(id) {
     if (!id) { setData(null); return; }
@@ -104,14 +107,19 @@ export default function CallConsole() {
         const k = await api.post(`/customers/${customerId}/contacts`, newPerson);
         contactId = k.id;
       }
-      const r = await api.post('/crm/requests', {
+      let r = await api.post('/crm/requests', {
         customerId, contactId: contactId || null, channel: rq.channel, notes: rq.notes, priority: rq.priority,
         vehicleId: rq.vehicleId || null, replyTo: rq.replyTo, createQuote: rq.createQuote && rq.items.length > 0,
         items: rq.items.map((i) => ({ ...i, quantity: parseFloat(i.quantity) || 1 })),
       });
+      if (pendingFiles.length) {
+        const fd = new FormData();
+        pendingFiles.forEach((f) => fd.append('files', f));
+        try { r = await api.postForm(`/crm/requests/${r.id}/files`, fd); } catch (upErr) { setError(`${t('La solicitud se guardó, pero no se pudieron subir los archivos:')} ${upErr.message}`); }
+      }
       setDone(r);
       setComposer(r);
-      setRq(blank); setNewPerson(null);
+      setRq(blank); setNewPerson(null); setPendingFiles([]);
       load360(customerId);
     } catch (err) { setError(err.message); }
   }
@@ -206,12 +214,16 @@ export default function CallConsole() {
 
                 <div className="field">
                   <label>{t('¿Qué está buscando?')}</label>
-                  <CatalogQuickPick catalog={catalog} value={rq.items} onChange={(items) => setRq({ ...rq, items })} />
+                  <CatalogQuickPick catalog={catalog} value={rq.items} onChange={(items) => setRq({ ...rq, items })} onCatalogChange={loadCatalog} />
                 </div>
                 <div className="field">
                   <label>{t('Detalles de la conversación')}</label>
                   <textarea rows={3} value={rq.notes} onChange={(e) => setRq({ ...rq, notes: e.target.value })}
                     placeholder={t('Chasis, capacidad, para cuándo lo necesita, presupuesto, quién decide…')} />
+                </div>
+                <div className="field">
+                  <label>{t('Documentos y fotos del cliente')}</label>
+                  <RequestFiles pending={pendingFiles} onPendingChange={setPendingFiles} />
                 </div>
                 <div className="grid grid-2">
                   <div className="field">

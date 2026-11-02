@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useI18n, pickLang } from '../i18n.jsx';
+import { api } from '../api.js';
 import { money } from './constants.js';
 
 const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -9,12 +10,15 @@ const squash = (s) => fold(s).replace(/[\s\-_./"'()]+/g, '');
 // compresor…), servicios del catálogo, o productos por categoría. El buscador queda como atajo
 // para ir directo a un producto concreto (nombre, SKU, Item # del fabricante).
 // value: [{ kind, productId, serviceId, productTypeId, equipmentTypeId, description, quantity }]
-export default function CatalogQuickPick({ catalog, value, onChange }) {
+export default function CatalogQuickPick({ catalog, value, onChange, onCatalogChange }) {
   const { t, lang } = useI18n();
   const [tab, setTab] = useState('equipos');
   const [typeId, setTypeId] = useState(null);
   const [q, setQ] = useState('');
   const [free, setFree] = useState('');
+  const [saveAs, setSaveAs] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');
 
   const keyOf = (i) => `${i.kind}:${i.productId || i.serviceId || i.equipmentTypeId || i.productTypeId || i.description}`;
   const chosen = new Set(value.map(keyOf));
@@ -35,6 +39,22 @@ export default function CatalogQuickPick({ catalog, value, onChange }) {
     }).slice(0, 40);
   }, [q, products]);
   const typeProducts = useMemo(() => (typeId ? products.filter((p) => p.product_type_id === typeId) : []), [typeId, products]);
+
+  async function addFree() {
+    const name = free.trim();
+    if (!name) return;
+    setAddError('');
+    if (!saveAs) { onChange([...value, { kind: 'libre', description: name, quantity: 1 }]); setFree(''); return; }
+    setAdding(true);
+    try {
+      const item = await api.post('/crm/catalog-item', { kind: saveAs, name, productTypeId: saveAs === 'producto' ? typeId : undefined });
+      const { existed, ...pick } = item;
+      if (!chosen.has(keyOf(pick))) onChange([...value, { quantity: 1, ...pick }]);
+      setFree(''); setSaveAs('');
+      onCatalogChange && onCatalogChange();
+      setTab(pick.kind === 'equipo' ? 'equipos' : pick.kind === 'servicio' ? 'servicios' : tab);
+    } catch (e) { setAddError(e.message); } finally { setAdding(false); }
+  }
 
   if (!catalog) return <div className="muted">{t('Cargando…')}</div>;
 
@@ -116,10 +136,21 @@ export default function CatalogQuickPick({ catalog, value, onChange }) {
           )}
         </>
       )}
-      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-        <input placeholder={t('Otra cosa que no está en la lista…')} value={free} onChange={(e) => setFree(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (free.trim()) { onChange([...value, { kind: 'libre', description: free.trim(), quantity: 1 }]); setFree(''); } } }} />
-        <button type="button" className="btn btn-sm" onClick={() => { if (free.trim()) { onChange([...value, { kind: 'libre', description: free.trim(), quantity: 1 }]); setFree(''); } }}>{t('+ Agregar')}</button>
+      <div className="qp-add">
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input style={{ flex: '1 1 220px' }} placeholder={t('¿No está en la lista? Escríbelo aquí…')} value={free} onChange={(e) => setFree(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFree(); } }} />
+          <select style={{ flex: '0 1 230px' }} value={saveAs} onChange={(e) => setSaveAs(e.target.value)} title={t('Si lo guardas en la lista, la próxima vez aparece para escogerlo con un clic')}>
+            <option value="">{t('Solo para esta solicitud')}</option>
+            <option value="equipo">{t('Agregar a la lista de Equipos')}</option>
+            <option value="servicio">{t('Agregar a la lista de Servicios')}</option>
+            <option value="producto">{typeId ? `${t('Agregar a Productos')} → ${(catalog.productTypes.find((x) => x.id === typeId) || {}).name}` : t('Agregar a Productos')}</option>
+          </select>
+          <button type="button" className="btn btn-sm btn-primary" disabled={adding || !free.trim()} onClick={addFree}>{adding ? t('Guardando…') : t('+ Agregar')}</button>
+        </div>
+        {saveAs === 'producto' && <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{t('Se crea en el inventario con costo y precio en $0: complétalo después en Catálogo de productos.')}{!typeId && ` ${t('Tip: escoge primero la categoría en la pestaña Productos.')}`}</div>}
+        {saveAs === 'servicio' && <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{t('Se crea con precio $0: ponle la tarifa después en Catálogo de Servicios.')}</div>}
+        {addError && <div className="text-danger" style={{ fontSize: 12, marginTop: 4 }}>{addError}</div>}
       </div>
 
       {value.length > 0 && (

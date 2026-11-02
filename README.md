@@ -328,4 +328,9 @@ En cuanto estén esos registros, Railway emite el certificado solo y la direcci�
   `borrador` a `pendiente`. Ganada → el cliente potencial pasa a `cliente`.
 - El ERP no envía correos por sí mismo: abre el programa de correo (`mailto:`), SMS o WhatsApp con el
   texto listo, o lo copia. Para envío directo desde el servidor haría falta configurar SMTP/Gmail.
+- Adjuntos de la solicitud: `crm_request_files` (archivos en `/uploads/crm-requests`, hasta 20 MB c/u),
+  `POST /api/crm/requests/:id/files` (campo `files`, varios) y `DELETE …/files/:fileId`.
+- Opciones nuevas en la lista: `POST /api/crm/catalog-item` `{kind: equipo|servicio|producto, name, productTypeId}`
+  crea el tipo de equipo, el servicio (precio $0, tarifa "servicio completo") o el producto (costo/precio $0)
+  o reutiliza el que ya exista con ese nombre.
 - Vehículo ↔ persona: `vehicles.contact_id` (`PUT /api/crm/vehicles/:id/contact`).

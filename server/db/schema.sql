@@ -94,6 +94,19 @@ CREATE TABLE IF NOT EXISTS crm_request_items (
   notes TEXT
 );
 
+-- Documentos y fotos que manda el cliente con su solicitud (requerimientos, especificaciones,
+-- fotos del equipo o del vehículo…). Cualquier tipo de archivo.
+CREATE TABLE IF NOT EXISTS crm_request_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL REFERENCES crm_requests(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  mime_type TEXT,
+  size INTEGER,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ===================== INVENTARIO =====================
 CREATE TABLE IF NOT EXISTS product_types (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

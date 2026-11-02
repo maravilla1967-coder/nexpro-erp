@@ -6,6 +6,7 @@ import { api } from '../api.js';
 import { useI18n } from '../i18n.jsx';
 import CatalogQuickPick from './CatalogQuickPick.jsx';
 import MessageComposer from './MessageComposer.jsx';
+import RequestFiles from './RequestFiles.jsx';
 import { REQUEST_STATUSES, PRIORITIES, CHANNELS, channelIcon, interactionIcon, contactTypeLabel, money, shortDate } from './constants.js';
 
 const toForm = (i) => ({ kind: i.kind, productId: i.product_id, serviceId: i.service_id, productTypeId: i.product_type_id, equipmentTypeId: i.equipment_type_id, description: i.description, quantity: i.quantity });
@@ -27,7 +28,8 @@ export default function RequestModal({ id, onClose, onChanged }) {
       api.get(`/customers/${x.customer_id}`).then((c) => setContacts(c.contacts)).catch(() => {});
     }).catch((e) => setError(e.message));
   }
-  useEffect(() => { load(); api.get('/crm/catalog').then(setCatalog).catch(() => {}); }, [id]);
+  const loadCatalog = () => api.get('/crm/catalog').then(setCatalog).catch(() => {});
+  useEffect(() => { load(); loadCatalog(); }, [id]);
 
   async function update(patch) {
     setError('');
@@ -92,7 +94,7 @@ export default function RequestModal({ id, onClose, onChanged }) {
           </div>
           {editItems ? (
             <>
-              <CatalogQuickPick catalog={catalog} value={editItems} onChange={setEditItems} />
+              <CatalogQuickPick catalog={catalog} value={editItems} onChange={setEditItems} onCatalogChange={loadCatalog} />
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
                 <button type="button" className="btn btn-sm" onClick={() => setEditItems(null)}>{t('Cancelar')}</button>
                 <button type="button" className="btn btn-sm btn-primary" onClick={saveItems}>{t('Guardar')}</button>
@@ -126,6 +128,9 @@ export default function RequestModal({ id, onClose, onChanged }) {
           )}
         </div>
       </div>
+
+      <div className="form-section">{t('Documentos y fotos')} ({(r.files || []).length})</div>
+      <RequestFiles request={r} onChanged={(x) => { setR(x); onChanged && onChanged(); }} />
 
       <div className="form-section">{t('Historial de esta solicitud')}</div>
       {r.interactions.length === 0 ? <div className="muted">—</div> : r.interactions.map((a) => (
