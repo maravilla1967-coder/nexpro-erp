@@ -5,6 +5,7 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
   // ===== CRM =====
+  'Ya está facturado: el estado no se puede cambiar mientras la factura exista.': 'Already invoiced: the status cannot be changed while the invoice exists.',
   '¿Anular la orden de compra': 'Void purchase order',
   'Queda en el historial como anulada y ya no se puede recibir.': 'It stays in the history as void and can no longer be received.',
   '¿Eliminar la orden de compra': 'Delete purchase order',

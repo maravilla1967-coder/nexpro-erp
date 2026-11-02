@@ -184,6 +184,13 @@ router.post('/', (req, res) => {
   if (salesOrderId) {
     sourceSalesOrder = get('SELECT * FROM sales_orders WHERE id = ?', [salesOrderId]);
     if (!sourceSalesOrder) return res.status(404).json({ error: 'Pedido no encontrado' });
+    const already = get('SELECT id, number, status FROM invoices WHERE sales_order_id = ?', [salesOrderId]);
+    if (already && !['anulada', 'cancelado'].includes(already.status)) {
+      run(`UPDATE sales_orders SET status = 'facturado' WHERE id = ?`, [salesOrderId]);
+      return res.status(409).json({ error: `Este pedido ya está facturado en la factura ${already.number}.`, invoiceId: already.id });
+    }
+    // Si la factura anterior del pedido se anuló, se suelta el enlace para poder facturarlo de nuevo.
+    if (already) run('UPDATE invoices SET sales_order_id = NULL WHERE id = ?', [already.id]);
     customerId = sourceSalesOrder.customer_id;
     items = all('SELECT * FROM sales_order_items WHERE sales_order_id = ?', [salesOrderId]);
   }

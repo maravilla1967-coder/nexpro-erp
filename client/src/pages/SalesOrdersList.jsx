@@ -88,8 +88,13 @@ export default function SalesOrdersList() {
 
   async function convertToInvoice(so) {
     if (!window.confirm(`${t('Generar factura a partir del pedido')} ${so.number}?`)) return;
-    const invoice = await api.post('/invoices', { salesOrderId: so.id });
-    navigate(`/facturas/${invoice.id}`);
+    try {
+      const invoice = await api.post('/invoices', { salesOrderId: so.id });
+      navigate(`/facturas/${invoice.id}`);
+    } catch (err) {
+      window.alert(err.message);
+      if (err.data && err.data.invoiceId) navigate(`/facturas/${err.data.invoiceId}`); else load();
+    }
   }
 
   async function deleteSo(so) {
@@ -129,6 +134,9 @@ export default function SalesOrdersList() {
                     <td className="mono clickable" onClick={() => openEdit(so.id)}>{so.number}</td>
                     <td>{so.customer_name}</td>
                     <td>
+                      {so.invoice_id ? (
+                        <span title={t('Ya está facturado: el estado no se puede cambiar mientras la factura exista.')}><Pill value="facturado" /></span>
+                      ) : (
                       <select value={so.status} onChange={(e) => updateStatus(so.id, e.target.value)} style={{ width: 140, display: 'inline-block' }}>
                         <option value="borrador">{t('borrador')}</option>
                         <option value="pendiente">{t('pendiente')}</option>
@@ -137,15 +145,21 @@ export default function SalesOrdersList() {
                         {(isAdmin || so.status === 'cancelado') && <option value="cancelado">{t('Anulado (cancelado)')}</option>}
                         {so.status === 'facturado' && <option value="facturado" disabled>{t('facturado')}</option>}
                       </select>
+                      )}
                     </td>
                     <td className="muted">{so.created_at}</td>
                     <td>
                       <div className="row-actions">
                         <button className="btn-row-action edit" onClick={() => openEdit(so.id)}>{t('Editar')}</button>
                         <Link className="btn-row-action" to={`/pedidos/${so.id}/documento`}>{t('Imprimir')}</Link>
-                        {so.status !== 'facturado' && <button className="btn-row-action" onClick={() => convertToInvoice(so)}>{t('Facturar')}</button>}
-                        {so.status === 'facturado' && <Pill value="facturado" />}
-                        {so.status !== 'facturado' && <button className="btn-row-action delete" onClick={() => deleteSo(so)}>{t('Eliminar')}</button>}
+                        {so.invoice_id ? (
+                          <Link className="btn-row-action" to={`/facturas/${so.invoice_id}`}>{t('Ver factura')} {so.invoice_number}</Link>
+                        ) : (
+                          <>
+                            {so.status !== 'facturado' && <button className="btn-row-action" onClick={() => convertToInvoice(so)}>{t('Facturar')}</button>}
+                            {so.status !== 'facturado' && <button className="btn-row-action delete" onClick={() => deleteSo(so)}>{t('Eliminar')}</button>}
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

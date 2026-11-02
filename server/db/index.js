@@ -109,6 +109,12 @@ tryAlter('ALTER TABLE sales_orders ADD COLUMN request_id INTEGER REFERENCES crm_
 try {
   db.exec("UPDATE customers SET roles = CASE WHEN status IN ('lead','prospecto') THEN 'potencial' ELSE 'cliente' END WHERE roles IS NULL OR roles = ''");
 } catch (e) { console.error('CRM roles:', e.message); }
+// Reparación: todo pedido con una factura vigente queda "facturado" (se habían devuelto a mano a
+// otro estado y volvían a aparecer como pendientes de facturar). Se corre en cada arranque.
+try {
+  db.exec(`UPDATE sales_orders SET status = 'facturado'
+           WHERE status != 'facturado' AND EXISTS (SELECT 1 FROM invoices i WHERE i.sales_order_id = sales_orders.id AND i.status NOT IN ('anulada','cancelado'))`);
+} catch (e) { console.error('Reparación de pedidos facturados:', e.message); }
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_activities_customer ON activities(customer_id)'); } catch (e) {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_requests_customer ON crm_requests(customer_id)'); } catch (e) {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_contacts_customer ON contacts(customer_id)'); } catch (e) {}
