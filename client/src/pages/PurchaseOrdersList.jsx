@@ -196,9 +196,9 @@ export default function PurchaseOrdersList() {
                       {po.status !== 'cancelado' && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
                       {po.status === 'borrador' && <button className="link-btn" onClick={() => markStatus(po, 'enviada')}>{t('Marcar enviada')}</button>}
                       {!['recibida', 'cancelado', 'cerrada'].includes(po.status) && <button className="link-btn" onClick={() => openReceive(po)}>{po.status === 'parcial' ? t('Recibir resto') : t('Recibir')}</button>}
-                      {['borrador', 'enviada'].includes(po.status) && <button className="link-btn" style={{ color: 'var(--amber)' }} onClick={() => voidPo(po)}>{t('Anular')}</button>}
-                      {po.status === 'cancelado' && <button className="link-btn" onClick={() => markStatus(po, 'borrador')}>{t('Reactivar')}</button>}
-                      {['borrador', 'enviada', 'cancelado'].includes(po.status) && <button className="link-btn" style={{ color: 'var(--red)' }} onClick={() => deletePo(po)}>{t('Eliminar')}</button>}
+                      {['borrador', 'enviada'].includes(po.status) && <button className="link-btn admin-only" style={{ color: 'var(--amber)' }} onClick={() => voidPo(po)}>{t('Anular')}</button>}
+                      {po.status === 'cancelado' && <button className="link-btn admin-only" onClick={() => markStatus(po, 'borrador')}>{t('Reactivar')}</button>}
+                      {['borrador', 'enviada', 'cancelado'].includes(po.status) && <button className="link-btn admin-only" style={{ color: 'var(--red)' }} onClick={() => deletePo(po)}>{t('Eliminar')}</button>}
                     </td>
                   </tr>
                 ))}
@@ -280,7 +280,7 @@ export default function PurchaseOrdersList() {
                 {(editingPo.attachments || []).map((a) => (
                   <div className="file-list-item" key={a.id}>
                     <a href={a.file_url} target="_blank" rel="noreferrer">{a.original_name || a.file_url.split('/').pop()}</a>
-                    <button type="button" className="link-btn" onClick={() => deletePoDoc(a.id)}>✕</button>
+                    <button type="button" className="link-btn admin-only" onClick={() => deletePoDoc(a.id)}>✕</button>
                   </div>
                 ))}
                 <label className="btn btn-sm" style={{ marginTop: 6, display: 'inline-block', cursor: 'pointer' }}>

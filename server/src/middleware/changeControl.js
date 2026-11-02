@@ -60,10 +60,22 @@ function docName(entity, id) {
   try { const r = get(q, [id]); return r && r.n ? r.n : `#${id}`; } catch (_) { return `#${id}`; }
 }
 
+// Anular o borrar es SOLO del administrador (decisión de Jorge): a los demás usuarios se les
+// rechaza de una vez (no va a Aprobaciones). Aplica a todos los módulos, incluidos pedidos y facturas.
+const ADMIN_ONLY_MSG = 'Solo el administrador puede anular o borrar. Pídeselo a Jorge.';
+function isVoidOrDelete(req) {
+  if (req.method === 'DELETE') return true;
+  const st = req.body && req.body.status;
+  return ['PUT', 'PATCH'].includes(req.method) && st && CANCEL_STATES.includes(String(st));
+}
+
 function changeControl(req, res, next) {
   if (!req.user || req.user.role === 'admin') return next();
   if (!['PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
   const path = req.path; // relativo a /api
+  if (!/^\/(approvals|auth)(\/|$)/.test(path) && isVoidOrDelete(req)) {
+    return res.status(403).json({ error: ADMIN_ONLY_MSG });
+  }
   if (SKIP.some((re) => re.test(path))) return next();
   // Préstamos y sus movimientos (desembolsos, abonos): solo el administrador los modifica;
   // no se mandan a aprobación.

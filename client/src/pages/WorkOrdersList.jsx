@@ -5,10 +5,12 @@ import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import WorkOrderPartsEditor, { partsTotal, partFromApi, partToApi } from '../components/WorkOrderPartsEditor.jsx';
 import AssigneeSelect, { assigneeValue, assigneePayload, assigneeName } from '../components/AssigneeSelect.jsx';
+import { useAuth } from '../auth.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
 export default function WorkOrdersList() {
   const { t, lang } = useI18n();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [list, setList] = useState([]);
   const [status, setStatus] = useState('');
@@ -155,7 +157,7 @@ export default function WorkOrdersList() {
                         ) : (
                           wo.status === 'completado' && <button className="btn-row-action" onClick={() => invoiceWorkOrder(wo)}>{t('Facturar')}</button>
                         )}
-                        {!wo.invoice_id && wo.status !== 'cancelado' && <button className="btn-row-action" style={{ color: 'var(--amber)' }} onClick={() => voidWo(wo)}>{t('Anular')}</button>}
+                        {!wo.invoice_id && wo.status !== 'cancelado' && <button className="btn-row-action admin-only" style={{ color: 'var(--amber)' }} onClick={() => voidWo(wo)}>{t('Anular')}</button>}
                         {!wo.invoice_id && <button className="btn-row-action delete" onClick={() => deleteWo(wo)}>{t('Eliminar')}</button>}
                       </div>
                     </td>
@@ -182,7 +184,7 @@ export default function WorkOrdersList() {
                   <option value="en_proceso">{t('En proceso')}</option>
                   <option value="completado">{t('Completado')}</option>
                   <option value="facturado">{t('Facturado')}</option>
-                  <option value="cancelado">{t('Anulada')}</option>
+                  {(isAdmin || woStatus === 'cancelado') && <option value="cancelado">{t('Anulada')}</option>}
                 </select>
               </div>
             </div>

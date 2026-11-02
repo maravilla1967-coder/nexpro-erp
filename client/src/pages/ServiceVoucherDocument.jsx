@@ -133,7 +133,7 @@ export default function ServiceVoucherDocument() {
               <strong>{t('Archivos adjuntos:')}</strong>
               <div className="file-list">{v.files.map((f, i) => (
                 <div className="file-list-item" key={f.id}><a href={f.file_url} target="_blank" rel="noreferrer" title={f.original_name}>📎 {t('Adjunto')} {i + 1}{f.original_name ? ` — ${f.original_name}` : ''}</a>
-                  <button type="button" className="link-btn" onClick={() => removeFile(f.id)}>✕</button></div>
+                  <button type="button" className="link-btn admin-only" onClick={() => removeFile(f.id)}>✕</button></div>
               ))}</div>
             </div>
           )}

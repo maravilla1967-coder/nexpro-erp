@@ -67,7 +67,7 @@ export default function RequestFiles({ request, onChanged, pending, onPendingCha
                 <span className="file-name" title={f.original_name}>{f.original_name || f.file_url.split('/').pop()}</span>
               </a>
               <span className="muted" style={{ fontSize: 11 }}>{String(f.created_at).slice(0, 10)}{f.size ? ` · ${kb(f.size)}` : ''}{f.created_by_name ? ` · ${f.created_by_name}` : ''}</span>
-              <button type="button" className="file-x" onClick={() => remove(f)}>✕</button>
+              <button type="button" className="file-x admin-only" onClick={() => remove(f)}>✕</button>
             </div>
           ))}
         </div>

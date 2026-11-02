@@ -169,6 +169,8 @@ con versiones.
 
 ## 7. Flujo de aprobaciones
 
+> Anular y borrar NO pasa por aprobaciones: solo el administrador puede hacerlo (ver "Anular y eliminar documentos").
+
 Para **facturas** y **pedidos** específicamente: si un usuario no-admin con permiso de edición
 en ese módulo intenta modificar o borrar un documento, el cambio **no se aplica de inmediato** —
 se guarda en `approval_requests` con estado `pendiente` y el usuario recibe el mensaje "Los
@@ -183,7 +185,10 @@ los módulos aplican los cambios de inmediato en cuanto el usuario tiene permiso
 - **Facturas:** "Anular factura" (sin pagos registrados) la deja en el historial como `anulada` y libera
   sus órdenes de trabajo, el pedido y los seriales para volver a facturar; "Eliminar factura" la borra.
 - **Órdenes de trabajo:** "Anular" (estado `cancelado`) y "Eliminar" solo si no están facturadas.
-- Para usuarios que no son administradores, anular o eliminar queda como solicitud en Aprobaciones.
+- **Anular o borrar es solo del administrador** (decisión de Jorge): a los demás usuarios no se les muestran
+  esos botones y el servidor les rechaza cualquier DELETE o cambio a estado anulado/cancelado (403, no va a
+  Aprobaciones) — `server/src/middleware/changeControl.js`, `isVoidOrDelete`. Las demás modificaciones de
+  documentos siguen yendo a Aprobaciones.
 
 ## 8. Documentos imprimibles: marca, transferencia bancaria y sincronización
 

@@ -147,7 +147,7 @@ export default function InvoiceView() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/facturas" className="btn">{t('← Volver')}</Link>
-          {!['anulada', 'cancelado'].includes(invoice.status) && <button type="button" className="btn" style={{ color: 'var(--amber)' }} onClick={voidInvoice}>{t('Anular factura')}</button>}
+          {!['anulada', 'cancelado'].includes(invoice.status) && <button type="button" className="btn admin-only" style={{ color: 'var(--amber)' }} onClick={voidInvoice}>{t('Anular factura')}</button>}
           <button type="button" className="btn btn-danger" onClick={deleteInvoice}>{t('Eliminar factura')}</button>
           {invoice.workOrders && invoice.workOrders.length > 0 && (
             <button type="button" className="btn" disabled={syncing} onClick={syncWorkOrders}>

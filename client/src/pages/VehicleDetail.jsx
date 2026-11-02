@@ -563,7 +563,7 @@ export default function VehicleDetail() {
                 {(editingWo.photos || []).map((p) => (
                   <div className="photo-gallery-item" key={p.id}>
                     <img src={p.photo_url} />
-                    <button type="button" className="photo-gallery-remove" onClick={() => deleteWoPhoto(p.id)}>✕</button>
+                    <button type="button" className="photo-gallery-remove admin-only" onClick={() => deleteWoPhoto(p.id)}>✕</button>
                   </div>
                 ))}
                 <label className="photo-gallery-add">

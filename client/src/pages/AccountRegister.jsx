@@ -105,7 +105,7 @@ export default function AccountRegister() {
                     <td className="text-right"><strong>{fmt$(r.balance)}</strong></td>
                     <td style={{ whiteSpace: 'nowrap' }}>{r.kind === 'manual' && <>
                       <button className="link-btn" onClick={() => editManual(r)}>{t('Editar')}</button>{' '}
-                      {!(r.loan_id && ['prestamo_socio', 'prestamo_tercero'].includes(r.category)) && <button className="link-btn" onClick={() => delManual(r)}>✕</button>}
+                      {!(r.loan_id && ['prestamo_socio', 'prestamo_tercero'].includes(r.category)) && <button className="link-btn admin-only" onClick={() => delManual(r)}>✕</button>}
                     </>}</td>
                   </tr>
                 ))}</tbody>

@@ -182,6 +182,8 @@ function MainShell() {
   const { t } = useI18n();
   const { isAdmin, canEdit } = useAuth();
   const showFinance = isAdmin || canEdit('finanzas');
+  // Anular y borrar es solo del administrador: a los demás se les ocultan esos botones.
+  React.useEffect(() => { document.body.classList.toggle('no-admin', !isAdmin); }, [isAdmin]);
   return (
     <div className="app-shell">
       <aside className="sidebar">

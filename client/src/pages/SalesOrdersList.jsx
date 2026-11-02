@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import LineItemsEditor from '../components/LineItemsEditor.jsx';
+import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
 const soDate = (r) => r.created_at;
@@ -19,6 +20,7 @@ const SO_COLUMNS = [
 
 export default function SalesOrdersList() {
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [list, setList] = useState([]);
@@ -132,7 +134,7 @@ export default function SalesOrdersList() {
                         <option value="pendiente">{t('pendiente')}</option>
                         <option value="aprobado">{t('aprobado')}</option>
                         <option value="en_proceso">{t('en_proceso')}</option>
-                        <option value="cancelado">{t('Anulado (cancelado)')}</option>
+                        {(isAdmin || so.status === 'cancelado') && <option value="cancelado">{t('Anulado (cancelado)')}</option>}
                         {so.status === 'facturado' && <option value="facturado" disabled>{t('facturado')}</option>}
                       </select>
                     </td>

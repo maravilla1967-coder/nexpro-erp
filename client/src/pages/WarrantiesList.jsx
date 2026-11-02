@@ -357,7 +357,7 @@ export default function WarrantiesList() {
                 {(editing.attachments || []).map((a) => (
                   <div className="file-list-item" key={a.id}>
                     <a href={a.file_url} target="_blank" rel="noreferrer">{a.original_name || a.file_url.split('/').pop()}</a>
-                    <button type="button" className="link-btn" onClick={() => removeFile(a.id)}>✕</button>
+                    <button type="button" className="link-btn admin-only" onClick={() => removeFile(a.id)}>✕</button>
                   </div>
                 ))}
                 <label className="btn btn-sm" style={{ marginTop: 6, display: 'inline-block', cursor: 'pointer' }}>

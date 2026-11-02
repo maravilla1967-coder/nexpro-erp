@@ -572,3 +572,6 @@ table.register tr.cleared td { background: #f8fafc; }
 .file-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-x { position: absolute; top: 4px; right: 4px; border: 0; background: rgba(255,255,255,.9); border-radius: 50%; width: 22px; height: 22px; cursor: pointer; color: var(--red); font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .qp-add { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+
+/* Solo el administrador puede anular o borrar: se ocultan esos botones a los demás usuarios */
+.no-admin .btn-danger, .no-admin .btn-row-action.delete, .no-admin .admin-only, .no-admin .file-x.admin-only { display: none !important; }
