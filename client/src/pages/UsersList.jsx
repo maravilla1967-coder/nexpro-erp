@@ -15,6 +15,8 @@ const MODULES = [
   { key: 'servicios', label: 'Catálogo de Servicios' },
   { key: 'mecanicos', label: 'Mecánicos' },
   { key: 'ordenes_trabajo', label: 'Órdenes de Trabajo' },
+  { key: 'garantias', label: 'Garantías' },
+  { key: 'finanzas', label: 'Bancos y finanzas' },
 ];
 
 const EMPTY = { name: '', email: '', role: 'usuario', modules: {} };

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import CustomerPicker from '../components/CustomerPicker.jsx';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import LineItemsEditor from '../components/LineItemsEditor.jsx';
+import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
 const soDate = (r) => r.created_at;
@@ -18,11 +20,14 @@ const SO_COLUMNS = [
 
 export default function SalesOrdersList() {
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [list, setList] = useState([]);
   const ex = useListExport({ rows: list, getDate: soDate, getNumber: soNumber });
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [services, setServices] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [customerId, setCustomerId] = useState('');
@@ -35,6 +40,7 @@ export default function SalesOrdersList() {
     load();
     api.get('/customers').then(setCustomers);
     api.get('/products').then(setProducts);
+    api.get('/services').then(setServices).catch(() => {});
   }, []);
 
   function openNew() {
@@ -51,6 +57,12 @@ export default function SalesOrdersList() {
       : [{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
     setError(''); setModalOpen(true);
   }
+
+  // Abrir directo un pedido desde otra pantalla (p. ej. una solicitud del CRM): /pedidos?abrir=ID
+  useEffect(() => {
+    const id = params.get('abrir');
+    if (id) { openEdit(id).catch(() => {}); setParams({}, { replace: true }); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save(e) {
     e.preventDefault();
@@ -76,8 +88,22 @@ export default function SalesOrdersList() {
 
   async function convertToInvoice(so) {
     if (!window.confirm(`${t('Generar factura a partir del pedido')} ${so.number}?`)) return;
-    const invoice = await api.post('/invoices', { salesOrderId: so.id });
-    navigate(`/facturas/${invoice.id}`);
+    try {
+      const invoice = await api.post('/invoices', { salesOrderId: so.id });
+      navigate(`/facturas/${invoice.id}`);
+    } catch (err) {
+      window.alert(err.message);
+      if (err.data && err.data.invoiceId) navigate(`/facturas/${err.data.invoiceId}`); else load();
+    }
+  }
+
+  async function deleteSo(so) {
+    if (!window.confirm(`${t('¿Eliminar el pedido')} ${so.number}?\n\n${t('Esto no se puede deshacer.')}`)) return;
+    try {
+      const result = await api.del(`/sales-orders/${so.id}`);
+      if (result && result.pending) setNotice(result.message || t('Los cambios se enviaron para autorización del administrador.'));
+    } catch (err) { window.alert(err.message); }
+    load();
   }
 
   async function updateStatus(id, status) {
@@ -108,20 +134,32 @@ export default function SalesOrdersList() {
                     <td className="mono clickable" onClick={() => openEdit(so.id)}>{so.number}</td>
                     <td>{so.customer_name}</td>
                     <td>
+                      {so.invoice_id ? (
+                        <span title={t('Ya está facturado: el estado no se puede cambiar mientras la factura exista.')}><Pill value="facturado" /></span>
+                      ) : (
                       <select value={so.status} onChange={(e) => updateStatus(so.id, e.target.value)} style={{ width: 140, display: 'inline-block' }}>
+                        <option value="borrador">{t('borrador')}</option>
                         <option value="pendiente">{t('pendiente')}</option>
                         <option value="aprobado">{t('aprobado')}</option>
                         <option value="en_proceso">{t('en_proceso')}</option>
-                        <option value="cancelado">{t('cancelado')}</option>
+                        {(isAdmin || so.status === 'cancelado') && <option value="cancelado">{t('Anulado (cancelado)')}</option>}
+                        {so.status === 'facturado' && <option value="facturado" disabled>{t('facturado')}</option>}
                       </select>
+                      )}
                     </td>
                     <td className="muted">{so.created_at}</td>
                     <td>
                       <div className="row-actions">
                         <button className="btn-row-action edit" onClick={() => openEdit(so.id)}>{t('Editar')}</button>
                         <Link className="btn-row-action" to={`/pedidos/${so.id}/documento`}>{t('Imprimir')}</Link>
-                        {so.status !== 'facturado' && <button className="btn-row-action" onClick={() => convertToInvoice(so)}>{t('Facturar')}</button>}
-                        {so.status === 'facturado' && <Pill value="facturado" />}
+                        {so.invoice_id ? (
+                          <Link className="btn-row-action" to={`/facturas/${so.invoice_id}`}>{t('Ver factura')} {so.invoice_number}</Link>
+                        ) : (
+                          <>
+                            {so.status !== 'facturado' && <button className="btn-row-action" onClick={() => convertToInvoice(so)}>{t('Facturar')}</button>}
+                            {so.status !== 'facturado' && <button className="btn-row-action delete" onClick={() => deleteSo(so)}>{t('Eliminar')}</button>}
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -137,12 +175,9 @@ export default function SalesOrdersList() {
           <form onSubmit={save}>
             {error && <div className="error-banner">{error}</div>}
             <div className="field"><label>{t('Cliente *')}</label>
-              <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                <option value="">{t('— Seleccionar —')}</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <CustomerPicker required customers={customers} value={customerId} onChange={setCustomerId} />
             </div>
-            <LineItemsEditor items={items} setItems={setItems} products={products} priceLabel="Precio unit." priceSourceField="selling_price" />
+            <LineItemsEditor items={items} setItems={setItems} products={products} services={services} priceLabel="Precio unit." priceSourceField="selling_price" />
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => setModalOpen(false)}>{t('Cancelar')}</button>
               <button type="submit" className="btn btn-primary">{t('Guardar')}</button>

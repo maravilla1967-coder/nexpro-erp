@@ -3,6 +3,8 @@ const { all, get, run, nowIso } = require('../../db');
 const { requireModuleEdit } = require('../middleware/auth');
 
 const router = express.Router();
+// Días de crédito del proveedor: vacío = sin definir, 0 = contado / prepago.
+const terms = (v) => { if (v === undefined || v === null || String(v).trim() === '') return null; const n = parseInt(v, 10); return Number.isNaN(n) || n < 0 ? null : n; };
 router.use(requireModuleEdit('proveedores'));
 
 router.get('/', (req, res) => {
@@ -36,12 +38,12 @@ router.post('/', (req, res) => {
   const code = (b.code && String(b.code).trim()) ? String(b.code).trim().toUpperCase().slice(0, 2) : deriveCode(b.name);
   const result = run(
     `INSERT INTO suppliers (
-       name, code, tax_id, email, phone, address, city, zip, notes,
+       name, code, tax_id, email, phone, address, city, zip, notes, payment_terms_days,
        beneficiary_name, beneficiary_address, bank_name, bank_address, aba_routing_number,
        account_number, account_type, swift_bic, bank_contact_name, bank_contact_phone, bank_contact_email, bank_notes
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
-      b.name, code, b.taxId || null, b.email || null, b.phone || null, b.address || null, b.city || null, b.zip || null, b.notes || null,
+      b.name, code, b.taxId || null, b.email || null, b.phone || null, b.address || null, b.city || null, b.zip || null, b.notes || null, terms(b.paymentTermsDays),
       b.beneficiaryName || null, b.beneficiaryAddress || null, b.bankName || null, b.bankAddress || null, b.abaRoutingNumber || null,
       b.accountNumber || null, b.accountType || null, b.swiftBic || null, b.bankContactName || null, b.bankContactPhone || null, b.bankContactEmail || null, b.bankNotes || null,
     ]
@@ -58,13 +60,14 @@ router.put('/:id', (req, res) => {
     : (existing.code || deriveCode(b.name ?? existing.name));
   run(
     `UPDATE suppliers SET
-       name=?, code=?, tax_id=?, email=?, phone=?, address=?, city=?, zip=?, notes=?,
+       name=?, code=?, tax_id=?, email=?, phone=?, address=?, city=?, zip=?, notes=?, payment_terms_days=?,
        beneficiary_name=?, beneficiary_address=?, bank_name=?, bank_address=?, aba_routing_number=?,
        account_number=?, account_type=?, swift_bic=?, bank_contact_name=?, bank_contact_phone=?, bank_contact_email=?, bank_notes=?
      WHERE id=?`,
     [
       b.name ?? existing.name, code, b.taxId ?? existing.tax_id, b.email ?? existing.email, b.phone ?? existing.phone,
       b.address ?? existing.address, b.city ?? existing.city, b.zip ?? existing.zip, b.notes ?? existing.notes,
+      b.paymentTermsDays !== undefined ? terms(b.paymentTermsDays) : existing.payment_terms_days,
       b.beneficiaryName ?? existing.beneficiary_name, b.beneficiaryAddress ?? existing.beneficiary_address,
       b.bankName ?? existing.bank_name, b.bankAddress ?? existing.bank_address, b.abaRoutingNumber ?? existing.aba_routing_number,
       b.accountNumber ?? existing.account_number, b.accountType ?? existing.account_type, b.swiftBic ?? existing.swift_bic,

@@ -21,6 +21,14 @@ async function handle(res) {
   if (res.status === 204) return null;
   const data = await res.json().catch(() => null);
   if (res.status === 401 && onUnauthorized) onUnauthorized();
+  // Control de cambios: el cambio quedó como solicitud en Aprobaciones. Se avisa al usuario y se
+  // corta el flujo de la pantalla (no hay documento actualizado que mostrar).
+  if (res.status === 202 && data && data.approvalRequired) {
+    try { window.alert(data.message); } catch (_) {}
+    const err = new Error(data.message);
+    err.status = 202; err.pendingApproval = true; err.data = data;
+    throw err;
+  }
   if (!res.ok) {
     const err = new Error((data && data.error) || `Error ${res.status}`);
     err.status = res.status;

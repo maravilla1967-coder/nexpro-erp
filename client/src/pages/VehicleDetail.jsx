@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import CustomerPicker from '../components/CustomerPicker.jsx';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api.js';
+import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
+import WorkOrderPartsEditor, { partsTotal, partFromApi, partToApi } from '../components/WorkOrderPartsEditor.jsx';
+import AssigneeSelect, { assigneeValue, assigneePayload, assigneeName } from '../components/AssigneeSelect.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
-const EQUIP_EMPTY = { equipmentTypeId: '', customTypeName: '', serialNumber: '', manufacturer: '', model: '', notes: '' };
+const EQUIP_EMPTY = { typeName: '', serialNumber: '', manufacturer: '', model: '', notes: '' };
+const VEHICLE_STATUSES = ['recibido', 'en_servicio', 'completado', 'entregado'];
 
 export default function VehicleDetail() {
   const { t, lang } = useI18n();
@@ -15,11 +19,22 @@ export default function VehicleDetail() {
   const [equipTypes, setEquipTypes] = useState([]);
   const [mechanics, setMechanics] = useState([]);
   const [services, setServices] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
 
   const [equipModalOpen, setEquipModalOpen] = useState(false);
   const [equipForm, setEquipForm] = useState(EQUIP_EMPTY);
-  const [useNewType, setUseNewType] = useState(false);
+  const [editingEquip, setEditingEquip] = useState(null);
   const [error, setError] = useState('');
+  // Editar la recepción del vehículo
+  const [editOpen, setEditOpen] = useState(false);
+  const [vForm, setVForm] = useState({});
+  const [vPhoto, setVPhoto] = useState(null);
+  const [customers, setCustomers] = useState([]);
+  // Lista maestra de tipos de equipo
+  const [typesOpen, setTypesOpen] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+  const [renaming, setRenaming] = useState(null);
 
   const [woModalOpen, setWoModalOpen] = useState(false);
   const [editingWo, setEditingWo] = useState(null); // null = nueva orden; si no, se está editando esta orden existente
@@ -34,12 +49,20 @@ export default function VehicleDetail() {
   const [invoicing, setInvoicing] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
-  function load() { api.get(`/vehicles/${id}`).then(setVehicle).catch(console.error); }
-  useEffect(() => { load(); }, [id]);
+  const [installedSerials, setInstalledSerials] = useState([]);
+  function load() {
+    api.get(`/vehicles/${id}`).then(setVehicle).catch(console.error);
+    api.get('/serials', { vehicleId: id }).then(setInstalledSerials).catch(() => {});
+  }
+  const [vouchers, setVouchers] = useState([]);
+  useEffect(() => { load(); api.get('/service-vouchers', { vehicleId: id }).then(setVouchers).catch(() => {}); }, [id]);
   useEffect(() => {
     api.get('/vehicles/equipment-types').then(setEquipTypes);
+    api.get('/customers').then(setCustomers).catch(() => {});
     api.get('/mechanics', { active: 'true' }).then(setMechanics);
+    api.get('/suppliers').then(setSuppliers).catch(() => {});
     api.get('/services', { active: 'true' }).then(setServices);
+    api.get('/products', { active: 'true' }).then(setProducts).catch(() => {});
   }, []);
 
   async function remove() {
@@ -48,13 +71,56 @@ export default function VehicleDetail() {
     navigate('/vehiculos');
   }
 
-  function openEquipModal() { setEquipForm(EQUIP_EMPTY); setUseNewType(false); setError(''); setEquipModalOpen(true); }
+  function openEquipModal() { setEditingEquip(null); setEquipForm(EQUIP_EMPTY); setError(''); setEquipModalOpen(true); }
+  function openEditEquip(eq) {
+    setEditingEquip(eq);
+    setEquipForm({ typeName: eq.equipment_type_name || eq.custom_type_name || '', serialNumber: eq.serial_number || '', manufacturer: eq.manufacturer || '', model: eq.model || '', notes: eq.notes || '' });
+    setError(''); setEquipModalOpen(true);
+  }
+
+  function openEditVehicle() {
+    setVForm({
+      vin: vehicle.vin || '', make: vehicle.make || '', model: vehicle.model || '', year: vehicle.year || '',
+      chassisType: vehicle.chassis_type || '', plate: vehicle.plate || '', customerName: vehicle.customer_name || '',
+      status: vehicle.status || 'recibido', notes: vehicle.notes || '', receivedAt: String(vehicle.received_at || '').slice(0, 10),
+    });
+    setVPhoto(null); setError(''); setEditOpen(true);
+  }
+  async function saveVehicle(e) {
+    e.preventDefault();
+    if (!String(vForm.vin || '').trim()) { setError(t('El VIN no puede quedar vacío')); return; }
+    try {
+      const fd = toFormData(vForm);
+      if (vPhoto) fd.append('photo', vPhoto);
+      setVehicle(await api.putForm(`/vehicles/${id}`, fd));
+      api.get('/customers').then(setCustomers).catch(() => {});
+      setEditOpen(false);
+    } catch (err) { setError(err.message); }
+  }
+
+  async function addType(e) {
+    e.preventDefault();
+    if (!newTypeName.trim()) return;
+    try { await api.post('/vehicles/equipment-types', { name: newTypeName.trim() }); setNewTypeName(''); setEquipTypes(await api.get('/vehicles/equipment-types')); }
+    catch (err) { setError(err.message); }
+  }
+  async function renameType() {
+    try { await api.put(`/vehicles/equipment-types/${renaming.id}`, { name: renaming.name }); setRenaming(null); setEquipTypes(await api.get('/vehicles/equipment-types')); load(); }
+    catch (err) { setError(err.message); }
+  }
+  async function deleteType(tp) {
+    if (!window.confirm(`${t('¿Eliminar de la lista el tipo')} "${tp.name}"?`)) return;
+    try { await api.del(`/vehicles/equipment-types/${tp.id}`); setEquipTypes(await api.get('/vehicles/equipment-types')); }
+    catch (err) { setError(err.message); }
+  }
 
   async function saveEquip(e) {
     e.preventDefault();
+    if (!equipForm.typeName.trim()) { setError(t('Escribe o elige el tipo de equipo')); return; }
     try {
-      await api.post(`/vehicles/${id}/equipment`, equipForm);
-      setEquipModalOpen(false);
+      if (editingEquip) await api.put(`/vehicles/equipment/${editingEquip.id}`, equipForm);
+      else await api.post(`/vehicles/${id}/equipment`, equipForm);
+      setEquipModalOpen(false); setEditingEquip(null);
       api.get('/vehicles/equipment-types').then(setEquipTypes);
       load();
     } catch (err) { setError(err.message); }
@@ -76,14 +142,14 @@ export default function VehicleDetail() {
 
   function openEditWo(wo) {
     setEditingWo(wo);
-    setWoMechanicId(wo.mechanic_id || ''); setWoStatus(wo.status);
+    setWoMechanicId(assigneeValue(wo)); setWoStatus(wo.status);
     setWoServices(
       wo.services.length > 0
         ? wo.services.map((s) => ({ serviceId: s.service_id || '', description: s.description, pricingType: s.pricing_type, hours: s.hours ?? 0, hourlyRate: s.hourly_rate ?? 0, flatPrice: s.flat_price ?? 0 }))
         : [{ serviceId: '', description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 }]
     );
     setWoNotes(wo.notes || ''); setWoDiagnosis(wo.diagnosis || ''); setWoResolution(wo.resolution || '');
-    setWoParts((wo.parts || []).map((p) => ({ description: p.description, action: p.action, quantity: p.quantity, unitCost: p.unit_cost, notes: p.notes || '' })));
+    setWoParts((wo.parts || []).map(partFromApi));
     setError(''); setWoModalOpen(true);
   }
   function updateWoService(idx, field, value) {
@@ -91,13 +157,6 @@ export default function VehicleDetail() {
     copy[idx] = { ...copy[idx], [field]: value };
     setWoServices(copy);
   }
-  function updateWoPart(idx, field, value) {
-    const copy = [...woParts];
-    copy[idx] = { ...copy[idx], [field]: value };
-    setWoParts(copy);
-  }
-  function addWoPartRow() { setWoParts([...woParts, { description: '', action: 'reemplazada', quantity: 1, unitCost: 0, notes: '' }]); }
-  function removeWoPartRow(idx) { setWoParts(woParts.filter((_, i) => i !== idx)); }
   async function saveServiceToCatalog(idx) {
     const row = woServices[idx];
     if (!row.description) return;
@@ -130,16 +189,13 @@ export default function VehicleDetail() {
   async function saveWorkOrder(e) {
     e.preventDefault();
     const payload = {
-      vehicleId: id, mechanicId: woMechanicId || null,
+      vehicleId: id, ...assigneePayload(woMechanicId),
       notes: woNotes || null, diagnosis: woDiagnosis || null, resolution: woResolution || null,
       services: woServices.filter((s) => s.description).map((s) => ({
         serviceId: s.serviceId || null, description: s.description, pricingType: s.pricingType,
         hours: parseFloat(s.hours) || 0, hourlyRate: parseFloat(s.hourlyRate) || 0, flatPrice: parseFloat(s.flatPrice) || 0,
       })),
-      parts: woParts.filter((p) => p.description).map((p) => ({
-        description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
-        notes: p.notes || null,
-      })),
+      parts: woParts.filter((p) => p.description).map(partToApi),
     };
     try {
       if (editingWo) {
@@ -195,7 +251,7 @@ export default function VehicleDetail() {
 
   if (!vehicle) return <div className="content">{t('Cargando…')}</div>;
 
-  const woTotalPreview = woServices.reduce((sum, s) => {
+  const woTotalPreview = partsTotal(woParts) + woServices.reduce((sum, s) => {
     if (s.pricingType === 'servicio_completo') return sum + (parseFloat(s.flatPrice) || 0);
     return sum + (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0);
   }, 0);
@@ -209,6 +265,8 @@ export default function VehicleDetail() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/vehiculos" className="btn">{t('← Volver')}</Link>
+          <Link to={`/garantias?nuevo=reclamo&vehiculo=${id}`} className="btn">{t('🛡️ Reclamar garantía')}</Link>
+          <button className="btn" onClick={openEditVehicle}>{t('✏️ Editar recepción')}</button>
           <Link to={`/vehiculos/${id}/documento`} className="btn btn-primary">{t('Imprimir recepción')}</Link>
           <button className="btn btn-danger" onClick={remove}>{t('Eliminar')}</button>
         </div>
@@ -235,19 +293,31 @@ export default function VehicleDetail() {
           <div className="card">
             <div className="card-title">
               {t('Equipos instalados en el chasis')}
-              <button className="btn btn-sm btn-primary" onClick={openEquipModal}>{t('+ Agregar equipo')}</button>
+              <span style={{ display: 'flex', gap: 6 }}>
+                <button className="btn btn-sm" onClick={() => { setError(''); setTypesOpen(true); }}>{t('Lista de equipos')}</button>
+                <button className="btn btn-sm btn-primary" onClick={openEquipModal}>{t('+ Agregar equipo')}</button>
+              </span>
             </div>
+            {installedSerials.length > 0 && (
+              <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
+                🔢 {t('Unidades del inventario instaladas:')}{' '}
+                {installedSerials.map((sr, i) => <React.Fragment key={sr.id}>{i > 0 && ', '}<Link to={`/seriales?producto=${sr.product_id}`} className="mono">{sr.serial}</Link> ({sr.product_name})</React.Fragment>)}
+              </div>
+            )}
             {vehicle.equipment.length === 0 ? <div className="empty-state">{t('Sin equipos registrados aún.')}</div> : (
               <table>
                 <thead><tr><th>{t('Tipo')}</th><th>{t('Serie')}</th><th>{t('Fabricante')}</th><th>{t('Modelo')}</th><th></th></tr></thead>
                 <tbody>
                   {vehicle.equipment.map((e) => (
                     <tr key={e.id}>
-                      <td>{e.equipment_type_name || e.custom_type_name} {!e.equipment_type_name && <span className="pill amber" style={{ marginLeft: 6 }}>{t('nuevo')}</span>}</td>
+                      <td>{e.equipment_type_name || e.custom_type_name}</td>
                       <td className="mono">{e.serial_number || '—'}</td>
                       <td>{e.manufacturer || '—'}</td>
                       <td>{e.model || '—'}</td>
-                      <td><button className="btn-row-action delete" onClick={() => deleteEquip(e.id)}>{t('Eliminar')}</button></td>
+                      <td><div className="row-actions">
+                        <button className="btn-row-action edit" onClick={() => openEditEquip(e)}>{t('Editar')}</button>
+                        <button className="btn-row-action delete" onClick={() => deleteEquip(e.id)}>{t('Eliminar')}</button>
+                      </div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -270,7 +340,7 @@ export default function VehicleDetail() {
           </div>
           {vehicle.workOrders.length === 0 ? <div className="empty-state">{t('Sin órdenes de trabajo todavía.')}</div> : (
             <table>
-              <thead><tr><th></th><th>{t('Número')}</th><th>{t('Mecánico')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
+              <thead><tr><th></th><th>{t('Número')}</th><th>{t('Asignado a')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
               <tbody>
                 {vehicle.workOrders.map((wo) => {
                   const facturable = wo.status === 'completado' && !wo.invoice_id;
@@ -282,7 +352,7 @@ export default function VehicleDetail() {
                         )}
                       </td>
                       <td className="mono">{wo.number}</td>
-                      <td>{wo.mechanic_name || '—'}</td>
+                      <td>{assigneeName(wo, t)}</td>
                       <td><Pill value={wo.status} /></td>
                       <td className="muted">{wo.created_at}</td>
                       <td>
@@ -292,7 +362,7 @@ export default function VehicleDetail() {
                           <button className="btn-row-action edit" onClick={() => openEditWo(wo)}>{t('Editar')}</button>
                         )}
                       </td>
-                      <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
+                      <td style={{ whiteSpace: 'nowrap' }}><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link> · <Link to={`/pagos-sin-factura?nuevo=1&vehiculo=${id}&orden=${wo.id}`} title={t('Registrar pago a un proveedor de servicios sin factura')}>{t('Pago sin factura')}</Link></td>
                     </tr>
                   );
                 })}
@@ -301,31 +371,47 @@ export default function VehicleDetail() {
           )}
           <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>{t('Gestiona el detalle de horas/servicios de cada orden en')} <Link to="/ordenes-trabajo">{t('Órdenes de Trabajo')}</Link>. {t('Las órdenes marcadas como "completado" pueden facturarse: selecciónalas con la casilla y haz clic en "Facturar seleccionadas".')}</div>
         </div>
+
+        <div className="card">
+          <div className="card-title">
+            {t('Pagos a proveedores sin factura')}
+            <Link className="btn btn-sm" to={`/pagos-sin-factura?nuevo=1&vehiculo=${id}`}>{t('+ Pago sin factura')}</Link>
+          </div>
+          {vouchers.length === 0 ? <div className="empty-state">{t('Ningún pago a terceros registrado para este vehículo.')}</div> : (
+            <table>
+              <thead><tr><th>{t('Número')}</th><th>{t('Fecha')}</th><th>{t('Proveedor')}</th><th>{t('Trabajo')}</th><th>{t('Orden')}</th><th className="text-right">{t('Monto')}</th><th></th></tr></thead>
+              <tbody>
+                {vouchers.map((sv) => (
+                  <tr key={sv.id}>
+                    <td className="mono"><Link to={`/pagos-sin-factura/${sv.id}/documento`}>{sv.number}</Link></td>
+                    <td className="muted">{sv.service_date}</td>
+                    <td>{sv.supplier_name}</td>
+                    <td>{sv.service_type ? <strong>{sv.service_type}: </strong> : null}{String(sv.description).slice(0, 70)}{String(sv.description).length > 70 ? '…' : ''}</td>
+                    <td className="mono muted">{sv.work_order_number || '—'}</td>
+                    <td className="text-right">${Number(sv.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td><Pill value={sv.bill_status || 'pendiente'} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {vouchers.length > 0 && <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{t('Total pagado a terceros en este vehículo:')} <strong>${vouchers.reduce((s, x) => s + Number(x.amount), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></div>}
+        </div>
       </div>
 
       {equipModalOpen && (
-        <Modal title={t('Agregar equipo instalado')} onClose={() => setEquipModalOpen(false)}>
-          <form onSubmit={saveEquip}>
+        <Modal title={editingEquip ? t('Editar equipo instalado') : t('Agregar equipo instalado')} onClose={() => setEquipModalOpen(false)}>
+          <form onSubmit={saveEquip} noValidate>
             {error && <div className="error-banner">{error}</div>}
             <div className="field">
               <label>{t('Tipo de equipo *')}</label>
-              {!useNewType ? (
-                <>
-                  <select value={equipForm.equipmentTypeId} onChange={(e) => setEquipForm({ ...equipForm, equipmentTypeId: e.target.value })}>
-                    <option value="">{t('— Seleccionar de la lista —')}</option>
-                    {equipTypes.map((t2) => <option key={t2.id} value={t2.id}>{t2.name}</option>)}
-                  </select>
-                  <button type="button" className="link-btn" style={{ marginTop: 6 }} onClick={() => { setUseNewType(true); setEquipForm({ ...equipForm, equipmentTypeId: '' }); }}>
-                    {t('No está en la lista, crear uno nuevo')}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <input placeholder={t('Nombre del nuevo tipo de equipo')} value={equipForm.customTypeName} onChange={(e) => setEquipForm({ ...equipForm, customTypeName: e.target.value })} />
-                  <button type="button" className="link-btn" style={{ marginTop: 6 }} onClick={() => { setUseNewType(false); setEquipForm({ ...equipForm, customTypeName: '' }); }}>
-                    {t('Usar la lista existente')}
-                  </button>
-                </>
+              <input list="equipment-types-list" placeholder={t('Escribe o elige: Grúa, Compresor, Bucket lift…')} value={equipForm.typeName}
+                onChange={(e) => setEquipForm({ ...equipForm, typeName: e.target.value })} />
+              <datalist id="equipment-types-list">
+                {equipTypes.map((t2) => <option key={t2.id} value={t2.name} />)}
+              </datalist>
+              {equipForm.typeName.trim() && !equipTypes.some((t2) => t2.name.toLowerCase() === equipForm.typeName.trim().toLowerCase()) && (
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>✚ {t('Tipo nuevo: se agregará a la lista de equipos al guardar.')}</div>
               )}
             </div>
             <div className="grid grid-2">
@@ -342,17 +428,76 @@ export default function VehicleDetail() {
         </Modal>
       )}
 
+      {editOpen && (
+        <Modal title={`${t('Editar recepción')} · ${vehicle.vin}`} onClose={() => setEditOpen(false)} wide>
+          <form onSubmit={saveVehicle} noValidate>
+            <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{t('Completa o corrige los datos que faltaban al recibir el vehículo.')}</div>
+            <div className="field"><label>{t('VIN *')}</label><input className="mono" value={vForm.vin} onChange={(e) => setVForm({ ...vForm, vin: e.target.value.toUpperCase() })} /></div>
+            <div className="grid grid-2">
+              <div className="field"><label>{t('Marca')}</label><input value={vForm.make} onChange={(e) => setVForm({ ...vForm, make: e.target.value })} /></div>
+              <div className="field"><label>{t('Modelo')}</label><input value={vForm.model} onChange={(e) => setVForm({ ...vForm, model: e.target.value })} /></div>
+              <div className="field"><label>{t('Año')}</label><input inputMode="numeric" value={vForm.year} onChange={(e) => setVForm({ ...vForm, year: e.target.value })} /></div>
+              <div className="field"><label>{t('Tipo de chasis')}</label><input placeholder="CA, DRW, SRW..." value={vForm.chassisType} onChange={(e) => setVForm({ ...vForm, chassisType: e.target.value })} /></div>
+              <div className="field"><label>{t('Placa')}</label><input value={vForm.plate} onChange={(e) => setVForm({ ...vForm, plate: e.target.value })} /></div>
+              <div className="field"><label>{t('Cliente / empresa')}</label>
+                <CustomerPicker freeText customers={customers} placeholder={t('Escribe o elige el cliente')} value={vForm.customerName} onChange={(name) => setVForm((f) => ({ ...f, customerName: name }))} />
+                {vForm.customerName.trim() && !customers.some((c) => c.name.trim().toLowerCase() === vForm.customerName.trim().toLowerCase()) && (
+                  <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>✚ {t('Cliente nuevo: se creará en Clientes al guardar y quedará enlazado al vehículo.')}</div>
+                )}
+              </div>
+              <div className="field"><label>{t('Estado')}</label>
+                <select value={vForm.status} onChange={(e) => setVForm({ ...vForm, status: e.target.value })}>
+                  {VEHICLE_STATUSES.map((st) => <option key={st} value={st}>{t(st.replace(/_/g, ' '))}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>{t('Fecha de recepción')}</label><input type="date" value={vForm.receivedAt} onChange={(e) => setVForm({ ...vForm, receivedAt: e.target.value })} /></div>
+            </div>
+            <div className="field"><label>{t('Cambiar foto del vehículo')}</label><input type="file" accept="image/*" onChange={(e) => setVPhoto(e.target.files[0] || null)} /></div>
+            <div className="field"><label>{t('Notas')}</label><textarea rows={3} value={vForm.notes} onChange={(e) => setVForm({ ...vForm, notes: e.target.value })} /></div>
+            {error && <div className="error-banner">{error}</div>}
+            <div className="modal-footer">
+              <button type="button" className="btn" onClick={() => setEditOpen(false)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Guardar cambios')}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {typesOpen && (
+        <Modal title={t('Lista de equipos')} onClose={() => { setTypesOpen(false); setRenaming(null); }}>
+          <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{t('Esta lista aparece al agregar un equipo a cualquier vehículo. Los tipos nuevos que escribas al agregar un equipo se suman aquí solos.')}</div>
+          <form onSubmit={addType} style={{ display: 'flex', gap: 8, marginBottom: 12 }} noValidate>
+            <input placeholder={t('Nuevo tipo de equipo')} value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} />
+            <button type="submit" className="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}>{t('+ Agregar')}</button>
+          </form>
+          {error && <div className="error-banner">{error}</div>}
+          <table>
+            <tbody>
+              {equipTypes.map((tp) => (
+                <tr key={tp.id}>
+                  <td>{renaming && renaming.id === tp.id
+                    ? <input autoFocus value={renaming.name} onChange={(e) => setRenaming({ ...renaming, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') renameType(); }} />
+                    : <>{tp.name} {tp.uses ? <span className="muted" style={{ fontSize: 12 }}>· {tp.uses} {t('en uso')}</span> : null}</>}</td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {renaming && renaming.id === tp.id
+                      ? <><button className="btn-row-action edit" onClick={renameType}>{t('Guardar')}</button> <button className="btn-row-action" onClick={() => setRenaming(null)}>{t('Cancelar')}</button></>
+                      : <><button className="btn-row-action edit" onClick={() => { setError(''); setRenaming({ id: tp.id, name: tp.name }); }}>{t('Renombrar')}</button> {!tp.uses && <button className="btn-row-action delete" onClick={() => deleteType(tp)}>{t('Eliminar')}</button>}</>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Modal>
+      )}
+
       {woModalOpen && (
-        <Modal title={editingWo ? `${t('Editar orden de trabajo')} ${editingWo.number}` : t('Nueva orden de trabajo')} onClose={() => { setWoModalOpen(false); setEditingWo(null); }} wide>
+        <Modal title={editingWo ? `${t('Editar orden de trabajo')} ${editingWo.number}` : t('Nueva orden de trabajo')} onClose={() => { setWoModalOpen(false); setEditingWo(null); }} xwide>
           <form onSubmit={saveWorkOrder}>
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
               <div className="field">
-                <label>{t('Mecánico asignado')}</label>
-                <select value={woMechanicId} onChange={(e) => setWoMechanicId(e.target.value)}>
-                  <option value="">{t('— Sin asignar —')}</option>
-                  {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+                <label>{t('Asignado a (mecánico o proveedor)')}</label>
+                <AssigneeSelect value={woMechanicId} onChange={setWoMechanicId} mechanics={mechanics} suppliers={suppliers} />
               </div>
               {editingWo && (
                 <div className="field">
@@ -409,30 +554,8 @@ export default function VehicleDetail() {
             <div className="field"><label>{t('Diagnóstico')}</label><textarea rows={2} value={woDiagnosis} onChange={(e) => setWoDiagnosis(e.target.value)} /></div>
             <div className="field"><label>{t('Solución / Reparación realizada')}</label><textarea rows={2} value={woResolution} onChange={(e) => setWoResolution(e.target.value)} /></div>
 
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes reemplazadas o reparadas')}</label>
-            <table className="line-items-table" style={{ marginTop: 6 }}>
-              <thead><tr><th>{t('Descripción')}</th><th style={{ width: 150 }}>{t('Acción')}</th><th style={{ width: 80 }}>{t('Cant.')}</th><th style={{ width: 110 }}>{t('Costo unit.')}</th><th style={{ width: 200 }}>{t('Nota (opcional)')}</th><th></th></tr></thead>
-              <tbody>
-                {woParts.map((p, idx) => (
-                  <tr key={idx}>
-                    <td><input value={p.description} onChange={(e) => updateWoPart(idx, 'description', e.target.value)} /></td>
-                    <td>
-                      <select value={p.action} onChange={(e) => updateWoPart(idx, 'action', e.target.value)}>
-                        <option value="reemplazada">{t('Reemplazada')}</option>
-                        <option value="reparada">{t('Reparada')}</option>
-                        <option value="garantia">{t('Garantía')}</option>
-                        <option value="cliente">{t('Suministrada por el cliente')}</option>
-                      </select>
-                    </td>
-                    <td><input type="number" step="1" value={p.quantity} onChange={(e) => updateWoPart(idx, 'quantity', e.target.value)} /></td>
-                    <td><input type="number" step="0.01" value={p.unitCost} onChange={(e) => updateWoPart(idx, 'unitCost', e.target.value)} /></td>
-                    <td><input placeholder={t('Nota sobre la parte (ej. garantía, quién la suministró, etc.)')} value={p.notes || ''} onChange={(e) => updateWoPart(idx, 'notes', e.target.value)} /></td>
-                    <td><button type="button" className="link-btn" onClick={() => removeWoPartRow(idx)}>✕</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addWoPartRow}>{t('+ Agregar parte')}</button>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes y productos')}</label>
+            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} defaultAction={String(woMechanicId).startsWith('s:') ? 'proveedor' : 'reemplazada'} supplierId={assigneePayload(woMechanicId).supplierId || ''} />
 
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)', marginTop: 16, display: 'block' }}>{t('Fotos')}</label>
             {editingWo ? (
@@ -440,7 +563,7 @@ export default function VehicleDetail() {
                 {(editingWo.photos || []).map((p) => (
                   <div className="photo-gallery-item" key={p.id}>
                     <img src={p.photo_url} />
-                    <button type="button" className="photo-gallery-remove" onClick={() => deleteWoPhoto(p.id)}>✕</button>
+                    <button type="button" className="photo-gallery-remove admin-only" onClick={() => deleteWoPhoto(p.id)}>✕</button>
                   </div>
                 ))}
                 <label className="photo-gallery-add">

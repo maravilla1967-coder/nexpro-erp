@@ -38,7 +38,16 @@ a { color: var(--orange); text-decoration: none; }
   display: flex;
   flex-direction: column;
   padding: 18px 0;
+  /* El menú se queda fijo y tiene su propia barra de desplazamiento, para que Finanzas y Administración nunca queden ocultas */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.25) transparent;
 }
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
 
 .brand {
   display: flex;
@@ -63,12 +72,12 @@ a { color: var(--orange); text-decoration: none; }
 .nav-group { margin-bottom: 4px; }
 .nav-label {
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-  color: #64748b; padding: 14px 18px 6px;
+  color: #64748b; padding: 10px 18px 4px;
 }
 
 .nav-link {
   display: flex; align-items: center; gap: 10px;
-  padding: 9px 18px;
+  padding: 7px 18px;
   color: #cbd5e1;
   font-size: 14px;
   border-left: 3px solid transparent;
@@ -183,6 +192,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
   padding: 22px 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.2);
 }
 .modal.wide { max-width: 860px; }
+.modal.xwide { max-width: min(1320px, 96vw); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .modal-header h2 { margin: 0; font-size: 17px; color: var(--navy); }
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
@@ -279,7 +289,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
   html, body, #root { height: auto !important; min-height: 0 !important; margin: 0 !important; }
   .app-shell { display: block !important; min-height: 0 !important; }
   .main { display: block !important; }
-  .sidebar, .topbar.no-print, .modal-overlay { display: none !important; }
+  .sidebar, .topbar.no-print, .modal-overlay, .no-print { display: none !important; }
   .content { padding: 0.4in !important; margin: 0 !important; }
   .card.invoice-sheet { border: none; box-shadow: none; margin: 0 !important; padding: 0; max-width: 100%; }
   body { background: #fff; font-size: 12px; }
@@ -347,3 +357,221 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 th:has(> .row-check), td:has(> .row-check) { width: 28px; }
 @media (max-width: 700px) { .list-export .range input, .list-export .range input[type="date"] { width: 110px; } }
 @media print { .list-export, .row-check { display: none !important; } }
+
+/* Garantías */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--card); }
+.seg-btn { border: 0; background: transparent; padding: 7px 14px; font-size: 13px; cursor: pointer; color: var(--steel); }
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.seg-btn.active { background: var(--navy); color: #fff; }
+.form-section { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--navy); margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.doc-rows { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 18px; }
+.doc-row { display: flex; flex-direction: column; font-size: 13px; }
+.doc-row .muted { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+@media (max-width: 700px) { .doc-rows { grid-template-columns: repeat(2, 1fr); } }
+
+/* Cartera / cuentas por pagar: tarjetas de antigüedad */
+.aging-cards { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 16px; }
+.aging-card { text-align: left; background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--navy); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; font: inherit; color: var(--text); }
+.aging-card span { font-size: 12px; color: var(--text-muted); }
+.aging-card strong { font-size: 18px; }
+.aging-card.active { box-shadow: 0 0 0 2px var(--orange); }
+.aging-card.b-corriente { border-left-color: var(--green); }
+.aging-card.b-1-30 { border-left-color: #eab308; }
+.aging-card.b-31-60 { border-left-color: var(--amber); }
+.aging-card.b-61-90 { border-left-color: var(--orange); }
+.aging-card.b-p90 { border-left-color: var(--red); }
+.aging-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.aging-pill.b-1-30 { background: #fef9c3; color: #854d0e; }
+.aging-pill.b-31-60 { background: #fef3c7; color: var(--amber); }
+.aging-pill.b-61-90 { background: #ffedd5; color: var(--orange-dark); }
+.aging-pill.b-p90 { background: #fee2e2; color: var(--red); }
+@media (max-width: 1000px) { .aging-cards { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px) { .aging-cards { grid-template-columns: repeat(2, 1fr); } }
+.notice-banner { background: #fef3c7; color: #92400e; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; }
+.text-danger { color: var(--red); }
+
+/* Ventanas: nunca más anchas que la pantalla; si el contenido es alto, la ventana tiene su
+   propio scroll y la barra de botones (Guardar/Cancelar) queda siempre visible abajo. */
+.modal { overflow-x: hidden; min-width: 0; }
+.modal .grid > *, .modal .field { min-width: 0; }
+input[type="file"] { width: 100%; max-width: 100%; font-size: 13px; padding: 6px; }
+/* Nombres de archivo largos (p. ej. recibos de Square o del banco): bajan de línea en vez de
+   estirar la ventana o la factura. */
+.payment-files { font-size: 12px; margin-top: 2px; }
+.payment-file { display: inline-block; max-width: 100%; margin-right: 10px; overflow-wrap: anywhere; word-break: break-word; }
+.file-list-item a, .file-list a { overflow-wrap: anywhere; word-break: break-word; }
+/* Barra de botones de las ventanas: si no caben en una línea, bajan en vez de cortarse
+   (Safari / pantallas angostas). En pantallas bajas la ventana usa casi todo el alto. */
+.modal-footer { flex-wrap: wrap; }
+.modal-footer .btn { flex-shrink: 0; }
+@media (max-height: 760px) { .modal-overlay { padding: 12px 12px; } }
+.modal input[type="file"]::-webkit-file-upload-button { max-width: 40%; }
+
+/* Desglose del pago con tarjeta: abono + recargo = total cobrado − comisión = neto */
+.pay-breakdown { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin: 4px 0 12px; font-size: 13px; }
+.pay-breakdown > div { display: flex; justify-content: space-between; padding: 2px 0; }
+.pay-breakdown > div.strong { font-weight: 700; border-top: 1px solid var(--border); margin-top: 3px; padding-top: 5px; }
+
+/* La ventana nunca es más alta que la pantalla: el contenido se desplaza por dentro y la barra
+   de botones (Guardar / Cancelar) queda siempre visible abajo, también en Safari. */
+.modal-overlay { align-items: center; padding: 16px; }
+.modal { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 0; }
+.modal > form, .modal > div:not(.modal-header) { padding-bottom: 0; }
+.modal .modal-footer { position: -webkit-sticky; position: sticky; bottom: 0; background: #fff; z-index: 5; margin-top: 18px; padding: 12px 0 16px; }
+.modal > *:last-child:not(form):not(.modal-footer) { margin-bottom: 18px; }
+
+/* Resumen de la cadena de una orden de compra: pedido → recibido → facturado → pagado */
+.chain-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 10px 0 12px; }
+.chain-box { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: #f8fafc; }
+.chain-box span { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+.chain-box strong { font-size: 15px; }
+.chain-box.warn { border-color: #fecaca; background: #fef2f2; }
+
+/* Manual de usuario */
+.help-layout { display: grid; grid-template-columns: 230px 1fr; gap: 16px; align-items: start; }
+.help-index { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 2px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+.help-index a { padding: 5px 8px; border-radius: 6px; font-size: 13px; color: var(--navy); text-decoration: none; }
+.help-index a:hover { background: #f1f5f9; }
+.help-index a.dim { opacity: .35; }
+.help-section { margin-bottom: 12px; padding: 0; scroll-margin-top: 12px; }
+.help-head { display: flex; gap: 12px; align-items: flex-start; width: 100%; background: none; border: 0; padding: 14px 18px; cursor: pointer; font: inherit; color: inherit; }
+.help-icon { font-size: 22px; line-height: 1; }
+.help-summary { display: block; font-size: 13px; margin-top: 3px; font-weight: 400; }
+.help-body { padding: 0 18px 16px 52px; }
+.help-task h4 { margin: 10px 0 4px; font-size: 14px; color: var(--navy); }
+.help-task ol { margin: 0; padding-left: 20px; }
+.help-task li { margin: 3px 0; line-height: 1.45; }
+.help-tips, .help-problems { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13.5px; }
+.help-tips { background: #eff6ff; }
+.help-tips ul { margin: 4px 0 0; padding-left: 18px; }
+.help-problems { background: #fff7ed; }
+.help-problem { margin-top: 8px; }
+.help-page mark { background: #fde68a; padding: 0 1px; border-radius: 2px; }
+.help-fab { position: fixed; right: 18px; bottom: 18px; z-index: 40; background: var(--navy, #0f2742); color: #fff; border-radius: 999px; padding: 9px 16px; font-weight: 700; font-size: 14px; text-decoration: none; box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+.help-fab:hover { filter: brightness(1.15); }
+@media (max-width: 900px) { .help-layout { grid-template-columns: 1fr; } .help-index { position: static; } .help-body { padding-left: 18px; } }
+@media print { .help-layout { display: block; } .help-section { break-inside: avoid-page; border: none; box-shadow: none; } .help-fab { display: none !important; } }
+
+/* Finanzas / Bancos */
+.bank-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.bank-card { display: flex; flex-direction: column; gap: 4px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; text-decoration: none; color: inherit; }
+a.bank-card:hover { border-color: var(--orange, #e8642c); box-shadow: 0 4px 14px rgba(0,0,0,.06); }
+.bank-card { position: relative; }
+.bank-card span { font-weight: 600; color: var(--navy); padding-right: 26px; }
+.bank-card-edit { position: absolute; top: 10px; right: 10px; border: none; background: transparent; cursor: pointer; font-size: 14px; opacity: .55; padding: 2px; }
+.bank-card-edit:hover { opacity: 1; }
+.bank-card.total .bank-card-edit { display: none; }
+.danger-zone { margin-top: 14px; padding: 10px 12px; border: 1px dashed #f1b4a8; border-radius: 8px; background: #fff8f6; }
+.link-btn.danger { color: #c0392b; }
+.bank-card strong { font-size: 22px; }
+.bank-card strong.neg { color: var(--red); }
+.bank-card em { font-style: normal; font-size: 12px; color: var(--text-muted); }
+.bank-card.total { background: var(--navy, #0f2742); color: #fff; }
+.bank-card.total span, .bank-card.total em { color: rgba(255,255,255,.8); }
+table.register tr.cleared td { background: #f8fafc; }
+
+/* Informes de préstamos (estado de cuenta e informe general) */
+.loan-report-wide { max-width: 1060px; }
+.loan-report-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-top: 14px; }
+.loan-report-kpis > div { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.loan-report-kpis span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.loan-report-kpis strong { font-size: 15px; color: var(--navy); }
+.loan-report-table { width: 100%; font-size: 12.5px; }
+.loan-report-table th, .loan-report-table td { padding: 5px 6px; }
+.loan-report-total td { border-top: 2px solid var(--navy); }
+@media print {
+  .loan-report-wide { max-width: 100%; }
+  .loan-report-table { font-size: 10.5px; }
+  .loan-report-table th, .loan-report-table td { padding: 3px 4px; }
+  .loan-report-kpis { gap: 6px; margin-top: 8px; }
+  .loan-report-kpis > div { padding: 5px 8px; }
+  .loan-report-kpis strong { font-size: 12px; }
+  .loan-report-kpis span { font-size: 9px; }
+  .loan-report .signature-block { margin-top: 26px !important; }
+  .loan-report-detail { page-break-inside: auto; }
+}
+
+.loan-pay-owed, .loan-pay-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.loan-pay-owed > div, .loan-pay-split > div { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+.loan-pay-split { margin-top: 8px; margin-bottom: 0; }
+.loan-pay-owed span, .loan-pay-split span { display: block; font-size: 11px; color: var(--text-muted); }
+.loan-pay-owed strong, .loan-pay-split strong { font-size: 15px; color: var(--navy); }
+
+/* ===================== CRM ===================== */
+.kpi-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi-row .kpi .value { font-size: 21px; }
+@media (max-width: 1200px) { .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.call-search { padding: 14px; position: relative; }
+.call-input { font-size: 18px !important; padding: 14px 16px !important; border: 2px solid var(--orange) !important; border-radius: 10px !important; }
+.call-hits { margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; max-height: 420px; overflow-y: auto; }
+.call-hit { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+.call-hit:hover { background: #fff3ec; }
+.call-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .call-grid { grid-template-columns: 1fr; } }
+.snap-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.snap-kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; }
+.snap-kpis > div { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; }
+.snap-kpis span { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.snap-kpis strong { font-size: 17px; color: var(--navy); }
+.snap-kpis strong.alert { color: var(--orange-dark); }
+.snap-kpis em { font-style: normal; font-size: 11.5px; color: var(--red); }
+.snap-sec { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--navy); margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--border); }
+.snap-contact { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; cursor: pointer; }
+.snap-contact:hover { border-color: var(--orange); }
+.snap-contact.on { border-color: var(--orange); background: #fff3ec; }
+.snap-line { padding: 6px 0; border-bottom: 1px dashed #e5e7eb; font-size: 13px; }
+.sub-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px 0; margin-bottom: 12px; }
+.check-line { display: flex; align-items: center; gap: 8px; font-size: 13.5px; margin: 6px 0; cursor: pointer; }
+.check-line input { width: auto; }
+.qp { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #fff; }
+.qp-tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+.qp-tab { border: 1px solid var(--border); background: #f8fafc; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; color: var(--steel); }
+.qp-tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.qp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.qp-chip { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--text); }
+.qp-chip:hover { border-color: var(--orange); }
+.qp-chip.on { background: var(--orange); border-color: var(--orange); color: #fff; }
+.qp-chip.on .muted { color: #ffe4d6; }
+.qp-chip.cat.on { background: var(--navy); border-color: var(--navy); }
+.qp-list { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+.qp-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #f1f5f9; cursor: pointer; font-size: 13px; }
+.qp-row:hover { background: #fff3ec; }
+.qp-row.on { background: #ffedd5; }
+.qp-check { width: 20px; text-align: center; font-weight: 700; color: var(--orange-dark); }
+.qp-sel-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+.qp-kind { font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; background: #eef2f7; color: var(--steel); border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
+.dup-box { border: 2px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; background: #fffaf5; }
+.dup-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid #f1e5da; }
+.dup-row:first-of-type { border-top: 0; }
+.req-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.contact-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.contact-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: #fff; }
+.timeline { display: flex; flex-direction: column; }
+.tl-item { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid #f1f5f9; }
+.tl-icon { width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tl-body { flex: 1; min-width: 0; font-size: 13.5px; }
+.tl-top { display: flex; gap: 8px; align-items: center; font-size: 12px; margin-bottom: 2px; flex-wrap: wrap; }
+.tl-kind { font-weight: 700; color: var(--navy); text-transform: uppercase; font-size: 11px; letter-spacing: .03em; }
+.report-h { font-size: 14px; color: var(--navy); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 6px; border-bottom: 2px solid var(--navy); padding-bottom: 3px; }
+.report-kv { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+.report-vehicle { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 13px; page-break-inside: avoid; }
+.report-sheet table { font-size: 12px; }
+
+.tl-detail { font-size: 12.5px; white-space: pre-wrap; max-height: 3.2em; overflow: hidden; cursor: pointer; position: relative; }
+.tl-detail.open { max-height: none; }
+.report-sheet td.nw, .report-sheet td.mono { white-space: nowrap; }
+.contact-card .row-actions { flex-wrap: nowrap; flex-shrink: 0; align-self: flex-start; }
+
+.drop-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 14px; text-align: center; font-size: 13px; color: var(--text-muted); cursor: pointer; background: #fafbfc; }
+.drop-zone:hover, .drop-zone.over { border-color: var(--orange); background: #fff3ec; color: var(--orange-dark); }
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+.file-tile { position: relative; border: 1px solid var(--border); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 3px; background: #fff; min-width: 0; }
+.file-tile img { width: 100%; height: 90px; object-fit: cover; border-radius: 6px; background: #f1f5f9; }
+.file-link { display: flex; flex-direction: column; gap: 3px; color: var(--text); min-width: 0; }
+.file-ico { height: 90px; display: flex; align-items: center; justify-content: center; font-size: 36px; background: #f8fafc; border-radius: 6px; }
+.file-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-x { position: absolute; top: 4px; right: 4px; border: 0; background: rgba(255,255,255,.9); border-radius: 50%; width: 22px; height: 22px; cursor: pointer; color: var(--red); font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.qp-add { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+
+/* Solo el administrador puede anular o borrar: se ocultan esos botones a los demás usuarios */
+.no-admin .btn-danger, .no-admin .btn-row-action.delete, .no-admin .admin-only, .no-admin .file-x.admin-only { display: none !important; }

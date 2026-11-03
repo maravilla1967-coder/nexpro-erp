@@ -14,11 +14,21 @@ function withItems(so) {
 
 // ---- Lógica de aplicación real de cambios (usada directamente por admin, o por la
 // ruta de aprobaciones cuando el administrador aprueba la solicitud de otro usuario) ----
+// Factura vigente del pedido (si la tiene). Mientras exista, el pedido es "facturado" siempre:
+// su estado no se puede cambiar a mano (antes el selector de estado permitía devolverlo a
+// "aprobado" y el pedido volvía a aparecer como pendiente de facturar).
+function liveInvoice(id) {
+  return get(`SELECT id, number FROM invoices WHERE sales_order_id = ? AND status NOT IN ('anulada','cancelado')`, [id]);
+}
+
 function applyUpdate(id, b) {
   const existing = get('SELECT * FROM sales_orders WHERE id = ?', [id]);
   if (!existing) throw new Error('Pedido no encontrado');
-  run(`UPDATE sales_orders SET status=?, notes=?, updated_at=? WHERE id=?`,
-    [b.status ?? existing.status, b.notes ?? existing.notes, nowIso(), id]);
+  if (liveInvoice(id)) b = { ...b, status: 'facturado' };
+  // El cliente también se puede cambiar al editar (antes se ignoraba y el pedido conservaba el cliente original).
+  const customerId = b.customerId && get('SELECT id FROM customers WHERE id = ?', [b.customerId]) ? Number(b.customerId) : existing.customer_id;
+  run(`UPDATE sales_orders SET customer_id=?, status=?, notes=?, updated_at=? WHERE id=?`,
+    [customerId, b.status ?? existing.status, b.notes ?? existing.notes, nowIso(), id]);
 
   if (Array.isArray(b.items)) {
     run('DELETE FROM sales_order_items WHERE sales_order_id = ?', [id]);
@@ -32,13 +42,23 @@ function applyUpdate(id, b) {
   return get('SELECT * FROM sales_orders WHERE id = ?', [id]);
 }
 
+// Un pedido ya facturado no se borra: primero se elimina o anula la factura.
+function assertCanDelete(id) {
+  const inv = get(`SELECT number FROM invoices WHERE sales_order_id = ? AND status NOT IN ('anulada','cancelado')`, [id]);
+  if (inv) throw Object.assign(new Error(`El pedido ya se facturó (${inv.number}). Elimina o anula esa factura primero.`), { status: 400 });
+}
+
 function applyDelete(id) {
+  assertCanDelete(id);
+  run(`UPDATE invoices SET sales_order_id = NULL WHERE sales_order_id = ?`, [id]);
   run('DELETE FROM sales_orders WHERE id = ?', [id]);
 }
 
 router.get('/', (req, res) => {
   const list = all(
     `SELECT so.*, c.name as customer_name,
+            (SELECT i.id FROM invoices i WHERE i.sales_order_id = so.id AND i.status NOT IN ('anulada','cancelado')) AS invoice_id,
+            (SELECT i.number FROM invoices i WHERE i.sales_order_id = so.id AND i.status NOT IN ('anulada','cancelado')) AS invoice_number,
             (SELECT COALESCE(SUM(i.quantity * i.unit_price), 0) FROM sales_order_items i WHERE i.sales_order_id = so.id) AS total
      FROM sales_orders so
      LEFT JOIN customers c ON c.id = so.customer_id ORDER BY so.created_at DESC`
@@ -49,8 +69,13 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   const so = get(
     `SELECT so.*, c.name as customer_name, c.address as customer_address, c.city as customer_city, c.zip as customer_zip,
-            c.tax_id as customer_tax_id, c.phone as customer_phone, c.email as customer_email
-     FROM sales_orders so LEFT JOIN customers c ON c.id = so.customer_id WHERE so.id = ?`,
+            c.tax_id as customer_tax_id, c.phone as customer_phone, c.email as customer_email,
+            k.name as contact_name, k.role as contact_role, k.email as contact_email, k.phone as contact_phone,
+            r.number as request_number,
+            (SELECT i.id FROM invoices i WHERE i.sales_order_id = so.id AND i.status NOT IN ('anulada','cancelado')) AS invoice_id,
+            (SELECT i.number FROM invoices i WHERE i.sales_order_id = so.id AND i.status NOT IN ('anulada','cancelado')) AS invoice_number
+     FROM sales_orders so LEFT JOIN customers c ON c.id = so.customer_id
+     LEFT JOIN contacts k ON k.id = so.contact_id LEFT JOIN crm_requests r ON r.id = so.request_id WHERE so.id = ?`,
     [req.params.id]
   );
   if (!so) return res.status(404).json({ error: 'Pedido no encontrado' });
@@ -104,10 +129,13 @@ router.delete('/:id', (req, res) => {
   const existing = get('SELECT * FROM sales_orders WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Pedido no encontrado' });
 
-  if (req.user.role === 'admin') {
-    applyDelete(req.params.id);
-    return res.status(204).end();
-  }
+  try {
+    assertCanDelete(req.params.id);
+    if (req.user.role === 'admin') {
+      applyDelete(req.params.id);
+      return res.status(204).end();
+    }
+  } catch (err) { return res.status(err.status || 500).json({ error: err.message }); }
   const result = run(
     `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
      VALUES ('sales_order', ?, 'delete', NULL, ?, ?)`,

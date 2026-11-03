@@ -42,6 +42,8 @@ export default function SalesOrderDocument() {
             <div className="muted">{so.customer_address} {so.customer_city || ''} {so.customer_zip || ''}</div>
             <div className="muted">{so.customer_tax_id && `${t('NIT/ID:')} ${so.customer_tax_id}`}</div>
             <div className="muted">{so.customer_email} {so.customer_phone}</div>
+            {so.contact_name && <div style={{ marginTop: 4 }}><strong>{t('Atención:')}</strong> {so.contact_name}{so.contact_role ? `, ${so.contact_role}` : ''}{so.contact_email ? ` · ${so.contact_email}` : ''}</div>}
+            {so.request_number && <div className="muted" style={{ fontSize: 12 }}>{t('Ref. solicitud')} {so.request_number}</div>}
           </div>
 
           <table style={{ marginTop: 20 }}>

@@ -5,7 +5,7 @@ import Pill from '../components/Pill.jsx';
 import DocumentBrand from '../components/DocumentBrand.jsx';
 import { useI18n } from '../i18n.jsx';
 
-const PART_ACTION_LABELS = { reemplazada: 'Reemplazada', reparada: 'Reparada', garantia: 'Garantía', cliente: 'Suministrada por el cliente' };
+const PART_ACTION_LABELS = { reemplazada: 'Reemplazada', reparada: 'Reparada', instalada: 'Instalada', proveedor: 'Suministrada e instalada por proveedor', garantia: 'Garantía', cliente: 'Suministrada por el cliente' };
 
 // Documento de recepción del vehículo: siempre disponible desde que el vehículo entra
 // (no depende de que ya exista una orden de trabajo), para que el cliente lo firme al
@@ -125,6 +125,7 @@ export default function VehicleReceptionDocument() {
                         <tr key={p.id}>
                           <td>
                             {p.description}
+                            {p.serial && <div className="mono" style={{ fontSize: 11 }}>S/N: {p.serial}</div>}
                             {p.notes && <div className="muted" style={{ fontSize: 11 }}>{p.notes}</div>}
                           </td>
                           <td>{t(PART_ACTION_LABELS[p.action] || 'Reemplazada')}</td>

@@ -55,6 +55,58 @@ CREATE TABLE IF NOT EXISTS activities (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ===================== CRM: SOLICITUDES =====================
+-- Cada vez que un cliente llama, escribe o manda un texto pidiendo algo queda una solicitud
+-- (NX-RQ-AAAAMMDD-NN) con lo que busca (productos, servicios o tipos de equipo escogidos de la
+-- lista). Un mismo cliente puede tener muchas solicitudes; si pide precio, la solicitud genera
+-- una orden de pedido borrador (sales_orders) para revisarla y cotizarla con exactitud.
+CREATE TABLE IF NOT EXISTS crm_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+  channel TEXT NOT NULL DEFAULT 'llamada', -- llamada / email / texto / whatsapp / web / visita
+  subject TEXT,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'nueva', -- nueva / en_proceso / cotizada / ganada / perdida / cerrada
+  priority TEXT NOT NULL DEFAULT 'normal', -- baja / normal / alta / urgente
+  vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL,
+  sales_order_id INTEGER REFERENCES sales_orders(id) ON DELETE SET NULL,
+  assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  reply_to TEXT, -- correo o teléfono por donde llegó (para responder por el mismo medio)
+  ack_sent_at TEXT,
+  quote_sent_at TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS crm_request_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL REFERENCES crm_requests(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'producto', -- producto / servicio / categoria / equipo / libre
+  product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+  service_id INTEGER REFERENCES services(id) ON DELETE SET NULL,
+  product_type_id INTEGER REFERENCES product_types(id) ON DELETE SET NULL,
+  equipment_type_id INTEGER REFERENCES equipment_types(id) ON DELETE SET NULL,
+  description TEXT NOT NULL,
+  quantity REAL NOT NULL DEFAULT 1,
+  unit_price REAL,
+  notes TEXT
+);
+
+-- Documentos y fotos que manda el cliente con su solicitud (requerimientos, especificaciones,
+-- fotos del equipo o del vehículo…). Cualquier tipo de archivo.
+CREATE TABLE IF NOT EXISTS crm_request_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL REFERENCES crm_requests(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  mime_type TEXT,
+  size INTEGER,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ===================== INVENTARIO =====================
 CREATE TABLE IF NOT EXISTS product_types (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +159,8 @@ CREATE TABLE IF NOT EXISTS products (
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  -- Columnas agregadas por migración (db/index.js): track_serials, vendor_item_number,
+  -- chassis_ca, gvwr, body_weight, installation_cost, vendor_stocked
 );
 
 -- ===================== COMPRAS =====================
@@ -332,5 +386,249 @@ CREATE TABLE IF NOT EXISTS approval_requests (
   resolved_by INTEGER REFERENCES users(id),
   resolved_at TEXT,
   reject_reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ===================== GARANTÍAS =====================
+-- Un solo módulo para dos usos:
+--   kind = 'reclamo'  → reclamo de garantía al fabricante (equipo/camión que falló).
+--   kind = 'registro' → registro de la garantía de un equipo recién comprado (constancia).
+-- Ningún dato es obligatorio: VIN, modelo, año, fecha de compra, etc. se llenan si se tienen.
+CREATE TABLE IF NOT EXISTS warranties (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL DEFAULT 'reclamo', -- 'reclamo' | 'registro'
+  status TEXT NOT NULL DEFAULT 'abierta', -- reclamo: abierta/enviada/aprobada/rechazada/cerrada; registro: registrada
+  vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL,
+  vehicle_equipment_id INTEGER REFERENCES vehicle_equipment(id) ON DELETE SET NULL,
+  purchase_order_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
+  supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  responsible_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  item_description TEXT,
+  vin TEXT,
+  serial_number TEXT,
+  manufacturer TEXT,
+  model TEXT,
+  year INTEGER,
+  purchase_date TEXT,
+  warranty_start TEXT,
+  warranty_end TEXT,
+  claim_date TEXT,
+  manufacturer_claim_number TEXT,
+  problem_description TEXT,
+  resolution TEXT,
+  claim_amount REAL,
+  approved_amount REAL,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Archivos de constancia: registro de garantía del fabricante, fotos de la falla, facturas, etc.
+CREATE TABLE IF NOT EXISTS warranty_attachments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  warranty_id INTEGER NOT NULL REFERENCES warranties(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ===================== COBROS (pagos de clientes a facturas) =====================
+-- Una factura puede recibir varios abonos. El estado de la factura se recalcula solo:
+-- pendiente (sin pagos) → parcial (pagó una parte) → pagada (saldo en cero).
+CREATE TABLE IF NOT EXISTS invoice_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  payment_date TEXT NOT NULL,
+  amount REAL NOT NULL,
+  method TEXT, -- cheque, transferencia (ACH/wire), tarjeta, efectivo, otro
+  reference TEXT, -- no. de cheque, confirmación de la transferencia…
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ===================== RECEPCIÓN DE MERCANCÍA (contra orden de compra) =====================
+-- Cada recepción registra cuánto llegó de cada línea; la orden queda "parcial" hasta que
+-- se recibe todo. El inventario sube solo por lo que realmente llegó.
+CREATE TABLE IF NOT EXISTS goods_receipts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  receipt_date TEXT NOT NULL,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS goods_receipt_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  goods_receipt_id INTEGER NOT NULL REFERENCES goods_receipts(id) ON DELETE CASCADE,
+  purchase_order_item_id INTEGER REFERENCES purchase_order_items(id) ON DELETE SET NULL,
+  product_id INTEGER REFERENCES products(id),
+  description TEXT,
+  quantity REAL NOT NULL
+);
+
+-- ===================== CUENTAS POR PAGAR (facturas de proveedores) =====================
+CREATE TABLE IF NOT EXISTS supplier_bills (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+  purchase_order_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
+  bill_number TEXT, -- número de la factura del proveedor
+  bill_date TEXT,
+  due_date TEXT,
+  amount REAL NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pendiente', -- pendiente / parcial / pagada / anulada
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS supplier_bill_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bill_id INTEGER NOT NULL REFERENCES supplier_bills(id) ON DELETE CASCADE,
+  payment_date TEXT NOT NULL,
+  amount REAL NOT NULL,
+  method TEXT,
+  reference TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS supplier_bill_attachments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bill_id INTEGER NOT NULL REFERENCES supplier_bills(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ===================== NÚMEROS DE SERIE POR UNIDAD =====================
+-- Para productos con "Maneja seriales": cada unidad física (grúa, compresor, bucket…) es un
+-- registro con su número de serie, de qué compra vino y a dónde fue (factura/cliente o
+-- vehículo donde quedó instalada). serial_events guarda la historia completa.
+CREATE TABLE IF NOT EXISTS product_serials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  serial TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'disponible', -- disponible / vendido / instalado / dado_de_baja
+  purchase_order_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
+  goods_receipt_id INTEGER REFERENCES goods_receipts(id) ON DELETE SET NULL,
+  supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+  received_date TEXT,
+  unit_cost REAL,
+  invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL,
+  status_date TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (product_id, serial)
+);
+CREATE TABLE IF NOT EXISTS serial_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  serial_id INTEGER NOT NULL REFERENCES product_serials(id) ON DELETE CASCADE,
+  event TEXT NOT NULL, -- recibido / alta_manual / vendido / instalado / dado_de_baja / disponible
+  reference TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Comprobantes de pago (tiquete de la tarjeta, confirmación de transferencia/ACH, foto del
+-- cheque…). Sirve tanto para cobros de facturas (kind='invoice') como para pagos a
+-- proveedores (kind='bill').
+CREATE TABLE IF NOT EXISTS payment_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL, -- 'invoice' | 'bill'
+  payment_id INTEGER NOT NULL,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Comprobante de pago sin factura (documento soporte): pago a un proveedor de servicios que
+-- no expide factura. Deja constancia de quién hizo el trabajo, qué se hizo, en qué vehículo u
+-- orden de trabajo, cuánto se pagó y cómo. Crea la cuenta por pagar enlazada (supplier_bills).
+CREATE TABLE IF NOT EXISTS service_vouchers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+  service_date TEXT,
+  service_type TEXT,
+  description TEXT NOT NULL,
+  amount REAL NOT NULL DEFAULT 0,
+  vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL,
+  work_order_id INTEGER REFERENCES work_orders(id) ON DELETE SET NULL,
+  bill_id INTEGER REFERENCES supplier_bills(id) ON DELETE SET NULL,
+  received_by TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS service_voucher_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  voucher_id INTEGER NOT NULL REFERENCES service_vouchers(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ===== Finanzas / Bancos =====
+-- Cuentas bancarias (o caja / tarjeta) con saldo inicial. El saldo = saldo inicial + cobros de
+-- facturas (invoice_payments.bank_account_id) − pagos a proveedores (supplier_bill_payments
+-- .bank_account_id) ± movimientos propios del banco (bank_transactions).
+CREATE TABLE IF NOT EXISTS bank_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  bank_name TEXT,
+  account_type TEXT NOT NULL DEFAULT 'corriente', -- corriente / ahorros / tarjeta / efectivo / otra
+  account_number TEXT,
+  routing_number TEXT,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  opening_balance REAL NOT NULL DEFAULT 0,
+  opening_date TEXT,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- Préstamos recibidos de socios o terceros (el dinero entra a una cuenta como bank_transaction).
+CREATE TABLE IF NOT EXISTS loans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  lender_name TEXT NOT NULL,
+  lender_type TEXT NOT NULL DEFAULT 'socio', -- socio / tercero / banco
+  principal REAL NOT NULL DEFAULT 0,
+  loan_date TEXT,
+  interest_rate REAL,
+  due_date TEXT,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- Movimientos propios del banco: préstamos recibidos y sus abonos, nómina, transferencias entre
+-- cuentas, comisiones, impuestos, aportes y otros ingresos/egresos.
+CREATE TABLE IF NOT EXISTS bank_transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL REFERENCES bank_accounts(id) ON DELETE CASCADE,
+  tx_date TEXT NOT NULL,
+  direction TEXT NOT NULL, -- 'in' ingreso / 'out' egreso
+  category TEXT NOT NULL,
+  amount REAL NOT NULL,
+  payee TEXT,
+  description TEXT,
+  reference TEXT,
+  period TEXT, -- nómina: periodo pagado
+  loan_id INTEGER REFERENCES loans(id) ON DELETE CASCADE,
+  transfer_group TEXT,
+  cleared INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS bank_transaction_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  transaction_id INTEGER NOT NULL REFERENCES bank_transactions(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

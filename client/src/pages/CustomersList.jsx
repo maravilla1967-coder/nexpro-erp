@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
+import CustomerForm, { EMPTY_CUSTOMER, EMPTY_CONTACT } from '../crm/CustomerForm.jsx';
+import { RolePills, StatusPill } from '../crm/CustomerSnapshot.jsx';
+import { ROLES, shortDate } from '../crm/constants.js';
 const CUSTOMER_COLUMNS = [
   { label: 'Nombre', value: (r) => r.name },
   { label: 'Tipo', value: (r) => r.type },
+  { label: 'Relación', value: (r) => r.roles },
+  { label: 'Otros nombres', value: (r) => r.aliases },
   { label: 'NIT', value: (r) => r.tax_id },
   { label: 'Industria', value: (r) => r.industry },
   { label: 'Email', value: (r) => r.email },
@@ -18,31 +23,32 @@ const CUSTOMER_COLUMNS = [
   { label: 'Estado', value: (r) => r.status },
 ];
 
-const EMPTY = { type: 'empresa', name: '', taxId: '', email: '', phone: '', address: '', city: '', zip: '', industry: '', status: 'lead', source: '', notes: '' };
-
 export default function CustomersList() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [list, setList] = useState([]);
   const ex = useListExport({ rows: list });
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [role, setRole] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState(EMPTY_CUSTOMER);
+  const [contact, setContact] = useState(EMPTY_CONTACT);
   const [error, setError] = useState('');
 
   function load() {
-    api.get('/customers', { q, status }).then(setList).catch(console.error);
+    api.get('/customers', { q, status, role }).then(setList).catch(console.error);
   }
-  useEffect(() => { load(); }, [q, status]);
+  useEffect(() => { load(); }, [q, status, role]);
 
-  function openNew() { setForm(EMPTY); setError(''); setModalOpen(true); }
+  function openNew() { setForm({ ...EMPTY_CUSTOMER, name: q }); setContact(EMPTY_CONTACT); setError(''); setModalOpen(true); }
 
   async function save(e) {
     e.preventDefault();
     try {
-      await api.post('/customers', form);
+      const c = await api.post('/customers', { ...form, firstContact: contact });
       setModalOpen(false);
-      load();
+      navigate(`/clientes/${c.id}`);
     } catch (err) { setError(err.message); }
   }
 
@@ -51,13 +57,20 @@ export default function CustomersList() {
       <div className="topbar">
         <div>
           <h1>{t('Clientes (CRM)')}</h1>
-          <div className="sub">{t('Empresas, municipios y contactos')}</div>
+          <div className="sub">{t('Clientes, clientes potenciales, proveedores y dealers')}</div>
         </div>
-        <button className="btn btn-primary" onClick={openNew}>{t('+ Nuevo cliente')}</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link to="/crm/llamada" className="btn">{t('📞 Atender llamada')}</Link>
+          <button className="btn btn-primary" onClick={openNew}>{t('+ Nuevo cliente')}</button>
+        </div>
       </div>
       <div className="content">
         <div className="toolbar">
-          <input className="search-input" placeholder={t('Buscar por nombre, email, teléfono…')} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="search-input" placeholder={t('Buscar por nombre, alias, persona, email, teléfono…')} value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="seg">
+            <button type="button" className={`seg-btn ${role === '' ? 'active' : ''}`} onClick={() => setRole('')}>{t('Todos')}</button>
+            {ROLES.map((r) => <button key={r.key} type="button" className={`seg-btn ${role === r.key ? 'active' : ''}`} onClick={() => setRole(r.key)}>{t(r.label)}</button>)}
+          </div>
           <select style={{ width: 180 }} value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">{t('Todos los estados')}</option>
             <option value="lead">{t('Lead')}</option>
@@ -73,17 +86,19 @@ export default function CustomersList() {
             <><ListExportBar ex={ex} title={t('Clientes')} filename="clientes" columns={CUSTOMER_COLUMNS} />
             <table>
               <thead>
-                <tr><th><SelectAllBox ex={ex} /></th><th>{t('Nombre')}</th><th>{t('Industria')}</th><th>{t('Contacto')}</th><th>{t('Ciudad')}</th><th>{t('Estado')}</th></tr>
+                <tr><th><SelectAllBox ex={ex} /></th><th>{t('Nombre')}</th><th>{t('Relación')}</th><th>{t('Contacto')}</th><th>{t('Personas')}</th><th>{t('Solicitudes abiertas')}</th><th>{t('Última interacción')}</th><th>{t('Estado')}</th></tr>
               </thead>
               <tbody>
                 {ex.visible.map((c) => (
-                  <tr key={c.id} className="clickable" onClick={() => window.location.assign(`/clientes/${c.id}`)}>
+                  <tr key={c.id} className="clickable" onClick={() => navigate(`/clientes/${c.id}`)}>
                     <td onClick={(e) => e.stopPropagation()}><RowBox ex={ex} row={c} /></td>
-                    <td><Link to={`/clientes/${c.id}`}>{c.name}</Link></td>
-                    <td className="muted">{c.industry || '—'}</td>
-                    <td className="muted">{c.email || c.phone || '—'}</td>
-                    <td className="muted">{c.city || '—'}</td>
-                    <td><Pill value={c.status} /></td>
+                    <td><Link to={`/clientes/${c.id}`}>{c.name}</Link>{c.aliases && <div className="muted" style={{ fontSize: 11.5 }}>{c.aliases}</div>}</td>
+                    <td><RolePills roles={c.roles} /></td>
+                    <td className="muted">{c.phone || c.email || '—'}{c.city && <div style={{ fontSize: 11.5 }}>{c.city}</div>}</td>
+                    <td className="muted">{c.contacts_count || 0}</td>
+                    <td>{c.open_requests ? <span className="pill amber">{c.open_requests}</span> : <span className="muted">—</span>}</td>
+                    <td className="muted">{shortDate(c.last_interaction)}</td>
+                    <td><StatusPill status={c.status} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -93,67 +108,11 @@ export default function CustomersList() {
       </div>
 
       {modalOpen && (
-        <Modal title={t('Nuevo cliente')} onClose={() => setModalOpen(false)}>
+        <Modal title={t('Nuevo cliente')} onClose={() => setModalOpen(false)} wide>
           <form onSubmit={save}>
             {error && <div className="error-banner">{error}</div>}
-            <div className="grid grid-2">
-              <div className="field">
-                <label>{t('Nombre / Empresa *')}</label>
-                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>{t('Tipo')}</label>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  <option value="empresa">{t('Empresa / Municipio')}</option>
-                  <option value="persona">{t('Persona')}</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>{t('Industria')}</label>
-                <input placeholder="municipal, utilities, construction..." value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>{t('Estado')}</label>
-                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                  <option value="lead">{t('Lead')}</option>
-                  <option value="prospecto">{t('Prospecto')}</option>
-                  <option value="cliente">{t('Cliente')}</option>
-                  <option value="inactivo">{t('Inactivo')}</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>{t('Email')}</label>
-                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>{t('Teléfono')}</label>
-                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>{t('Dirección')}</label>
-                <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>{t('Ciudad')}</label>
-                <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>{t('Código postal')}</label>
-                <input value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>{t('NIT / Identificación')}</label>
-                <input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} />
-              </div>
-              <div className="field">
-                <label>{t('Fuente')}</label>
-                <input placeholder={t('referido, web, llamada...')} value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} />
-              </div>
-            </div>
-            <div className="field">
-              <label>{t('Notas')}</label>
-              <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-            </div>
+            <CustomerForm form={form} setForm={setForm} withContact contact={contact} setContact={setContact}
+              onUseExisting={(d) => { setModalOpen(false); navigate(`/clientes/${d.id}`); }} />
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => setModalOpen(false)}>{t('Cancelar')}</button>
               <button type="submit" className="btn btn-primary">{t('Guardar')}</button>

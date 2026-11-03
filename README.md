@@ -115,7 +115,7 @@ La base de datos vive en `server/db/nexpro.db` (un solo archivo).
 | Módulo | Pantallas | Qué hace |
 |---|---|---|
 | **Dashboard** | `/` | Totales (clientes, leads, productos, stock bajo, pedidos abiertos, facturas pendientes y su monto, vehículos en taller, órdenes de trabajo abiertas) + actividad reciente + vehículos recientes. |
-| **CRM (Clientes)** | `/clientes`, `/clientes/:id` | Clientes/municipios, contactos, pipeline de oportunidades por etapas, actividades y tareas de seguimiento, vehículos vinculados. |
+| **CRM** | `/crm/llamada`, `/crm/solicitudes`, `/clientes`, `/clientes/:id`, `/clientes/:id/informe` | Ver sección 16. Atender llamada (búsqueda por teléfono/nombre/VIN/serie con ficha 360 al instante), solicitudes con productos/servicios escogidos de la lista, orden de pedido borrador para cotizar, correo de acuse y de cotización, varias personas por cliente con su cargo, roles cliente/potencial/proveedor/dealer, detección de duplicados, historial completo e informe imprimible. |
 | **Inventario** | `/inventario` | Productos con foto, costo de compra, flete, margen de ganancia (precio = (costo+flete)/(1−margen%)), tipos de producto configurables, control de stock. |
 | **Proveedores** | `/proveedores` | Catálogo de proveedores, con código de 2 letras (automático o manual) usado en la numeración de órdenes de compra. |
 | **Compras** | `/compras` | Órdenes de compra a proveedores; al marcarlas "recibida" se suma automáticamente al stock del producto. |
@@ -147,7 +147,7 @@ solo un punto de partida.
 
 Definido completo en `server/db/schema.sql`. Tablas principales:
 
-`customers`, `contacts`, `opportunities`, `activities` — CRM
+`customers` (+ roles, aliases, supplier_id, preferred_language…), `contacts` (+ contact_type, mobile, is_primary), `opportunities`, `activities` (interacciones: + contact_id, request_id, direction, created_by, occurred_at), `crm_requests` + `crm_request_items` — CRM
 `product_types`, `products`, `suppliers` — inventario y proveedores
 `purchase_orders` + `purchase_order_items` — compras
 `sales_orders` + `sales_order_items` — pedidos
@@ -169,12 +169,26 @@ con versiones.
 
 ## 7. Flujo de aprobaciones
 
+> Anular y borrar NO pasa por aprobaciones: solo el administrador puede hacerlo (ver "Anular y eliminar documentos").
+
 Para **facturas** y **pedidos** específicamente: si un usuario no-admin con permiso de edición
 en ese módulo intenta modificar o borrar un documento, el cambio **no se aplica de inmediato** —
 se guarda en `approval_requests` con estado `pendiente` y el usuario recibe el mensaje "Los
 cambios se enviaron para autorización del administrador." Un admin lo ve en **Aprobaciones** y
 puede aprobarlo (se aplica tal cual se solicitó) o rechazarlo (con motivo opcional). El resto de
 los módulos aplican los cambios de inmediato en cuanto el usuario tiene permiso de edición.
+
+### Anular y eliminar documentos
+- **Órdenes de compra:** "Anular" (queda como `cancelado`, se puede "Reactivar") y "Eliminar" solo si no
+  tiene mercancía recibida ni cuentas por pagar vigentes; si ya se recibió algo se usa "cerrar faltante".
+- **Órdenes de pedido:** anular = estado "cancelado"; "Eliminar" solo si no tiene una factura vigente.
+- **Facturas:** "Anular factura" (sin pagos registrados) la deja en el historial como `anulada` y libera
+  sus órdenes de trabajo, el pedido y los seriales para volver a facturar; "Eliminar factura" la borra.
+- **Órdenes de trabajo:** "Anular" (estado `cancelado`) y "Eliminar" solo si no están facturadas.
+- **Anular o borrar es solo del administrador** (decisión de Jorge): a los demás usuarios no se les muestran
+  esos botones y el servidor les rechaza cualquier DELETE o cambio a estado anulado/cancelado (403, no va a
+  Aprobaciones) — `server/src/middleware/changeControl.js`, `isVoidOrDelete`. Las demás modificaciones de
+  documentos siguen yendo a Aprobaciones.
 
 ## 8. Documentos imprimibles: marca, transferencia bancaria y sincronización
 
@@ -269,6 +283,11 @@ En cuanto estén esos registros, Railway emite el certificado solo y la direcci�
 
 ## 14. Historial de cambios importantes (más reciente primero)
 
+- **CRM completo (nov 2026):** consola "Atender llamada", solicitudes (`NX-RQ-…`), orden de pedido
+  borrador desde la solicitud, correos de acuse/cotización, varias personas por cliente con cargo,
+  roles cliente/potencial/proveedor/dealer, detección de clientes duplicados, ficha 360 e informe
+  del cliente. Detalle en la sección 16.
+
 - **Sincronizar factura con orden de trabajo:** botón para traer a una factura ya generada las
   líneas nuevas que se agreguen después en su orden de trabajo, sin tocar lo ya facturado. De
   paso se corrigió un error donde actualizar una factura (por ejemplo con el botón de
@@ -291,3 +310,41 @@ En cuanto estén esos registros, Railway emite el certificado solo y la direcci�
   frenado tanto la publicación del sitio web como el dominio propio del ERP.
 - Si el volumen de datos crece mucho o se necesita acceso concurrente pesado, el modelo de datos
   ya está listo para migrar de SQLite a Postgres si hace falta más adelante.
+
+## 16. CRM (detalle)
+
+**Pantallas**
+- `/crm/llamada` — *Atender llamada*: un buscador (`GET /api/crm/lookup?q=`) que encuentra por
+  teléfono en cualquier formato (compara solo dígitos, en cliente y en cada persona), nombre o alias
+  del cliente, nombre/correo de la persona, VIN, placa, número de serie de un equipo instalado o
+  vendido, y proveedores sin ficha CRM (se les crea con `POST /api/crm/from-supplier/:id`). Al
+  escoger, muestra la ficha resumida (`GET /api/crm/customers/:id/360`) y el formulario de la
+  solicitud.
+- `/crm/solicitudes` — lista con filtros por estado; `?abrir=ID` abre el detalle (revisar ítems,
+  crear/completar la orden de pedido, enviar acuse o cotización, cambiar estado/prioridad).
+- `/clientes/:id` — ficha 360 con pestañas (historial completo, personas, solicitudes,
+  interacciones, vehículos y equipos con historial de servicio, cotizaciones/facturas/pagos,
+  oportunidades, datos). `/clientes/:id/informe` — informe imprimible.
+
+**Reglas**
+- Roles en `customers.roles` (texto separado por comas): `cliente`, `potencial`, `proveedor`,
+  `dealer`. Al marcar `proveedor` se enlaza (o crea) la ficha en `suppliers` (`customers.supplier_id`).
+- Duplicados: `GET /api/crm/duplicates?name=&phone=&email=&taxId=` puntúa 0-100 (nombre normalizado
+  sin "Inc/LLC/City of…", contenido uno en otro, errores de tipeo, siglas, alias; teléfono/correo/Tax
+  ID iguales = 95-100). El formulario de cliente lo consulta mientras se escribe.
+- Solicitud (`crm_requests`, número `NX-RQ-AAAAMMDD-NN`): al crearla se registra la interacción
+  entrante en `activities`; un cliente en `lead` pasa a `prospecto`. La solicitud NO crea la orden de pedido: solo se crea
+  (estado `borrador`) cuando alguien pulsa "Crear cotización" o "Facturar" en la solicitud (`sales_orders.request_id`, `contact_id`). Productos y servicios
+  van con precio de lista; categorías/equipos/texto libre van en $0 "(por cotizar)". "Traer ítems
+  nuevos" solo agrega líneas mientras la orden siga en borrador, nunca borra.
+- Mensajes (`POST /api/crm/requests/:id/messages`, kind `acuse` | `cotizacion` | `seguimiento`):
+  quedan como interacción saliente. La cotización pasa la solicitud a `cotizada` y la orden de
+  `borrador` a `pendiente`. Ganada → el cliente potencial pasa a `cliente`.
+- El ERP no envía correos por sí mismo: abre el programa de correo (`mailto:`), SMS o WhatsApp con el
+  texto listo, o lo copia. Para envío directo desde el servidor haría falta configurar SMTP/Gmail.
+- Adjuntos de la solicitud: `crm_request_files` (archivos en `/uploads/crm-requests`, hasta 20 MB c/u),
+  `POST /api/crm/requests/:id/files` (campo `files`, varios) y `DELETE …/files/:fileId`.
+- Opciones nuevas en la lista: `POST /api/crm/catalog-item` `{kind: equipo|servicio|producto, name, productTypeId}`
+  crea el tipo de equipo, el servicio (precio $0, tarifa "servicio completo") o el producto (costo/precio $0)
+  o reutiliza el que ya exista con ese nombre.
+- Vehículo ↔ persona: `vehicles.contact_id` (`PUT /api/crm/vehicles/:id/contact`).

@@ -7,11 +7,16 @@ import Modal from './components/Modal.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import CustomersList from './pages/CustomersList.jsx';
 import CustomerDetail from './pages/CustomerDetail.jsx';
+import CustomerReport from './pages/CustomerReport.jsx';
+import CallConsole from './pages/CallConsole.jsx';
+import RequestsList from './pages/RequestsList.jsx';
 import ProductsList from './pages/ProductsList.jsx';
+import InventoryStockPage from './pages/InventoryStockPage.jsx';
 import SuppliersList from './pages/SuppliersList.jsx';
 import PurchaseOrdersList from './pages/PurchaseOrdersList.jsx';
 import PurchaseOrderDocument from './pages/PurchaseOrderDocument.jsx';
 import SalesOrdersList from './pages/SalesOrdersList.jsx';
+import DeliveryTicketDocument from './pages/DeliveryTicketDocument.jsx';
 import SalesOrderDocument from './pages/SalesOrderDocument.jsx';
 import InvoicesList from './pages/InvoicesList.jsx';
 import InvoiceView from './pages/InvoiceView.jsx';
@@ -22,6 +27,19 @@ import ServicesList from './pages/ServicesList.jsx';
 import MechanicsList from './pages/MechanicsList.jsx';
 import WorkOrdersList from './pages/WorkOrdersList.jsx';
 import WorkOrderDocument from './pages/WorkOrderDocument.jsx';
+import WarrantiesList from './pages/WarrantiesList.jsx';
+import ReceivablesPage from './pages/ReceivablesPage.jsx';
+import PayablesPage from './pages/PayablesPage.jsx';
+import HelpPage from './pages/HelpPage.jsx';
+import FinancePage from './pages/FinancePage.jsx';
+import AccountRegister from './pages/AccountRegister.jsx';
+import LoansPage from './pages/LoansPage.jsx';
+import { LoanStatementDocument, LoansReportDocument } from './pages/LoanReports.jsx';
+import HelpButton from './components/HelpButton.jsx';
+import ServiceVouchersList from './pages/ServiceVouchersList.jsx';
+import ServiceVoucherDocument from './pages/ServiceVoucherDocument.jsx';
+import SerialsPage from './pages/SerialsPage.jsx';
+import WarrantyDocument from './pages/WarrantyDocument.jsx';
 import UsersList from './pages/UsersList.jsx';
 import ApprovalsList from './pages/ApprovalsList.jsx';
 import Login from './pages/Login.jsx';
@@ -31,7 +49,11 @@ const NAV = [
   { label: 'General', links: [{ to: '/', text: 'Dashboard', icon: '📊' }] },
   {
     label: 'CRM',
-    links: [{ to: '/clientes', text: 'Clientes', icon: '🤝' }],
+    links: [
+      { to: '/crm/llamada', text: 'Atender llamada', icon: '📞' },
+      { to: '/crm/solicitudes', text: 'Solicitudes', icon: '📥' },
+      { to: '/clientes', text: 'Clientes y contactos', icon: '🤝' },
+    ],
   },
   {
     label: 'Taller',
@@ -40,6 +62,7 @@ const NAV = [
       { to: '/ordenes-trabajo', text: 'Órdenes de Trabajo', icon: '🔧' },
       { to: '/servicios', text: 'Catálogo de Servicios', icon: '📋' },
       { to: '/mecanicos', text: 'Mecánicos', icon: '👷' },
+      { to: '/garantias', text: 'Garantías', icon: '🛡️' },
     ],
   },
   {
@@ -47,14 +70,19 @@ const NAV = [
     links: [
       { to: '/pedidos', text: 'Órdenes de Pedido', icon: '🧾' },
       { to: '/facturas', text: 'Facturación', icon: '💵' },
+      { to: '/cartera', text: 'Cartera', icon: '📒' },
     ],
   },
   {
     label: 'Inventario y Compras',
     links: [
       { to: '/inventario', text: 'Inventario', icon: '📦' },
+      { to: '/productos', text: 'Catálogo de productos', icon: '🏷️' },
       { to: '/proveedores', text: 'Proveedores', icon: '🏭' },
       { to: '/compras', text: 'Órdenes de Compra', icon: '🛒' },
+      { to: '/cuentas-por-pagar', text: 'Cuentas por pagar', icon: '🧾' },
+      { to: '/pagos-sin-factura', text: 'Pagos sin factura', icon: '🧰' },
+      { to: '/seriales', text: 'Números de serie', icon: '🔢' },
     ],
   },
 ];
@@ -152,7 +180,10 @@ function AccountMenu() {
 
 function MainShell() {
   const { t } = useI18n();
-  const { isAdmin } = useAuth();
+  const { isAdmin, canEdit } = useAuth();
+  const showFinance = isAdmin || canEdit('finanzas');
+  // Anular y borrar es solo del administrador: a los demás se les ocultan esos botones.
+  React.useEffect(() => { document.body.classList.toggle('no-admin', !isAdmin); }, [isAdmin]);
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -182,6 +213,13 @@ function MainShell() {
             ))}
           </div>
         ))}
+        {showFinance && (
+          <div className="nav-group">
+            <div className="nav-label">{t('Finanzas')}</div>
+            <NavLink to="/finanzas" end={false} className={({ isActive }) => `nav-link ${isActive && !window.location.pathname.startsWith('/finanzas/prestamos') ? 'active' : ''}`}><span>🏦</span><span>{t('Bancos')}</span></NavLink>
+            <NavLink to="/finanzas/prestamos" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span>🤝</span><span>{t('Préstamos')}</span></NavLink>
+          </div>
+        )}
         <div className="nav-group">
           <div className="nav-label">{t('Administración')}</div>
           <NavLink to={APPROVALS_LINK.to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -193,16 +231,33 @@ function MainShell() {
             </NavLink>
           )}
         </div>
+        <div className="nav-group">
+          <div className="nav-label">{t('Ayuda')}</div>
+          <NavLink to="/ayuda" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <span>📘</span><span>{t('Manual de usuario')}</span>
+          </NavLink>
+        </div>
         <div style={{ marginTop: 'auto', padding: '10px 14px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <AccountMenu />
         </div>
       </aside>
       <div className="main">
+        <HelpButton />
         <Routes>
+          <Route path="/ayuda" element={<HelpPage />} />
+          <Route path="/finanzas" element={<FinancePage />} />
+          <Route path="/finanzas/cuenta/:id" element={<AccountRegister />} />
+          <Route path="/finanzas/prestamos" element={<LoansPage />} />
+          <Route path="/finanzas/prestamos/informe" element={<LoansReportDocument />} />
+          <Route path="/finanzas/prestamos/:id/estado" element={<LoanStatementDocument />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/clientes" element={<CustomersList />} />
           <Route path="/clientes/:id" element={<CustomerDetail />} />
-          <Route path="/inventario" element={<ProductsList />} />
+          <Route path="/clientes/:id/informe" element={<CustomerReport />} />
+          <Route path="/crm/llamada" element={<CallConsole />} />
+          <Route path="/crm/solicitudes" element={<RequestsList />} />
+          <Route path="/inventario" element={<InventoryStockPage />} />
+          <Route path="/productos" element={<ProductsList />} />
           <Route path="/proveedores" element={<SuppliersList />} />
           <Route path="/compras" element={<PurchaseOrdersList />} />
           <Route path="/compras/:id/documento" element={<PurchaseOrderDocument />} />
@@ -210,6 +265,7 @@ function MainShell() {
           <Route path="/pedidos/:id/documento" element={<SalesOrderDocument />} />
           <Route path="/facturas" element={<InvoicesList />} />
           <Route path="/facturas/:id" element={<InvoiceView />} />
+          <Route path="/facturas/:id/entrega" element={<DeliveryTicketDocument />} />
           <Route path="/vehiculos" element={<VehiclesList />} />
           <Route path="/vehiculos/:id" element={<VehicleDetail />} />
           <Route path="/vehiculos/:id/documento" element={<VehicleReceptionDocument />} />
@@ -217,6 +273,13 @@ function MainShell() {
           <Route path="/mecanicos" element={<MechanicsList />} />
           <Route path="/ordenes-trabajo" element={<WorkOrdersList />} />
           <Route path="/ordenes-trabajo/:id/documento" element={<WorkOrderDocument />} />
+          <Route path="/garantias" element={<WarrantiesList />} />
+          <Route path="/cartera" element={<ReceivablesPage />} />
+          <Route path="/cuentas-por-pagar" element={<PayablesPage />} />
+          <Route path="/pagos-sin-factura" element={<ServiceVouchersList />} />
+          <Route path="/pagos-sin-factura/:id/documento" element={<ServiceVoucherDocument />} />
+          <Route path="/seriales" element={<SerialsPage />} />
+          <Route path="/garantias/:id/documento" element={<WarrantyDocument />} />
           <Route path="/aprobaciones" element={<ApprovalsList />} />
           {isAdmin && <Route path="/usuarios" element={<UsersList />} />}
         </Routes>

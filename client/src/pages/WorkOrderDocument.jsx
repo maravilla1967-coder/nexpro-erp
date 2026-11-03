@@ -5,7 +5,7 @@ import Pill from '../components/Pill.jsx';
 import DocumentBrand from '../components/DocumentBrand.jsx';
 import { useI18n } from '../i18n.jsx';
 
-const PART_ACTION_LABELS = { reemplazada: 'Reemplazada', reparada: 'Reparada', garantia: 'Garantía', cliente: 'Suministrada por el cliente' };
+const PART_ACTION_LABELS = { reemplazada: 'Reemplazada', reparada: 'Reparada', instalada: 'Instalada', proveedor: 'Suministrada e instalada por proveedor', garantia: 'Garantía', cliente: 'Suministrada por el cliente' };
 
 export default function WorkOrderDocument() {
   const { t } = useI18n();
@@ -50,6 +50,7 @@ export default function WorkOrderDocument() {
               <h2>{t('DOCUMENTO DE SERVICIO')}</h2>
               <div><strong>{t('No.')}</strong> {wo.number}</div>
               <div><strong>{t('Recibido:')}</strong> {vehicle.received_at}</div>
+              {(wo.supplier_name || wo.mechanic_name) && <div><strong>{t('Realizado por:')}</strong> {wo.supplier_name || wo.mechanic_name}</div>}
             </div>
           </div>
 
@@ -119,6 +120,7 @@ export default function WorkOrderDocument() {
                     <tr key={p.id}>
                       <td>
                         {p.description}
+                        {p.serial && <div className="mono" style={{ fontSize: 11 }}>S/N: {p.serial}</div>}
                         {p.notes && <div className="muted" style={{ fontSize: 11 }}>{p.notes}</div>}
                       </td>
                       <td>{t(PART_ACTION_LABELS[p.action] || 'Reemplazada')}</td>

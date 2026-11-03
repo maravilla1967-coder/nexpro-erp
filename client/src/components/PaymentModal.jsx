@@ -1,0 +1,250 @@
+import React, { useEffect, useState } from 'react';
+import Modal from './Modal.jsx';
+import { api } from '../api.js';
+import { useI18n } from '../i18n.jsx';
+
+// Formulario común para registrar un pago (abono) — se usa para cobros de clientes
+// (facturas) y para pagos a proveedores (cuentas por pagar).
+export const PAYMENT_METHODS = ['cheque', 'transferencia', 'ach', 'square', 'tarjeta', 'efectivo', 'otro'];
+const METHOD_LABELS = { square: 'Tarjeta de crédito / Square' };
+export function methodLabel(t, m) { return m ? t(METHOD_LABELS[m] || m) : '—'; }
+
+// Deja constancia en el servidor de lo que pasa en el navegador al guardar (sin datos sensibles).
+export function logClient(event, data) {
+  try {
+    fetch('/api/client-log', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, ...data, at: new Date().toISOString() }) }).catch(() => {});
+  } catch (_) { /* nada */ }
+}
+
+// Guarda el pago y sus comprobantes en una sola petición (multipart). method: 'post' | 'put'.
+// Si el navegador no logra enviar el archivo (Safari: "Load failed"), guarda el pago sin el
+// archivo para no perderlo y avisa; el comprobante se puede volver a adjuntar con "+ comprobante".
+export async function sendPayment(method, path, payload, files) {
+  const list = Array.from(files || []);
+  const fd = new FormData();
+  Object.entries(payload).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, String(v)); });
+  list.forEach((f) => fd.append('files', f, f.name));
+  logClient('payment-send', { method, path, files: list.map((f) => ({ size: f.size, type: f.type })) });
+  try {
+    const r = method === 'put' ? await api.putForm(path, fd) : await api.postForm(path, fd);
+    logClient('payment-ok', { path });
+    return r;
+  } catch (err) {
+    logClient('payment-error', { path, message: String(err && err.message), name: err && err.name });
+    if (list.length === 0 || (err && err.status)) throw err;
+    // Falla de red con archivo: guardar al menos el pago.
+    const r = method === 'put' ? await api.put(path, payload) : await api.post(path, payload);
+    logClient('payment-ok-without-files', { path });
+    try { window.alert('El pago se guardó, pero el navegador no pudo enviar el archivo adjunto. Usa "+ comprobante" en el pago para subirlo de nuevo.'); } catch (_) {}
+    return r;
+  }
+}
+
+// Lee el archivo en memoria apenas se elige: si el navegador no puede leerlo (archivo en iCloud
+// sin descargar, foto en un formato raro…) se avisa en ese momento y no al guardar.
+export async function readFilesNow(fileList) {
+  const out = [];
+  for (const f of Array.from(fileList || [])) {
+    const buf = await f.arrayBuffer();
+    out.push(new File([buf], f.name || 'comprobante', { type: f.type || 'application/octet-stream' }));
+  }
+  return out;
+}
+
+// Sube los comprobantes de un pago (basePath: '/invoices/12' o '/payables/3'). Devuelve el
+// documento actualizado, o null si no había archivos.
+export async function uploadPaymentFiles(basePath, paymentId, files) {
+  const list = Array.from(files || []);
+  logClient('proof-add', { count: list.length, paymentId });
+  if (list.length === 0 || !paymentId) return null;
+  const fd = new FormData();
+  list.forEach((f) => fd.append('files', f, f.name));
+  return api.postForm(`${basePath}/payments/${paymentId}/files`, fd);
+}
+
+// Lista de comprobantes de un pago, con enlace para abrirlos (y ✕ si se permite borrar).
+// Se muestran como "Comprobante de pago" (1, 2…) en vez del nombre del archivo, que suele ser
+// larguísimo (recibos de Square, del banco); el nombre original aparece al pasar el mouse.
+export function PaymentFiles({ files, onRemove }) {
+  const { t } = useI18n();
+  const [asking, setAsking] = useState(null);
+  if (!files || files.length === 0) return null;
+  return (
+    <div className="payment-files">
+      {files.map((f, i) => (
+        <span key={f.id} className="payment-file">
+          📎 <a href={f.file_url} target="_blank" rel="noreferrer" title={f.original_name || ''}>{t('Comprobante de pago')}{files.length > 1 ? ` ${i + 1}` : ''}</a>
+          {onRemove && asking !== f.id && <button type="button" className="link-btn no-print" style={{ marginLeft: 4 }} title={t('Quitar archivo')} onClick={() => setAsking(f.id)}>✕</button>}
+          {onRemove && asking === f.id && (
+            <span className="no-print" style={{ marginLeft: 6 }}>
+              {t('¿Quitar?')} <button type="button" className="btn btn-sm btn-danger" style={{ padding: '1px 8px' }} onClick={() => { setAsking(null); onRemove(f); }}>{t('Sí, quitar')}</button>{' '}
+              <button type="button" className="btn btn-sm" style={{ padding: '1px 8px' }} onClick={() => setAsking(null)}>{t('No')}</button>
+            </span>
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function money(v) {
+  return '$' + (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Acepta montos escritos como "9,342", "$9,342.00" o "9342".
+export function parseAmount(v) {
+  const n = parseFloat(String(v ?? '').replace(/[$,\s]/g, ''));
+  return Number.isNaN(n) ? NaN : Math.round(n * 100) / 100;
+}
+
+// Cuentas bancarias para elegir a dónde entra / de dónde sale el dinero (Finanzas).
+export function useBankAccounts() {
+  const [accounts, setAccounts] = useState(null);
+  useEffect(() => { api.get('/bank/accounts/options').then(setAccounts).catch(() => setAccounts([])); }, []);
+  return accounts;
+}
+export function BankAccountSelect({ accounts, value, onChange, label }) {
+  const { t } = useI18n();
+  if (!accounts) return null;
+  return (
+    <div className="field">
+      <label>{label || t('Cuenta bancaria')}</label>
+      {accounts.length === 0
+        ? <div className="muted" style={{ fontSize: 12 }}>{t('Aún no hay cuentas bancarias. Créalas en Finanzas → Bancos para que el pago quede en el banco.')}</div>
+        : <select value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
+            <option value="">{t('— Sin cuenta —')}</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.last4 ? ` ••••${a.last4}` : ''}{a.bank_name ? ` · ${a.bank_name}` : ''}</option>)}
+          </select>}
+    </div>
+  );
+}
+const defaultAccount = (accounts) => { const d = (accounts || []).find((a) => a.is_default) || (accounts || [])[0]; return d ? String(d.id) : ''; };
+export { defaultAccount };
+
+// showSurcharge: muestra el campo "Recargo cobrado al cliente" (solo cobros de facturas).
+export default function PaymentModal({ title, balance, onSave, onClose, initial, submitLabel, showSurcharge }) {
+  const { t } = useI18n();
+  const [form, setForm] = useState(initial ? {
+    paymentDate: initial.payment_date, amount: Number(initial.amount).toFixed(2),
+    surcharge: initial.surcharge ? Number(initial.surcharge).toFixed(2) : '',
+    processorFee: initial.processor_fee ? Number(initial.processor_fee).toFixed(2) : '',
+    method: initial.method || 'cheque', reference: initial.reference || '', notes: initial.notes || '',
+  } : {
+    paymentDate: new Date().toISOString().slice(0, 10),
+    amount: balance > 0 ? Number(balance).toFixed(2) : '',
+    surcharge: '', processorFee: '', method: 'cheque', reference: '', notes: '',
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [files, setFiles] = useState([]);
+  const accounts = useBankAccounts();
+  const [bankAccountId, setBankAccountId] = useState(initial ? (initial.bank_account_id ? String(initial.bank_account_id) : '') : null);
+  useEffect(() => { if (bankAccountId === null && accounts) setBankAccountId(defaultAccount(accounts)); }, [accounts]);
+  const [reading, setReading] = useState(false);
+  const [removedIds, setRemovedIds] = useState([]);
+  const busy = React.useRef(false);
+  const fileInput = React.useRef(null);
+  async function pickFiles(e) {
+    const chosen = Array.from((e.target && e.target.files) || []);
+    logClient('file-picked', { count: chosen.length, sizes: chosen.map((f) => f.size), types: chosen.map((f) => f.type) });
+    setError('');
+    if (!chosen || chosen.length === 0) { setFiles([]); return; }
+    setReading(true);
+    try { setFiles(await readFilesNow(chosen)); }
+    catch (err) {
+      logClient('file-read-error', { message: String(err && err.message) });
+      setFiles([]);
+      setError(t('No se pudo leer el archivo. Guárdalo primero en el Escritorio (o descárgalo de iCloud) y vuelve a elegirlo.'));
+    } finally { setReading(false); }
+  }
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  const amountN = parseAmount(form.amount);
+  const surchargeN = form.surcharge === '' ? 0 : parseAmount(form.surcharge);
+  const feeN = form.processorFee === '' ? 0 : parseAmount(form.processorFee);
+  const totalCharged = (amountN || 0) + (surchargeN || 0);
+  const isCard = ['square', 'tarjeta'].includes(form.method);
+
+  async function submit(e) {
+    if (e) e.preventDefault();
+    if (busy.current || reading) return;
+    setError('');
+    // Si el estado no recibió el archivo (Safari), se toma directo del campo al guardar.
+    let toSend = files;
+    const inField = Array.from((fileInput.current && fileInput.current.files) || []);
+    if (toSend.length === 0 && inField.length > 0) {
+      try { toSend = await readFilesNow(inField); } catch (err) { toSend = inField; }
+    }
+    logClient('payment-submit-click', { files: files.length, inField: inField.length, sending: toSend.length });
+    if (!form.paymentDate) { setError(t('Indica la fecha del pago.')); return; }
+    if (!(amountN > 0)) { setError(t('Escribe el monto del pago (por ejemplo 9070 o 9,070.00).')); return; }
+    if (Number.isNaN(surchargeN) || surchargeN < 0) { setError(t('El recargo no es un número válido.')); return; }
+    if (Number.isNaN(feeN) || feeN < 0) { setError(t('La comisión no es un número válida.')); return; }
+    setSaving(true); busy.current = true;
+    try { await onSave({ ...form, amount: amountN, surcharge: surchargeN, processorFee: feeN, bankAccountId: bankAccountId ?? '', ...(removedIds.length ? { removeFileIds: removedIds.join(',') } : {}) }, toSend); }
+    catch (err) { setError(err.message || String(err)); setSaving(false); busy.current = false; }
+  }
+
+  return (
+    <Modal title={title} onClose={onClose}>
+      <form onSubmit={submit} noValidate>
+        {!initial && <div className="muted" style={{ marginBottom: 10 }}>{t('Saldo pendiente:')} <strong>{money(balance)}</strong></div>}
+        <div className="grid grid-2">
+          <div className="field"><label>{t('Fecha del pago')}</label><input type="date" value={form.paymentDate} onChange={set('paymentDate')} /></div>
+          <div className="field"><label>{showSurcharge ? t('Monto abonado a la factura *') : t('Monto *')}</label><input inputMode="decimal" value={form.amount} onChange={set('amount')} /></div>
+          <div className="field"><label>{t('Forma de pago')}</label>
+            <select value={form.method} onChange={set('method')}>
+              {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{methodLabel(t, m)}</option>)}
+            </select>
+          </div>
+          <div className="field"><label>{t('Referencia (no. de cheque, confirmación…)')}</label><input value={form.reference} onChange={set('reference')} /></div>
+        </div>
+        {showSurcharge && (
+          <div className="field">
+            <label>{t('Recargo cobrado al cliente (ej. 3% por tarjeta) — no reduce el saldo')}</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input inputMode="decimal" placeholder="0.00" value={form.surcharge} onChange={set('surcharge')} />
+              <button type="button" className="btn btn-sm" onClick={() => setForm({ ...form, surcharge: (Math.round((amountN || 0) * 3) / 100).toFixed(2) })}>3%</button>
+              {form.surcharge !== '' && <button type="button" className="link-btn" onClick={() => setForm({ ...form, surcharge: '' })}>✕</button>}
+            </div>
+          </div>
+        )}
+        {showSurcharge && (isCard || feeN > 0) && (
+          <div className="field">
+            <label>{t('Comisión que nos cobra el procesador (Square)')}</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input inputMode="decimal" placeholder="0.00" value={form.processorFee} onChange={set('processorFee')} />
+              <button type="button" className="btn btn-sm" style={{ whiteSpace: 'nowrap' }}
+                onClick={() => setForm({ ...form, processorFee: (Math.round((totalCharged * 0.035 + 0.15) * 100) / 100).toFixed(2) })}>Square 3.5% + $0.15</button>
+            </div>
+          </div>
+        )}
+        {showSurcharge && amountN > 0 && (surchargeN > 0 || feeN > 0) && (
+          <div className="pay-breakdown">
+            <div><span>{t('Abono a la factura')}</span><span>{money(amountN)}</span></div>
+            {surchargeN > 0 && <div><span>+ {t('Recargo al cliente')}</span><span>{money(surchargeN)}</span></div>}
+            <div className="strong"><span>{t('Total cobrado (recibo de Square)')}</span><span>{money(totalCharged)}</span></div>
+            {feeN > 0 && <div><span>− {t('Comisión del procesador')}</span><span>{money(feeN)}</span></div>}
+            {feeN > 0 && <div className="strong"><span>{t('Neto recibido en el banco')}</span><span>{money(totalCharged - feeN)}</span></div>}
+          </div>
+        )}
+        <BankAccountSelect accounts={accounts} value={bankAccountId} onChange={setBankAccountId} label={showSurcharge ? t('Cuenta bancaria donde entró el dinero') : t('Cuenta bancaria de donde salió el pago')} />
+        <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={form.notes} onChange={set('notes')} /></div>
+        <div className="field">
+          <label>{t('Comprobante del pago (tiquete de la tarjeta, transferencia, cheque…)')}</label>
+          {initial && <PaymentFiles files={(initial.files || []).filter((f) => !removedIds.includes(f.id))} onRemove={(f) => setRemovedIds([...removedIds, f.id])} />}
+          {removedIds.length > 0 && <div className="muted" style={{ fontSize: 12 }}>{removedIds.length} {t('archivo(s) se quitarán al guardar')} · <button type="button" className="link-btn" onClick={() => setRemovedIds([])}>{t('Deshacer')}</button></div>}
+          <input ref={fileInput} type="file" multiple onChange={pickFiles} onInput={pickFiles} />
+          {reading && <div className="muted" style={{ fontSize: 12 }}>{t('Leyendo archivo…')}</div>}
+          {!reading && files.length > 0 && <div className="muted" style={{ fontSize: 12 }}>✓ {files.length} {t('archivo(s) listo(s) para adjuntar')}</div>}
+        </div>
+        <div className="modal-footer">
+          {error && <div className="error-banner" style={{ margin: 0, flexBasis: '100%' }}>{error}</div>}
+          <button type="button" className="btn" onClick={onClose}>{t('Cancelar')}</button>
+          <button type="button" className="btn btn-primary" disabled={saving || reading} onClick={submit}>{saving ? t('Guardando…') : (submitLabel || t('Registrar pago'))}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

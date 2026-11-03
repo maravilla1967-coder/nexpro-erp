@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import CustomerPicker from '../components/CustomerPicker.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
-const EMPTY = { vin: '', make: '', model: '', year: '', chassisType: '', plate: '', customerId: '', notes: '' };
+const EMPTY = { vin: '', make: '', model: '', year: '', chassisType: '', plate: '', customerName: '', notes: '' };
 const EMPTY_SERVICE_ROW = { serviceId: '', description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 };
 
 export default function VehiclesList() {
@@ -57,7 +58,7 @@ export default function VehiclesList() {
   function addWoServiceRow() { setWoServices([...woServices, { ...EMPTY_SERVICE_ROW }]); }
   function removeWoServiceRow(idx) { setWoServices(woServices.filter((_, i) => i !== idx)); }
 
-  const selectedCustomer = customers.find((c) => String(c.id) === String(form.customerId));
+  const selectedCustomer = customers.find((c) => c.name.trim().toLowerCase() === form.customerName.trim().toLowerCase());
 
   async function save(e) {
     e.preventDefault();
@@ -134,11 +135,11 @@ export default function VehiclesList() {
               <div className="field"><label>{t('Año')}</label><input type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} /></div>
               <div className="field"><label>{t('Tipo de chasis')}</label><input placeholder="CA, DRW, SRW..." value={form.chassisType} onChange={(e) => setForm({ ...form, chassisType: e.target.value })} /></div>
               <div className="field"><label>{t('Placa')}</label><input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} /></div>
-              <div className="field"><label>{t('Cliente')}</label>
-                <select value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
-                  <option value="">{t('— Sin asignar —')}</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+              <div className="field"><label>{t('Cliente / empresa')}</label>
+                <CustomerPicker freeText customers={customers} placeholder={t('Escribe o elige el cliente')} value={form.customerName} onChange={(name) => setForm((f) => ({ ...f, customerName: name }))} />
+                {form.customerName.trim() && !customers.some((c) => c.name.trim().toLowerCase() === form.customerName.trim().toLowerCase()) && (
+                  <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>✚ {t('Cliente nuevo: se creará en Clientes al guardar y quedará enlazado al vehículo.')}</div>
+                )}
               </div>
             </div>
 

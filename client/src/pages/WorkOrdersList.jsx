@@ -3,15 +3,21 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
+import WorkOrderPartsEditor, { partsTotal, partFromApi, partToApi } from '../components/WorkOrderPartsEditor.jsx';
+import AssigneeSelect, { assigneeValue, assigneePayload, assigneeName } from '../components/AssigneeSelect.jsx';
+import { useAuth } from '../auth.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
 export default function WorkOrdersList() {
   const { t, lang } = useI18n();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [list, setList] = useState([]);
   const [status, setStatus] = useState('');
   const [mechanics, setMechanics] = useState([]);
   const [services, setServices] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [editing, setEditing] = useState(null);
   const [woMechanicId, setWoMechanicId] = useState('');
   const [woStatus, setWoStatus] = useState('pendiente');
@@ -26,18 +32,20 @@ export default function WorkOrdersList() {
   useEffect(() => { load(); }, [status]);
   useEffect(() => {
     api.get('/mechanics', { active: 'true' }).then(setMechanics);
+    api.get('/suppliers').then(setSuppliers).catch(() => {});
     api.get('/services', { active: 'true' }).then(setServices);
+    api.get('/products', { active: 'true' }).then(setProducts).catch(() => {});
   }, []);
 
   function openEdit(wo) {
     setEditing(wo);
-    setWoMechanicId(wo.mechanic_id || '');
+    setWoMechanicId(assigneeValue(wo));
     setWoStatus(wo.status);
     setWoServices(wo.services.map((s) => ({ ...s, hours: s.hours ?? 0, hourlyRate: s.hourly_rate ?? 0, flatPrice: s.flat_price ?? 0, pricingType: s.pricing_type })));
     setWoNotes(wo.notes || '');
     setWoDiagnosis(wo.diagnosis || '');
     setWoResolution(wo.resolution || '');
-    setWoParts((wo.parts || []).map((p) => ({ ...p, unitCost: p.unit_cost ?? 0, notes: p.notes || '' })));
+    setWoParts((wo.parts || []).map(partFromApi));
     setError('');
   }
 
@@ -76,27 +84,16 @@ export default function WorkOrdersList() {
     } catch (err) { setError(err.message); }
   }
 
-  function updatePart(idx, field, value) {
-    const copy = [...woParts];
-    copy[idx] = { ...copy[idx], [field]: value };
-    setWoParts(copy);
-  }
-  function addPartRow() { setWoParts([...woParts, { description: '', action: 'reemplazada', quantity: 1, unitCost: 0, notes: '' }]); }
-  function removePartRow(idx) { setWoParts(woParts.filter((_, i) => i !== idx)); }
-
   async function saveEdit(e) {
     e.preventDefault();
     const payload = {
-      mechanicId: woMechanicId || null, status: woStatus,
+      ...assigneePayload(woMechanicId), status: woStatus,
       notes: woNotes || null, diagnosis: woDiagnosis || null, resolution: woResolution || null,
       services: woServices.filter((s) => s.description).map((s) => ({
         serviceId: s.service_id || s.serviceId || null, description: s.description, pricingType: s.pricingType,
         hours: parseFloat(s.hours) || 0, hourlyRate: parseFloat(s.hourlyRate) || 0, flatPrice: parseFloat(s.flatPrice) || 0,
       })),
-      parts: woParts.filter((p) => p.description).map((p) => ({
-        description: p.description, action: p.action, quantity: parseFloat(p.quantity) || 1, unitCost: parseFloat(p.unitCost) || 0,
-        notes: p.notes || null,
-      })),
+      parts: woParts.filter((p) => p.description).map(partToApi),
     };
     try { await api.put(`/work-orders/${editing.id}`, payload); setEditing(null); load(); }
     catch (err) { setError(err.message); }
@@ -110,7 +107,18 @@ export default function WorkOrdersList() {
     } catch (err) { alert(err.message); }
   }
 
-  const total = woServices.reduce((sum, s) => sum + (s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0)), 0);
+  const total = partsTotal(woParts) + woServices.reduce((sum, s) => sum + (s.pricingType === 'servicio_completo' ? (parseFloat(s.flatPrice) || 0) : (parseFloat(s.hours) || 0) * (parseFloat(s.hourlyRate) || 0)), 0);
+
+  async function voidWo(wo) {
+    if (!window.confirm(`${t('¿Anular la orden de trabajo')} ${wo.number}? ${t('Queda en el historial como anulada.')}`)) return;
+    try { await api.put(`/work-orders/${wo.id}`, { status: 'cancelado' }); } catch (err) { if (!err.pendingApproval) window.alert(err.message); }
+    load();
+  }
+  async function deleteWo(wo) {
+    if (!window.confirm(`${t('¿Eliminar la orden de trabajo')} ${wo.number}?\n\n${t('Esto no se puede deshacer.')}`)) return;
+    try { await api.del(`/work-orders/${wo.id}`); } catch (err) { if (!err.pendingApproval) window.alert(err.message); }
+    load();
+  }
 
   return (
     <>
@@ -125,18 +133,19 @@ export default function WorkOrdersList() {
             <option value="en_proceso">{t('En proceso')}</option>
             <option value="completado">{t('Completado')}</option>
             <option value="facturado">{t('Facturado')}</option>
+            <option value="cancelado">{t('Anulada')}</option>
           </select>
         </div>
         <div className="card">
           {list.length === 0 ? <div className="empty-state">{t('No hay órdenes de trabajo todavía. Se crean desde la ficha del vehículo.')}</div> : (
             <table>
-              <thead><tr><th>{t('Número')}</th><th>{t('Vehículo')}</th><th>{t('Mecánico')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
+              <thead><tr><th>{t('Número')}</th><th>{t('Vehículo')}</th><th>{t('Asignado a')}</th><th>{t('Total')}</th><th>{t('Estado')}</th><th>{t('Fecha')}</th><th></th><th></th></tr></thead>
               <tbody>
                 {list.map((wo) => (
                   <tr key={wo.id}>
                     <td className="mono">{wo.number}</td>
                     <td><Link to={`/vehiculos/${wo.vehicle_id}`}>{wo.vin}</Link> <span className="muted">{wo.make} {wo.model}</span></td>
-                    <td>{wo.mechanic_name || '—'}</td>
+                    <td>{assigneeName(wo, t)}</td>
                     <td><strong>${Number(wo.total).toLocaleString()}</strong></td>
                     <td><Pill value={wo.status} /></td>
                     <td className="muted">{wo.created_at}</td>
@@ -148,6 +157,8 @@ export default function WorkOrdersList() {
                         ) : (
                           wo.status === 'completado' && <button className="btn-row-action" onClick={() => invoiceWorkOrder(wo)}>{t('Facturar')}</button>
                         )}
+                        {!wo.invoice_id && wo.status !== 'cancelado' && <button className="btn-row-action admin-only" style={{ color: 'var(--amber)' }} onClick={() => voidWo(wo)}>{t('Anular')}</button>}
+                        {!wo.invoice_id && <button className="btn-row-action delete" onClick={() => deleteWo(wo)}>{t('Eliminar')}</button>}
                       </div>
                     </td>
                     <td><Link to={`/ordenes-trabajo/${wo.id}/documento`}>{t('Documento')}</Link></td>
@@ -160,15 +171,12 @@ export default function WorkOrdersList() {
       </div>
 
       {editing && (
-        <Modal title={`${t('Orden de trabajo')} ${editing.number}`} onClose={() => setEditing(null)} wide>
+        <Modal title={`${t('Orden de trabajo')} ${editing.number}`} onClose={() => setEditing(null)} xwide>
           <form onSubmit={saveEdit}>
             {error && <div className="error-banner">{error}</div>}
             <div className="grid grid-2">
-              <div className="field"><label>{t('Mecánico')}</label>
-                <select value={woMechanicId} onChange={(e) => setWoMechanicId(e.target.value)}>
-                  <option value="">{t('— Sin asignar —')}</option>
-                  {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+              <div className="field"><label>{t('Asignado a (mecánico o proveedor)')}</label>
+                <AssigneeSelect value={woMechanicId} onChange={setWoMechanicId} mechanics={mechanics} suppliers={suppliers} />
               </div>
               <div className="field"><label>{t('Estado')}</label>
                 <select value={woStatus} onChange={(e) => setWoStatus(e.target.value)}>
@@ -176,6 +184,7 @@ export default function WorkOrdersList() {
                   <option value="en_proceso">{t('En proceso')}</option>
                   <option value="completado">{t('Completado')}</option>
                   <option value="facturado">{t('Facturado')}</option>
+                  {(isAdmin || woStatus === 'cancelado') && <option value="cancelado">{t('Anulada')}</option>}
                 </select>
               </div>
             </div>
@@ -221,30 +230,8 @@ export default function WorkOrdersList() {
             <div className="field"><label>{t('Diagnóstico')}</label><textarea rows={2} value={woDiagnosis} onChange={(e) => setWoDiagnosis(e.target.value)} /></div>
             <div className="field"><label>{t('Solución / Reparación realizada')}</label><textarea rows={2} value={woResolution} onChange={(e) => setWoResolution(e.target.value)} /></div>
 
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes reemplazadas o reparadas')}</label>
-            <table className="line-items-table" style={{ marginTop: 6 }}>
-              <thead><tr><th>{t('Descripción')}</th><th style={{ width: 150 }}>{t('Acción')}</th><th style={{ width: 80 }}>{t('Cant.')}</th><th style={{ width: 110 }}>{t('Costo unit.')}</th><th style={{ width: 200 }}>{t('Nota (opcional)')}</th><th></th></tr></thead>
-              <tbody>
-                {woParts.map((p, idx) => (
-                  <tr key={idx}>
-                    <td><input value={p.description} onChange={(e) => updatePart(idx, 'description', e.target.value)} /></td>
-                    <td>
-                      <select value={p.action} onChange={(e) => updatePart(idx, 'action', e.target.value)}>
-                        <option value="reemplazada">{t('Reemplazada')}</option>
-                        <option value="reparada">{t('Reparada')}</option>
-                        <option value="garantia">{t('Garantía')}</option>
-                        <option value="cliente">{t('Suministrada por el cliente')}</option>
-                      </select>
-                    </td>
-                    <td><input type="number" step="1" value={p.quantity} onChange={(e) => updatePart(idx, 'quantity', e.target.value)} /></td>
-                    <td><input type="number" step="0.01" value={p.unitCost} onChange={(e) => updatePart(idx, 'unitCost', e.target.value)} /></td>
-                    <td><input placeholder={t('Nota sobre la parte (ej. garantía, quién la suministró, etc.)')} value={p.notes || ''} onChange={(e) => updatePart(idx, 'notes', e.target.value)} /></td>
-                    <td><button type="button" className="link-btn" onClick={() => removePartRow(idx)}>✕</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <button type="button" className="btn btn-sm" style={{ marginTop: 8 }} onClick={addPartRow}>{t('+ Agregar parte')}</button>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)' }}>{t('Partes y productos')}</label>
+            <WorkOrderPartsEditor parts={woParts} setParts={setWoParts} products={products} defaultAction={String(woMechanicId).startsWith('s:') ? 'proveedor' : 'reemplazada'} supplierId={assigneePayload(woMechanicId).supplierId || ''} />
 
             <div className="modal-footer">
               <button type="button" className="btn" onClick={() => setEditing(null)}>{t('Cancelar')}</button>

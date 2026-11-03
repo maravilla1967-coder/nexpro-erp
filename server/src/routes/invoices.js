@@ -1,14 +1,19 @@
 const express = require('express');
-const { all, get, run } = require('../../db');
+const { db, all, get, run } = require('../../db');
 const { nextDocNumber, asInvoiceNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
+const { round2, refreshInvoiceStatus } = require('../utils/payments');
+const { setPaymentBank } = require('../utils/bank');
+const { attachFiles, mountPaymentFileRoutes, deleteFilesOfPayment, paymentUpload, saveFilesForPayment } = require('../utils/paymentFiles');
 
 const router = express.Router();
 router.use(requireModuleEdit('facturas'));
 
 function withItems(inv) {
   if (!inv) return inv;
-  inv.items = all('SELECT * FROM invoice_items WHERE invoice_id = ?', [inv.id]);
+  inv.items = all(`SELECT ii.*, p.sku AS product_sku, p.vendor_item_number AS product_item_number, p.unit AS product_unit
+                   FROM invoice_items ii LEFT JOIN products p ON p.id = ii.product_id
+                   WHERE ii.invoice_id = ? ORDER BY ii.id`, [inv.id]);
   return inv;
 }
 
@@ -28,6 +33,19 @@ function getFullInvoice(id) {
   if (!inv) return inv;
   withItems(inv);
   inv.workOrders = all('SELECT id, number, status FROM work_orders WHERE invoice_id = ?', [inv.id]);
+  // Vehículos ligados a la factura (por sus órdenes de trabajo o por seriales instalados): para la boleta de entrega.
+  inv.vehicles = all(`SELECT DISTINCT v.id, v.vin, v.make, v.model, v.year, v.plate FROM vehicles v
+                      WHERE v.id IN (SELECT vehicle_id FROM work_orders WHERE invoice_id = ? AND vehicle_id IS NOT NULL
+                                     UNION SELECT vehicle_id FROM product_serials WHERE invoice_id = ? AND vehicle_id IS NOT NULL)`, [inv.id, inv.id]);
+  inv.payments = all(
+    `SELECT p.*, u.name AS created_by_name FROM invoice_payments p
+     LEFT JOIN users u ON u.id = p.created_by WHERE p.invoice_id = ? ORDER BY p.payment_date, p.id`,
+    [inv.id]
+  );
+  attachFiles(inv.payments, 'invoice');
+  inv.paid = round2(inv.payments.reduce((s, p) => s + Number(p.amount || 0), 0));
+  inv.surcharges = round2(inv.payments.reduce((s, p) => s + Number(p.surcharge || 0), 0));
+  inv.balance = round2(Number(inv.total || 0) - inv.paid);
   return inv;
 }
 
@@ -59,24 +77,93 @@ function applyUpdate(id, b) {
     subtotal = totals.subtotal; taxAmount = totals.taxAmount; total = totals.total;
   }
 
+  if (b.status === 'anulada' && existing.status !== 'anulada') {
+    assertCanVoid(id);
+    releaseInvoiceLinks(id, `Factura ${existing.number} anulada`);
+  }
   const includeWireInfo = b.includeWireInfo !== undefined ? (b.includeWireInfo ? 1 : 0) : existing.include_wire_info;
   run(
     `UPDATE invoices SET status=?, due_date=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, notes=?, include_wire_info=? WHERE id=?`,
     [b.status ?? existing.status, b.dueDate ?? existing.due_date, subtotal, taxRate, taxAmount, total, b.notes ?? existing.notes, includeWireInfo, id]
   );
+  // El estado de cobro (pendiente/parcial/pagada) sale de los pagos registrados.
+  if (b.status === undefined || ['pendiente', 'parcial', 'pagada'].includes(b.status)) refreshInvoiceStatus(id);
   return get('SELECT * FROM invoices WHERE id = ?', [id]);
 }
 
-function applyDelete(id) {
-  run('DELETE FROM invoices WHERE id = ?', [id]);
+// Borrar una factura deja todo lo que estaba ligado a ella como si nunca se hubiera
+// facturado: las órdenes de trabajo vuelven a "completado" (se pueden facturar de nuevo),
+// el pedido de origen vuelve a "aprobado" y los seriales vendidos con ella vuelven a
+// "disponible". Sus líneas y pagos se borran con ella.
+// Suelta todo lo que la factura tenía amarrado (órdenes de trabajo, pedido, seriales vendidos),
+// para que se pueda volver a facturar. Se usa al eliminarla y al anularla.
+function releaseInvoiceLinks(id, note) {
+  run(`UPDATE work_orders SET invoice_id = NULL, status = 'completado' WHERE invoice_id = ?`, [id]);
+  const inv = get('SELECT sales_order_id FROM invoices WHERE id = ?', [id]);
+  if (inv && inv.sales_order_id) run(`UPDATE sales_orders SET status = 'aprobado' WHERE id = ? AND status = 'facturado'`, [inv.sales_order_id]);
+  const sold = all(`SELECT id FROM product_serials WHERE invoice_id = ?`, [id]);
+  for (const sr of sold) {
+    run(`UPDATE product_serials SET invoice_id = NULL, customer_id = CASE WHEN vehicle_id IS NULL THEN NULL ELSE customer_id END,
+           status = CASE WHEN status = 'vendido' THEN 'disponible' ELSE status END WHERE id = ?`, [sr.id]);
+    run(`INSERT INTO serial_events (serial_id, event, notes) VALUES (?, 'disponible', ?)`, [sr.id, note]);
+  }
 }
+
+// Anular exige que no tenga pagos (si los tiene, primero se eliminan o se devuelven).
+function assertCanVoid(id) {
+  const paid = get('SELECT COALESCE(SUM(amount),0) AS s FROM invoice_payments WHERE invoice_id = ?', [id]).s;
+  if (paid > 0.004) throw Object.assign(new Error('La factura tiene pagos registrados: elimina esos pagos antes de anularla.'), { status: 400 });
+}
+
+function applyDelete(id) {
+  db.exec('BEGIN');
+  try {
+    releaseInvoiceLinks(id, 'Factura eliminada');
+    run('DELETE FROM invoices WHERE id = ?', [id]);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+const PAID_SQL = `(SELECT COALESCE(SUM(p.amount),0) FROM invoice_payments p WHERE p.invoice_id = i.id)`;
 
 router.get('/', (req, res) => {
   const list = all(
-    `SELECT i.*, c.name as customer_name FROM invoices i
+    `SELECT i.*, c.name as customer_name, ROUND(${PAID_SQL}, 2) AS paid, ROUND(i.total - ${PAID_SQL}, 2) AS balance
+     FROM invoices i
      LEFT JOIN customers c ON c.id = i.customer_id ORDER BY i.created_at DESC`
   );
   res.json(list);
+});
+
+// Cartera (cuentas por cobrar): facturas con saldo, con días vencidos y rango de antigüedad.
+// Si la factura no tiene fecha de vencimiento se toma la fecha de emisión + los días de
+// crédito indicados (por omisión 30, lo habitual con municipios: Net 30).
+router.get('/receivables', (req, res) => {
+  const termDays = Math.max(0, parseInt(req.query.termDays, 10) || 30);
+  const rows = all(
+    `SELECT i.id, i.number, i.customer_id, c.name AS customer_name, c.email AS customer_email, c.phone AS customer_phone,
+            date(i.issue_date) AS issue_date,
+            COALESCE(date(i.due_date), date(i.issue_date, '+' || ? || ' days')) AS due_date,
+            i.due_date IS NULL AS due_date_estimated,
+            i.total, i.status, ROUND(${PAID_SQL}, 2) AS paid, ROUND(i.total - ${PAID_SQL}, 2) AS balance,
+            (SELECT MAX(p.payment_date) FROM invoice_payments p WHERE p.invoice_id = i.id) AS last_payment
+     FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id
+     WHERE i.status NOT IN ('cancelado','anulada') ${req.query.includePaid === '1' ? '' : `AND ROUND(i.total - ${PAID_SQL}, 2) > 0.004`}
+     ORDER BY due_date`,
+    [termDays]
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  const dayMs = 86400000;
+  for (const r of rows) {
+    const days = Math.floor((Date.parse(today) - Date.parse(r.due_date)) / dayMs);
+    r.days_overdue = Number.isNaN(days) ? 0 : days;
+    r.bucket = r.balance <= 0.004 ? 'pagada' : r.days_overdue <= 0 ? 'corriente' : r.days_overdue <= 30 ? '1-30' : r.days_overdue <= 60 ? '31-60' : r.days_overdue <= 90 ? '61-90' : '+90';
+    r.due_date_estimated = !!r.due_date_estimated;
+  }
+  res.json({ today, termDays, rows });
 });
 
 router.get('/:id', (req, res) => {
@@ -97,6 +184,13 @@ router.post('/', (req, res) => {
   if (salesOrderId) {
     sourceSalesOrder = get('SELECT * FROM sales_orders WHERE id = ?', [salesOrderId]);
     if (!sourceSalesOrder) return res.status(404).json({ error: 'Pedido no encontrado' });
+    const already = get('SELECT id, number, status FROM invoices WHERE sales_order_id = ?', [salesOrderId]);
+    if (already && !['anulada', 'cancelado'].includes(already.status)) {
+      run(`UPDATE sales_orders SET status = 'facturado' WHERE id = ?`, [salesOrderId]);
+      return res.status(409).json({ error: `Este pedido ya está facturado en la factura ${already.number}.`, invoiceId: already.id });
+    }
+    // Si la factura anterior del pedido se anuló, se suelta el enlace para poder facturarlo de nuevo.
+    if (already) run('UPDATE invoices SET sales_order_id = NULL WHERE id = ?', [already.id]);
     customerId = sourceSalesOrder.customer_id;
     items = all('SELECT * FROM sales_order_items WHERE sales_order_id = ?', [salesOrderId]);
   }
@@ -190,9 +284,10 @@ router.post('/from-work-orders', (req, res) => {
     }
     for (const p of parts) {
       items.push({
-        description: `${wo.number} — ${p.description}`,
+        description: `${wo.number} — ${p.description}${p.serial ? ` (S/N ${p.serial})` : ''}`,
         quantity: Number(p.quantity || 1),
         unitPrice: Number(p.unit_cost || 0),
+        productId: p.product_id || null,
       });
     }
   }
@@ -213,8 +308,8 @@ router.post('/from-work-orders', (req, res) => {
   const invId = result.lastInsertRowid;
   for (const item of items) {
     run(
-      `INSERT INTO invoice_items (invoice_id, description, quantity, unit_price) VALUES (?,?,?,?)`,
-      [invId, item.description, item.quantity, item.unitPrice]
+      `INSERT INTO invoice_items (invoice_id, product_id, description, quantity, unit_price) VALUES (?,?,?,?,?)`,
+      [invId, item.productId || null, item.description, item.quantity, item.unitPrice]
     );
   }
   for (const wo of workOrders) {
@@ -255,9 +350,10 @@ router.post('/:id/sync-work-orders', (req, res) => {
     }
     for (const p of parts) {
       expectedItems.push({
-        description: `${wo.number} — ${p.description}`,
+        description: `${wo.number} — ${p.description}${p.serial ? ` (S/N ${p.serial})` : ''}`,
         quantity: Number(p.quantity || 1),
         unitPrice: Number(p.unit_cost || 0),
+        productId: p.product_id || null,
       });
     }
   }
@@ -307,14 +403,44 @@ router.post('/:id/sync-work-orders', (req, res) => {
 // Editar o eliminar una factura existente: un administrador lo aplica de inmediato;
 // cualquier otro usuario con permiso de edición en "facturas" solo puede proponer el
 // cambio, que queda pendiente de autorización del administrador.
+// ---- Boleta de entrega (Delivery Ticket) ----
+// Crea o actualiza la boleta de entrega de la factura. El número se asigna la primera vez y
+// sigue al de la factura: NX-INV-AAAAMMDD-NN → NX-DT-AAAAMMDD-NN (si la factura tiene otro
+// formato, NX-DT-<número de factura>). No pasa por aprobación: no cambia montos ni líneas.
+function deliveryNumberFor(invNumber) {
+  const s = String(invNumber || '');
+  if (/^NX-INV-/.test(s)) return s.replace(/^NX-INV-/, 'NX-DT-');
+  return `NX-DT-${s.replace(/^NX-/, '')}`;
+}
+router.post('/:id/delivery', (req, res) => {
+  const inv = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
+  if (!inv) return res.status(404).json({ error: 'Factura no encontrada' });
+  const b = req.body || {};
+  const clean = (v) => (v === undefined ? undefined : (String(v).trim() || null));
+  const number = inv.delivery_number || deliveryNumberFor(inv.number);
+  const date = clean(b.deliveryDate) || inv.delivery_date || new Date().toISOString().slice(0, 10);
+  run(`UPDATE invoices SET delivery_number = ?, delivery_date = ?,
+         delivery_delivered_by = COALESCE(?, delivery_delivered_by), delivery_received_by = COALESCE(?, delivery_received_by),
+         delivery_notes = COALESCE(?, delivery_notes) WHERE id = ?`,
+    [number, date, clean(b.deliveredBy) ?? null, clean(b.receivedBy) ?? null, clean(b.notes) ?? null, inv.id]);
+  // Permite borrar un campo enviándolo vacío ('')
+  for (const [k, col] of [['deliveredBy', 'delivery_delivered_by'], ['receivedBy', 'delivery_received_by'], ['notes', 'delivery_notes']]) {
+    if (b[k] !== undefined && clean(b[k]) === null) run(`UPDATE invoices SET ${col} = NULL WHERE id = ?`, [inv.id]);
+  }
+  res.json(getFullInvoice(inv.id));
+});
+
 router.put('/:id', (req, res) => {
   const existing = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Factura no encontrada' });
 
-  if (req.user.role === 'admin') {
-    applyUpdate(req.params.id, req.body);
-    return res.json(getFullInvoice(req.params.id));
-  }
+  try {
+    if (req.body && req.body.status === 'anulada' && existing.status !== 'anulada') assertCanVoid(req.params.id);
+    if (req.user.role === 'admin') {
+      applyUpdate(req.params.id, req.body);
+      return res.json(getFullInvoice(req.params.id));
+    }
+  } catch (err) { return res.status(err.status || 500).json({ error: err.message }); }
   const result = run(
     `INSERT INTO approval_requests (entity_type, entity_id, action, payload, summary, requested_by)
      VALUES ('invoice', ?, 'update', ?, ?, ?)`,
@@ -338,6 +464,66 @@ router.delete('/:id', (req, res) => {
   );
   res.status(202).json({ pending: true, approvalId: result.lastInsertRowid, message: 'La eliminación se envió para autorización del administrador.' });
 });
+
+// ---- Pagos de clientes (abonos) ----
+// Registrar un pago no modifica la factura en sí (sus líneas y total), por eso no pasa por
+// aprobación: basta el permiso de edición de Facturación. Borrar un pago sí es solo del admin.
+router.post('/:id/payments', paymentUpload, (req, res) => {
+  const inv = get('SELECT * FROM invoices WHERE id = ?', [req.params.id]);
+  if (!inv) return res.status(404).json({ error: 'Factura no encontrada' });
+  if (['cancelado', 'anulada'].includes(inv.status)) return res.status(400).json({ error: 'La factura está anulada' });
+  const b = req.body || {};
+  const amount = round2(b.amount);
+  if (!(amount > 0)) return res.status(400).json({ error: 'El monto del pago debe ser mayor que cero' });
+  const paid = round2(get('SELECT COALESCE(SUM(amount),0) AS s FROM invoice_payments WHERE invoice_id = ?', [inv.id]).s);
+  const balance = round2(inv.total - paid);
+  if (amount - balance > 0.004) {
+    return res.status(400).json({ error: `El pago ($${amount.toLocaleString('en-US')}) es mayor que el saldo de la factura ($${balance.toLocaleString('en-US')})` });
+  }
+  const newId = run(
+    `INSERT INTO invoice_payments (invoice_id, payment_date, amount, surcharge, processor_fee, method, reference, notes, created_by) VALUES (?,?,?,?,?,?,?,?,?)`,
+    [inv.id, b.paymentDate || new Date().toISOString().slice(0, 10), amount, Math.max(0, round2(b.surcharge)), Math.max(0, round2(b.processorFee)), b.method || null, b.reference || null, b.notes || null, req.user ? req.user.id : null]
+  ).lastInsertRowid;
+  saveFilesForPayment('invoice', newId, req.files);
+  setPaymentBank('invoice', newId, b.bankAccountId);
+  refreshInvoiceStatus(inv.id);
+  res.status(201).json({ ...getFullInvoice(inv.id), newPaymentId: newId });
+});
+
+// Corregir los datos de un pago ya registrado (fecha, monto, forma de pago, referencia).
+// Útil sobre todo para los pagos que se crearon solos al activar el módulo de cobros
+// ("Marcada como pagada antes del registro de cobros"). Solo administrador.
+router.put('/:id/payments/:paymentId', paymentUpload, (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede corregir un pago registrado.' });
+  const pay = get('SELECT * FROM invoice_payments WHERE id = ? AND invoice_id = ?', [req.params.paymentId, req.params.id]);
+  if (!pay) return res.status(404).json({ error: 'Pago no encontrado' });
+  const inv = get('SELECT total FROM invoices WHERE id = ?', [req.params.id]);
+  const b = req.body || {};
+  const amount = b.amount !== undefined ? round2(b.amount) : pay.amount;
+  if (!(amount > 0)) return res.status(400).json({ error: 'El monto del pago debe ser mayor que cero' });
+  const others = round2(get('SELECT COALESCE(SUM(amount),0) AS s FROM invoice_payments WHERE invoice_id = ? AND id != ?', [req.params.id, pay.id]).s);
+  if (amount + others - inv.total > 0.004) return res.status(400).json({ error: 'Con ese monto los pagos superan el total de la factura' });
+  run(`UPDATE invoice_payments SET payment_date = ?, amount = ?, surcharge = ?, processor_fee = ?, method = ?, reference = ?, notes = ? WHERE id = ?`,
+    [b.paymentDate || pay.payment_date, amount, b.surcharge !== undefined ? Math.max(0, round2(b.surcharge)) : pay.surcharge,
+     b.processorFee !== undefined ? Math.max(0, round2(b.processorFee)) : pay.processor_fee, b.method ?? pay.method, b.reference ?? pay.reference, b.notes ?? null, pay.id]);
+  for (const fid of String(b.removeFileIds || '').split(',').map((x) => parseInt(x, 10)).filter(Boolean)) {
+    run(`DELETE FROM payment_files WHERE id = ? AND kind = 'invoice' AND payment_id = ?`, [fid, pay.id]);
+  }
+  saveFilesForPayment('invoice', pay.id, req.files);
+  if (b.bankAccountId !== undefined) setPaymentBank('invoice', pay.id, b.bankAccountId);
+  refreshInvoiceStatus(req.params.id);
+  res.json(getFullInvoice(req.params.id));
+});
+
+router.delete('/:id/payments/:paymentId', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Solo un administrador puede borrar un pago registrado.' });
+  run('DELETE FROM invoice_payments WHERE id = ? AND invoice_id = ?', [req.params.paymentId, req.params.id]);
+  deleteFilesOfPayment('invoice', req.params.paymentId);
+  refreshInvoiceStatus(req.params.id);
+  res.json(getFullInvoice(req.params.id));
+});
+
+mountPaymentFileRoutes(router, 'invoice', getFullInvoice);
 
 router.service = { applyUpdate, applyDelete };
 module.exports = router;

@@ -38,6 +38,7 @@ export default function PurchaseOrderDocument() {
               <div><strong>No.</strong> {po.number}</div>
               <div><strong>{t('Fecha:')}</strong> {po.order_date || po.created_at}</div>
               <div><strong>{t('Estado:')}</strong> <Pill value={po.status} /></div>
+              {po.effective_terms_days != null && <div><strong>{t('Condiciones de pago:')}</strong> {Number(po.effective_terms_days) === 0 ? t('Contado / prepago') : `${t('Crédito')} ${po.effective_terms_days} ${t('días')}`}</div>}
             </div>
           </div>
 
@@ -71,7 +72,12 @@ export default function PurchaseOrderDocument() {
             <div className="invoice-total-grand"><span>{t('Total')}</span><span>${total.toLocaleString()}</span></div>
           </div>
 
-          {po.notes && <div style={{ marginTop: 20 }}><strong>{t('Notas:')}</strong> {po.notes}</div>}
+          {po.notes && (
+            <div style={{ marginTop: 20, border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', breakInside: 'avoid' }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('Comentarios e instrucciones')}</div>
+              <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.45 }}>{po.notes}</div>
+            </div>
+          )}
         </div>
       </div>
     </>

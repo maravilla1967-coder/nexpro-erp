@@ -10,8 +10,9 @@ router.get('/', (req, res) => {
     products: get('SELECT COUNT(*) as n FROM products').n,
     lowStock: get('SELECT COUNT(*) as n FROM products WHERE stock_qty <= 0').n,
     openSalesOrders: get(`SELECT COUNT(*) as n FROM sales_orders WHERE status != 'facturado' AND status != 'cancelado'`).n,
-    pendingInvoices: get(`SELECT COUNT(*) as n FROM invoices WHERE status = 'pendiente'`).n,
-    pendingInvoicesTotal: get(`SELECT COALESCE(SUM(total),0) as n FROM invoices WHERE status = 'pendiente'`).n,
+    pendingInvoices: get(`SELECT COUNT(*) as n FROM invoices WHERE status IN ('pendiente','parcial')`).n,
+    pendingInvoicesTotal: get(`SELECT COALESCE(SUM(i.total - (SELECT COALESCE(SUM(p.amount),0) FROM invoice_payments p WHERE p.invoice_id = i.id)),0) as n
+                               FROM invoices i WHERE i.status IN ('pendiente','parcial')`).n,
     vehiclesInShop: get(`SELECT COUNT(*) as n FROM vehicles WHERE status IN ('recibido','en_servicio')`).n,
     openWorkOrders: get(`SELECT COUNT(*) as n FROM work_orders WHERE status != 'completado' AND status != 'facturado'`).n,
   };
