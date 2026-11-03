@@ -31,6 +31,19 @@ tryAlter('ALTER TABLE suppliers ADD COLUMN zip TEXT');
 tryAlter('ALTER TABLE work_orders ADD COLUMN invoice_id INTEGER REFERENCES invoices(id)');
 tryAlter('ALTER TABLE invoices ADD COLUMN include_wire_info INTEGER NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN order_date TEXT');
+// Datos bancarios del proveedor (ACH/wire) para bases de datos ya existentes.
+tryAlter('ALTER TABLE suppliers ADD COLUMN beneficiary_name TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN beneficiary_address TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN bank_name TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN bank_address TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN aba_routing_number TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN account_number TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN account_type TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN swift_bic TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN bank_contact_name TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN bank_contact_phone TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN bank_contact_email TEXT');
+tryAlter('ALTER TABLE suppliers ADD COLUMN bank_notes TEXT');
 
 function all(sql, params = []) {
   const stmt = db.prepare(sql);

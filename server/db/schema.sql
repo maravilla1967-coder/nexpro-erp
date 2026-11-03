@@ -72,6 +72,21 @@ CREATE TABLE IF NOT EXISTS suppliers (
   city TEXT,
   zip TEXT,
   notes TEXT,
+  -- Datos bancarios para hacer transferencias/pagos (ACH o wire) a este proveedor.
+  -- beneficiary_name/address: por si el nombre o dirección a nombre de quien se recibe el pago
+  -- no coincide exactamente con el nombre/dirección comercial del proveedor (pasa seguido).
+  beneficiary_name TEXT,
+  beneficiary_address TEXT,
+  bank_name TEXT,
+  bank_address TEXT,
+  aba_routing_number TEXT,
+  account_number TEXT,
+  account_type TEXT, -- 'checking' | 'savings'
+  swift_bic TEXT, -- para transferencias internacionales (wire), no aplica a ACH doméstico
+  bank_contact_name TEXT, -- contacto del proveedor para notificación de pago
+  bank_contact_phone TEXT,
+  bank_contact_email TEXT,
+  bank_notes TEXT, -- instrucciones adicionales (banco intermediario, referencia obligatoria, etc.)
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
