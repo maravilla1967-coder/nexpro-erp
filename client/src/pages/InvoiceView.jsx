@@ -3,6 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
 import DocumentBrand from '../components/DocumentBrand.jsx';
+import Modal from '../components/Modal.jsx';
+import CustomerPicker from '../components/CustomerPicker.jsx';
+import LineItemsEditor from '../components/LineItemsEditor.jsx';
 import PaymentModal, { money, methodLabel, uploadPaymentFiles, PaymentFiles, sendPayment } from '../components/PaymentModal.jsx';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
@@ -46,6 +49,57 @@ export default function InvoiceView() {
   }
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
+
+  // Editar factura: cliente, fechas, impuesto, items y notas. Siempre disponible para el
+  // administrador (aplica directo); para los demás, igual que cualquier otro cambio a una
+  // factura, queda pendiente de autorización (lo resuelve el backend en PUT /invoices/:id).
+  const [editOpen, setEditOpen] = useState(false);
+  const [editCustomerId, setEditCustomerId] = useState('');
+  const [editIssueDate, setEditIssueDate] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editTaxRate, setEditTaxRate] = useState(0);
+  const [editNotes, setEditNotes] = useState('');
+  const [editItems, setEditItems] = useState([]);
+  const [editError, setEditError] = useState('');
+  const [customers, setCustomers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [services, setServices] = useState([]);
+
+  function openEditInvoice() {
+    setEditCustomerId(invoice.customer_id);
+    setEditIssueDate((invoice.issue_date || '').slice(0, 10));
+    setEditDueDate((invoice.due_date || '').slice(0, 10));
+    setEditTaxRate(invoice.tax_rate || 0);
+    setEditNotes(invoice.notes || '');
+    setEditItems(invoice.items.map((it) => ({ productId: it.product_id || '', description: it.description, quantity: it.quantity, unitPrice: it.unit_price })));
+    setEditError('');
+    setEditOpen(true);
+  }
+
+  async function saveEditInvoice(e) {
+    e.preventDefault();
+    const payload = {
+      customerId: editCustomerId,
+      issueDate: editIssueDate || null,
+      dueDate: editDueDate || null,
+      taxRate: parseFloat(editTaxRate) || 0,
+      notes: editNotes,
+      items: editItems.filter((i) => i.description).map((i) => ({ productId: i.productId || null, description: i.description, quantity: parseFloat(i.quantity) || 0, unitPrice: parseFloat(i.unitPrice) || 0 })),
+    };
+    try {
+      const result = await api.put(`/invoices/${id}`, payload);
+      if (result && result.pending) {
+        alert(result.message || t('Los cambios se enviaron para autorización del administrador.'));
+        setEditOpen(false);
+      } else {
+        setInvoice(result);
+        loadSerials(result);
+        setEditOpen(false);
+      }
+    } catch (err) {
+      setEditError(err.message);
+    }
+  }
   // Anular: la factura queda en el historial (con su número) pero sin valor; las órdenes de trabajo,
   // el pedido y los seriales quedan libres para volver a facturar. No se puede si tiene pagos.
   async function voidInvoice() {
@@ -82,6 +136,11 @@ export default function InvoiceView() {
   }
 
   useEffect(() => { api.get(`/invoices/${id}`).then((inv) => { setInvoice(inv); loadSerials(inv); }).catch(console.error); }, [id]);
+  useEffect(() => {
+    api.get('/customers').then(setCustomers).catch(() => {});
+    api.get('/products').then(setProducts).catch(() => {});
+    api.get('/services').then(setServices).catch(() => {});
+  }, []);
 
   async function toggleWireInfo() {
     setSavingWireInfo(true);
@@ -147,6 +206,7 @@ export default function InvoiceView() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/facturas" className="btn">{t('← Volver')}</Link>
+          <button type="button" className="btn admin-only" onClick={openEditInvoice}>{t('✏️ Editar factura')}</button>
           {!['anulada', 'cancelado'].includes(invoice.status) && <button type="button" className="btn admin-only" style={{ color: 'var(--amber)' }} onClick={voidInvoice}>{t('Anular factura')}</button>}
           <button type="button" className="btn btn-danger" onClick={deleteInvoice}>{t('Eliminar factura')}</button>
           {invoice.workOrders && invoice.workOrders.length > 0 && (
@@ -286,6 +346,29 @@ export default function InvoiceView() {
       )}
       {payOpen && (
         <PaymentModal showSurcharge title={`${t('Registrar pago')} · ${invoice.number}`} balance={invoice.balance} onSave={savePayment} onClose={() => setPayOpen(false)} />
+      )}
+      {editOpen && (
+        <Modal title={`${t('Editar factura')} ${invoice.number}`} onClose={() => setEditOpen(false)} wide>
+          <form onSubmit={saveEditInvoice}>
+            {editError && <div className="error-banner">{editError}</div>}
+            <div className="grid grid-2">
+              <div className="field"><label>{t('Cliente *')}</label>
+                <CustomerPicker required customers={customers} value={editCustomerId} onChange={setEditCustomerId} />
+              </div>
+              <div className="field"><label>{t('Impuesto (%)')}</label><input type="number" step="0.01" value={editTaxRate} onChange={(e) => setEditTaxRate(e.target.value)} /></div>
+            </div>
+            <div className="grid grid-2">
+              <div className="field"><label>{t('Fecha de emisión')}</label><input type="date" value={editIssueDate} onChange={(e) => setEditIssueDate(e.target.value)} /></div>
+              <div className="field"><label>{t('Fecha de vencimiento')}</label><input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} /></div>
+            </div>
+            <LineItemsEditor items={editItems} setItems={setEditItems} products={products} services={services} priceLabel="Precio unit." priceSourceField="selling_price" />
+            <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} /></div>
+            <div className="modal-footer">
+              <button type="button" className="btn" onClick={() => setEditOpen(false)}>{t('Cancelar')}</button>
+              <button type="submit" className="btn btn-primary">{t('Guardar cambios')}</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </>
   );

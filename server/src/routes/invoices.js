@@ -82,9 +82,14 @@ function applyUpdate(id, b) {
     releaseInvoiceLinks(id, `Factura ${existing.number} anulada`);
   }
   const includeWireInfo = b.includeWireInfo !== undefined ? (b.includeWireInfo ? 1 : 0) : existing.include_wire_info;
+  // Cliente y fecha de emisión: editables igual que el resto de la factura (solo admin, o vía
+  // aprobación para los demás), por ejemplo para corregir una factura hecha al cliente
+  // equivocado o con la fecha mal puesta. Cadena vacía no borra el cliente (es obligatorio).
+  const customerId = (b.customerId !== undefined && b.customerId !== null && b.customerId !== '') ? b.customerId : existing.customer_id;
+  const issueDate = b.issueDate || existing.issue_date;
   run(
-    `UPDATE invoices SET status=?, due_date=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, notes=?, include_wire_info=? WHERE id=?`,
-    [b.status ?? existing.status, b.dueDate ?? existing.due_date, subtotal, taxRate, taxAmount, total, b.notes ?? existing.notes, includeWireInfo, id]
+    `UPDATE invoices SET customer_id=?, status=?, issue_date=?, due_date=?, subtotal=?, tax_rate=?, tax_amount=?, total=?, notes=?, include_wire_info=? WHERE id=?`,
+    [customerId, b.status ?? existing.status, issueDate, b.dueDate ?? existing.due_date, subtotal, taxRate, taxAmount, total, b.notes ?? existing.notes, includeWireInfo, id]
   );
   // El estado de cobro (pendiente/parcial/pagada) sale de los pagos registrados.
   if (b.status === undefined || ['pendiente', 'parcial', 'pagada'].includes(b.status)) refreshInvoiceStatus(id);
