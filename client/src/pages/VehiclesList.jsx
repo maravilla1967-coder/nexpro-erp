@@ -6,7 +6,7 @@ import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import { useI18n, pickLang } from '../i18n.jsx';
 
-const EMPTY = { vin: '', make: '', model: '', year: '', chassisType: '', plate: '', customerName: '', notes: '' };
+const EMPTY = { vin: '', make: '', model: '', year: '', chassisType: '', plate: '', customerName: '', notes: '', requestId: '' };
 const EMPTY_SERVICE_ROW = { serviceId: '', description: '', pricingType: 'hora', hours: 1, hourlyRate: 0, flatPrice: 0 };
 
 export default function VehiclesList() {
@@ -24,6 +24,8 @@ export default function VehiclesList() {
   const [woMechanicId, setWoMechanicId] = useState('');
   const [woServices, setWoServices] = useState([{ ...EMPTY_SERVICE_ROW }]);
   const [error, setError] = useState('');
+  // Llamadas abiertas sin equipo recibido, para indicar de cuál viene esta recepción
+  const [openRequests, setOpenRequests] = useState([]);
 
   function load() { api.get('/vehicles', { q, status }).then(setList).catch(console.error); }
   useEffect(() => { load(); }, [q, status]);
@@ -37,6 +39,7 @@ export default function VehiclesList() {
     setForm(EMPTY); setPhotoFile(null);
     setWoMechanicId(''); setWoServices([{ ...EMPTY_SERVICE_ROW }]);
     setError(''); setModalOpen(true);
+    api.get('/crm/requests', { status: 'abiertas' }).then((l) => setOpenRequests(l.filter((r) => !r.vehicle_id))).catch(() => setOpenRequests([]));
   }
 
   function updateWoService(idx, field, value) {
@@ -74,7 +77,7 @@ export default function VehiclesList() {
         await api.post('/work-orders', { vehicleId: vehicle.id, mechanicId: woMechanicId || null, services: filteredServices });
       }
       setModalOpen(false);
-      navigate(`/vehiculos/${vehicle.id}`);
+      navigate(`/vehiculos/${vehicle.id}`, { state: vehicle.autoLinked && vehicle.autoLinked.length ? { autoLinked: vehicle.autoLinked, manual: !!form.requestId } : null });
     } catch (err) { setError(err.message); }
   }
 
@@ -150,6 +153,16 @@ export default function VehiclesList() {
                 <div className="muted">{selectedCustomer.tax_id && `${t('NIT/ID:')} ${selectedCustomer.tax_id}`}</div>
                 <div className="muted">{selectedCustomer.address || ''} {selectedCustomer.city || ''} {selectedCustomer.zip || ''}</div>
                 <div className="muted">{selectedCustomer.phone} {selectedCustomer.phone && selectedCustomer.email ? '|' : ''} {selectedCustomer.email}</div>
+              </div>
+            )}
+
+            {openRequests.length > 0 && (
+              <div className="field"><label>{t('¿Viene de una llamada? (opcional)')}</label>
+                <select value={form.requestId} onChange={(e) => setForm({ ...form, requestId: e.target.value })}>
+                  <option value="">{t('— Detectar automáticamente —')}</option>
+                  {openRequests.map((r) => <option key={r.id} value={r.id}>{r.number} · {r.customer_name} · {r.subject}{r.reply_to ? ` · ${r.reply_to}` : ''}</option>)}
+                </select>
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('Si no escoges ninguna, se enlaza sola la llamada con el mismo teléfono, correo o cliente y el mismo producto.')}</div>
               </div>
             )}
 

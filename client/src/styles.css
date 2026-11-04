@@ -199,6 +199,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 
 .line-items-table input { padding: 6px 8px; font-size: 13px; }
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+.info-banner { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; background: #e0f2fe; color: #075985; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; }
 .error-banner { background: #fee2e2; color: var(--red); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; }
 
 .thumb { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; background: #f1f5f9; border: 1px solid var(--border); }

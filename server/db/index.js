@@ -119,6 +119,8 @@ tryAlter('ALTER TABLE vehicles ADD COLUMN contact_id INTEGER REFERENCES contacts
 // Orden de pedido nacida de una solicitud del CRM, a la atención de un contacto.
 tryAlter('ALTER TABLE sales_orders ADD COLUMN contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL');
 tryAlter('ALTER TABLE sales_orders ADD COLUMN request_id INTEGER REFERENCES crm_requests(id) ON DELETE SET NULL');
+// Orden de trabajo (servicio) nacida de una llamada / solicitud del CRM.
+tryAlter('ALTER TABLE work_orders ADD COLUMN request_id INTEGER REFERENCES crm_requests(id) ON DELETE SET NULL');
 try {
   db.exec("UPDATE customers SET roles = CASE WHEN status IN ('lead','prospecto') THEN 'potencial' ELSE 'cliente' END WHERE roles IS NULL OR roles = ''");
 } catch (e) { console.error('CRM roles:', e.message); }
@@ -130,6 +132,7 @@ try {
 } catch (e) { console.error('Reparación de pedidos facturados:', e.message); }
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_activities_customer ON activities(customer_id)'); } catch (e) {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_requests_customer ON crm_requests(customer_id)'); } catch (e) {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_requests_vehicle ON crm_requests(vehicle_id)'); } catch (e) {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_contacts_customer ON contacts(customer_id)'); } catch (e) {}
 
 function all(sql, params = []) {

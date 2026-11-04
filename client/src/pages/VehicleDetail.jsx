@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import CustomerPicker from '../components/CustomerPicker.jsx';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, toFormData } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
@@ -15,7 +15,10 @@ export default function VehicleDetail() {
   const { t, lang } = useI18n();
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [vehicle, setVehicle] = useState(null);
+  // Aviso de enlace con la llamada (al recibir, al crear desde la llamada o al editar la recepción)
+  const [linkNotice, setLinkNotice] = useState(location.state || null);
   const [equipTypes, setEquipTypes] = useState([]);
   const [mechanics, setMechanics] = useState([]);
   const [services, setServices] = useState([]);
@@ -65,6 +68,18 @@ export default function VehicleDetail() {
     api.get('/products', { active: 'true' }).then(setProducts).catch(() => {});
   }, []);
 
+  async function linkRequest(m) {
+    const other = vehicle.customer_id && m.request.customer_id !== vehicle.customer_id;
+    if (!window.confirm(`${t('¿Enlazar la solicitud')} ${m.request.number} ${t('con este equipo?')}${other ? `\n\n${t('La llamada está a nombre de')} "${m.request.customer_name}": ${t('pasará con su historial a')} ${vehicle.customer_name}${t('; si ese nombre era provisional, se fusiona.')}` : ''}`)) return;
+    try { const x = await api.post(`/vehicles/${id}/link-request`, { requestId: m.request.id }); setVehicle(x.vehicle); setLinkNotice({ autoLinked: [x.link], manual: true }); }
+    catch (err) { if (!err.pendingApproval) setError(err.message); }
+  }
+  async function unlinkRequest(rq) {
+    if (!window.confirm(`${t('¿Quitar el enlace con')} ${rq.number}?`)) return;
+    try { setVehicle(await api.post(`/vehicles/${id}/unlink-request`, { requestId: rq.id })); } catch (err) { if (!err.pendingApproval) setError(err.message); }
+  }
+  const REASON = { vin: 'VIN / serial', cliente: 'mismo cliente', telefono: 'mismo teléfono', correo: 'mismo correo', producto: 'mismo producto' };
+
   async function remove() {
     if (!window.confirm(t('¿Eliminar este vehículo y todo su historial?'))) return;
     await api.del(`/vehicles/${id}`);
@@ -92,7 +107,9 @@ export default function VehicleDetail() {
     try {
       const fd = toFormData(vForm);
       if (vPhoto) fd.append('photo', vPhoto);
-      setVehicle(await api.putForm(`/vehicles/${id}`, fd));
+      const saved = await api.putForm(`/vehicles/${id}`, fd);
+      setVehicle(saved);
+      if (saved.autoLinked && saved.autoLinked.length) setLinkNotice({ autoLinked: saved.autoLinked });
       api.get('/customers').then(setCustomers).catch(() => {});
       setEditOpen(false);
     } catch (err) { setError(err.message); }
@@ -272,6 +289,17 @@ export default function VehicleDetail() {
         </div>
       </div>
       <div className="content">
+        {linkNotice && (linkNotice.fromRequest || (linkNotice.autoLinked && linkNotice.autoLinked.length > 0)) && (
+          <div className="info-banner">
+            <span>🔗 {linkNotice.fromRequest
+              ? `${t('Recibido desde la llamada')} ${linkNotice.fromRequest}${linkNotice.workOrderNumber ? ` · ${t('orden de servicio')} ${linkNotice.workOrderNumber}` : ''}.`
+              : linkNotice.autoLinked.map((l) => `${linkNotice.manual ? t('Enlazado con') : t('Se enlazó solo con la llamada')} ${l.requestNumber}`).join(' · ') + '.'}
+            {[linkNotice.merged, ...((linkNotice.autoLinked || []).map((l) => l.merge))].filter(Boolean).map((mg, i) => (
+              <span key={i}> {t('El cliente provisional')} "{mg.name}" {mg.deleted ? t('se fusionó en este cliente.') : t('se fusionó y quedó inactivo (el administrador puede eliminarlo).')}</span>
+            ))}</span>
+            <button type="button" className="link-btn" onClick={() => setLinkNotice(null)}>✕</button>
+          </div>
+        )}
         <div className="grid grid-2">
           <div className="card">
             <div className="card-title">{t('Datos del vehículo')}</div>
@@ -324,6 +352,45 @@ export default function VehicleDetail() {
               </table>
             )}
           </div>
+        </div>
+
+        <div className="card">
+          <div className="card-title">{t('Llamadas y solicitudes del CRM')}</div>
+          {(vehicle.requests || []).length === 0 && (vehicle.requestSuggestions || []).length === 0 && (
+            <div className="muted" style={{ fontSize: 13 }}>{t('Ninguna llamada enlazada. Si alguien llamó por este equipo, se enlaza solo cuando coincide el teléfono, correo o cliente y el producto (o el VIN / serial).')}</div>
+          )}
+          {(vehicle.requests || []).length > 0 && (
+            <table>
+              <tbody>
+                {vehicle.requests.map((rq) => (
+                  <tr key={rq.id}>
+                    <td className="mono"><Link to={`/crm/solicitudes?abrir=${rq.id}`}>{rq.number}</Link></td>
+                    <td>{rq.subject}</td>
+                    <td className="muted">{String(rq.created_at).slice(0, 10)}{rq.reply_to ? ` · ${rq.reply_to}` : ''}{rq.files_count ? ` · 📎 ${rq.files_count}` : ''}</td>
+                    <td><Pill value={rq.status} /></td>
+                    <td><button type="button" className="link-btn" onClick={() => unlinkRequest(rq)}>{t('Quitar enlace')}</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {(vehicle.requestSuggestions || []).length > 0 && (
+            <>
+              <div className="form-section">{t('Llamadas que pueden ser de este equipo')}</div>
+              <table>
+                <tbody>
+                  {vehicle.requestSuggestions.map((m) => (
+                    <tr key={m.request.id}>
+                      <td className="mono"><Link to={`/crm/solicitudes?abrir=${m.request.id}`}>{m.request.number}</Link></td>
+                      <td><strong>{m.request.customer_name}</strong> — {m.request.subject}<div className="muted" style={{ fontSize: 12 }}>{String(m.request.notes || '').slice(0, 90)}</div></td>
+                      <td className="muted" style={{ fontSize: 12 }}>{String(m.request.created_at).slice(0, 10)}{m.request.reply_to ? ` · ${m.request.reply_to}` : ''}<div>{m.reasons.map((x) => t(REASON[x] || x)).join(' + ')}</div></td>
+                      <td><button type="button" className="btn btn-sm btn-primary" onClick={() => linkRequest(m)}>🔗 {t('Enlazar')}</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
         </div>
 
         <div className="card">
