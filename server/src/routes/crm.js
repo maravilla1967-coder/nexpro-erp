@@ -453,10 +453,44 @@ router.put('/requests/:id', (req, res) => {
   res.json(getRequest(r.id));
 });
 
-router.delete('/requests/:id', (req, res) => {
-  run('UPDATE activities SET request_id = NULL WHERE request_id = ?', [req.params.id]);
-  run('DELETE FROM crm_requests WHERE id = ?', [req.params.id]);
+// Borrar una solicitud mal hecha: SOLO el administrador (Jorge). Se van con ella su historial de la
+// llamada, sus ítems y archivos, y la cotización si sigue en borrador sin factura. Lo que ya tiene
+// vida propia se conserva: cotización enviada o facturada, vehículo recibido y órdenes de trabajo
+// (quedan sin enlace a la solicitud).
+function deleteRequest(id) {
+  const r = get('SELECT * FROM crm_requests WHERE id = ?', [id]);
+  if (!r) return null;
+  run('DELETE FROM activities WHERE request_id = ?', [id]);
+  run('UPDATE work_orders SET request_id = NULL WHERE request_id = ?', [id]);
+  let quoteDeleted = false;
+  if (r.sales_order_id) {
+    const so = get(`SELECT so.id, so.status, (SELECT COUNT(*) FROM invoices i WHERE i.sales_order_id = so.id) AS inv FROM sales_orders so WHERE so.id = ?`, [r.sales_order_id]);
+    if (so && so.status === 'borrador' && !so.inv) {
+      run('UPDATE crm_requests SET sales_order_id = NULL WHERE id = ?', [id]);
+      run('DELETE FROM sales_order_items WHERE sales_order_id = ?', [so.id]);
+      run('DELETE FROM sales_orders WHERE id = ?', [so.id]);
+      quoteDeleted = true;
+    }
+  }
+  run('UPDATE sales_orders SET request_id = NULL WHERE request_id = ?', [id]);
+  run('DELETE FROM crm_requests WHERE id = ?', [id]);
+  return { number: r.number, quoteDeleted };
+}
+const adminOnly = (req, res, next) => (req.user && req.user.role === 'admin' ? next()
+  : res.status(403).json({ error: 'Solo el administrador puede borrar solicitudes. Pídeselo a Jorge.' }));
+
+router.delete('/requests/:id', adminOnly, (req, res) => {
+  const out = deleteRequest(Number(req.params.id));
+  if (!out) return res.status(404).json({ error: 'Solicitud no encontrada' });
   res.status(204).end();
+});
+
+// Borrar varias a la vez (las marcadas en la lista). Solo el administrador.
+router.post('/requests/bulk-delete', adminOnly, (req, res) => {
+  const ids = (Array.isArray((req.body || {}).ids) ? req.body.ids : []).map(Number).filter(Boolean);
+  if (!ids.length) return res.status(400).json({ error: 'No escogiste ninguna solicitud' });
+  const deleted = ids.map(deleteRequest).filter(Boolean);
+  res.json({ deleted: deleted.length });
 });
 
 // Crear / completar la orden de pedido (cotización) a partir de la solicitud

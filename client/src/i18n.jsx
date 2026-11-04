@@ -4,6 +4,12 @@ import React, { createContext, useCallback, useContext, useState } from 'react';
 // El español es el idioma "fuente": el código usa literales en español como
 // clave de traducción, y t() devuelve el inglés cuando el idioma activo es 'en'.
 const DICT = {
+  // ===== Borrar solicitudes =====
+  '¿Eliminar': 'Delete',
+  '¿Eliminar la solicitud': 'Delete request',
+  'Se borra con su historial de la llamada, archivos y la cotización si sigue en borrador. Una cotización enviada o facturada, el vehículo recibido y las órdenes de trabajo se conservan.': 'It is deleted with its call history, files and the quote if it is still a draft. A sent or invoiced quote, the received vehicle and the work orders are kept.',
+  'solicitud(es)?': 'request(s)?',
+  'Eliminar seleccionadas': 'Delete selected',
   // ===== Enlace llamada ↔ recepción / orden de servicio =====
   '; si ese nombre era provisional, se fusiona.': '; if that name was provisional, it is merged.',
   'Cliente nuevo: se crea al guardar.': 'New customer: created on save.',
