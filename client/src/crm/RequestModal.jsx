@@ -4,9 +4,11 @@ import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
 import { api } from '../api.js';
 import { useI18n } from '../i18n.jsx';
+import { useAuth } from '../auth.jsx';
 import CatalogQuickPick from './CatalogQuickPick.jsx';
 import MessageComposer from './MessageComposer.jsx';
 import RequestFiles from './RequestFiles.jsx';
+import ServiceOrderModal from './ServiceOrderModal.jsx';
 import { REQUEST_STATUSES, PRIORITIES, CHANNELS, channelIcon, interactionIcon, contactTypeLabel, money, shortDate } from './constants.js';
 
 const toForm = (i) => ({ kind: i.kind, productId: i.product_id, serviceId: i.service_id, productTypeId: i.product_type_id, equipmentTypeId: i.equipment_type_id, description: i.description, quantity: i.quantity });
@@ -15,6 +17,7 @@ const toForm = (i) => ({ kind: i.kind, productId: i.product_id, serviceId: i.ser
 // enviar acuse o cotización por el mismo medio por donde llegó, y cambiar el estado.
 export default function RequestModal({ id, onClose, onChanged }) {
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
   const [r, setR] = useState(null);
   const [catalog, setCatalog] = useState(null);
   const [contacts, setContacts] = useState([]);
@@ -22,6 +25,7 @@ export default function RequestModal({ id, onClose, onChanged }) {
   const [composer, setComposer] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [serviceOpen, setServiceOpen] = useState(false);
   const navigate = useNavigate();
 
   function load() {
@@ -69,7 +73,7 @@ export default function RequestModal({ id, onClose, onChanged }) {
     try { const x = await api.post(`/crm/requests/${id}/quote`, {}); setR(x.request); onChanged && onChanged(); } catch (e) { setError(e.message); }
   }
   async function remove() {
-    if (!window.confirm(t('¿Eliminar esta solicitud? La orden de pedido (si existe) no se borra.'))) return;
+    if (!window.confirm(`${t('¿Eliminar la solicitud')} ${r.number}?\n\n${t('Se borra con su historial de la llamada, archivos y la cotización si sigue en borrador. Una cotización enviada o facturada, el vehículo recibido y las órdenes de trabajo se conservan.')}`)) return;
     try { await api.del(`/crm/requests/${id}`); onChanged && onChanged(); onClose(); } catch (e) { if (!e.pendingApproval) setError(e.message); }
   }
 
@@ -162,6 +166,23 @@ export default function RequestModal({ id, onClose, onChanged }) {
         </div>
       </div>
 
+      <div className="form-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>{t('Equipo / vehículo y orden de servicio')}</span>
+        <button type="button" className="btn btn-sm btn-primary" onClick={() => setServiceOpen(true)}>
+          {r.vehicle ? t('🔧 Nueva orden de servicio') : t('🔧 Recibir equipo y crear orden de servicio')}
+        </button>
+      </div>
+      {r.vehicle ? (
+        <div>
+          <Link to={`/vehiculos/${r.vehicle.id}`} className="mono">{r.vehicle.vin}</Link> · {[r.vehicle.year, r.vehicle.make, r.vehicle.model].filter(Boolean).join(' ')} <Pill value={r.vehicle.status} />
+          {(r.work_orders || []).map((w) => (
+            <div key={w.id} className="snap-line"><Link to={`/ordenes-trabajo/${w.id}/documento`} className="mono">{w.number}</Link> <Pill value={w.status} /> <span className="muted">{String(w.created_at).slice(0, 10)}</span></div>
+          ))}
+        </div>
+      ) : (
+        <div className="muted" style={{ fontSize: 12.5 }}>{t('Todavía no se ha recibido el equipo de esta llamada. Cuando llegue, se enlaza solo si coincide el teléfono, correo o cliente y el producto (o el VIN / serial); o recíbelo desde aquí con el botón.')}</div>
+      )}
+
       <div className="form-section">{t('Documentos y fotos')} ({(r.files || []).length})</div>
       <RequestFiles request={r} onChanged={(x) => { setR(x); onChanged && onChanged(); }} />
 
@@ -174,12 +195,13 @@ export default function RequestModal({ id, onClose, onChanged }) {
       ))}
 
       <div className="modal-footer" style={{ flexWrap: 'wrap' }}>
-        <button type="button" className="btn btn-danger" onClick={remove} style={{ marginRight: 'auto' }}>{t('Eliminar')}</button>
+        {isAdmin ? <button type="button" className="btn btn-danger" onClick={remove} style={{ marginRight: 'auto' }}>{t('Eliminar')}</button> : <span style={{ marginRight: 'auto' }} />}
         <button type="button" className="btn" onClick={() => setComposer('acuse')}>{r.ack_sent_at ? t('✓ Acuse enviado — reenviar') : t('✉️ Enviar acuse de recibo')}</button>
         <button type="button" className="btn btn-primary" onClick={() => setComposer('cotizacion')} disabled={!r.sales_order_id}>
           {r.quote_sent_at ? t('✓ Cotización enviada — reenviar') : t('📤 Enviar cotización')}
         </button>
       </div>
+      {serviceOpen && <ServiceOrderModal request={r} onClose={() => setServiceOpen(false)} onDone={(x) => { setServiceOpen(false); if (x) setR(x); onChanged && onChanged(); }} />}
       {composer && <MessageComposer request={r} kind={composer} onClose={() => setComposer(null)} onSent={(x) => { setR(x); onChanged && onChanged(); }} />}
     </Modal>
   );

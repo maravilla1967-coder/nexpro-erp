@@ -63,6 +63,23 @@ try {
   console.error('No se pudo restaurar la numeración original de las órdenes de compra:', err.message);
 }
 
+// Una sola vez: enlaza las recepciones ya hechas con la llamada que les corresponde (mismo
+// teléfono / correo / cliente y mismo producto, o el VIN / serial dicho en la llamada).
+try {
+  const { get: dbGet, all: dbAll, run: dbRun } = require('../db');
+  if (!dbGet("SELECT value FROM app_settings WHERE key = 'request_vehicle_autolink_v1'")) {
+    const { autoLinkVehicle } = require('./utils/requestLinks');
+    let n = 0;
+    for (const v of dbAll("SELECT id FROM vehicles WHERE received_at >= datetime('now', '-365 days') AND NOT EXISTS (SELECT 1 FROM crm_requests r WHERE r.vehicle_id = vehicles.id)")) {
+      n += autoLinkVehicle(v.id, null).length;
+    }
+    dbRun("INSERT INTO app_settings (key, value) VALUES ('request_vehicle_autolink_v1', ?)", [String(n)]);
+    console.log(`Enlace llamada ↔ recepción: ${n} solicitud(es) enlazada(s)`);
+  }
+} catch (err) {
+  console.error('No se pudo enlazar las llamadas con las recepciones:', err.message);
+}
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Autenticación: login, aceptar invitación, etc. No requiere sesión previa.

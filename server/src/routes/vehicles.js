@@ -2,6 +2,7 @@ const express = require('express');
 const { all, get, run } = require('../../db');
 const { makeUploader } = require('../middleware/upload');
 const { requireModuleEdit } = require('../middleware/auth');
+const { findRequestMatches, linkRequestToVehicle, autoLinkVehicle, linkedRequests } = require('../utils/requestLinks');
 
 const router = express.Router();
 router.use(requireModuleEdit('vehiculos'));
@@ -35,6 +36,9 @@ function withDetails(vehicle) {
     wo.parts = all('SELECT * FROM work_order_parts WHERE work_order_id = ? ORDER BY id', [wo.id]);
     wo.photos = all('SELECT * FROM work_order_photos WHERE work_order_id = ? ORDER BY id', [wo.id]);
   });
+  // Llamadas / solicitudes del CRM enlazadas a esta recepción, y las que pueden corresponderle
+  vehicle.requests = linkedRequests(vehicle.id);
+  try { vehicle.requestSuggestions = findRequestMatches(vehicle.id); } catch (e) { vehicle.requestSuggestions = []; }
   return vehicle;
 }
 
@@ -149,7 +153,33 @@ router.post('/', upload.single('photo'), (req, res) => {
     [b.vin, b.make || null, b.model || null, b.year ? parseInt(b.year, 10) : null, b.chassisType || null,
      b.plate || null, resolveCustomer(b) || null, photoUrl, b.status || 'recibido', b.notes || null]
   );
-  res.status(201).json(withDetails(getVehicleFull(result.lastInsertRowid)));
+  const vid = result.lastInsertRowid;
+  // Enlace con la llamada: la que se escogió en la recepción, o la que se detecte sola
+  // (mismo teléfono / correo / cliente y mismo producto, o el VIN / serial dicho en la llamada).
+  let autoLinked = [];
+  if (b.requestId) {
+    try { autoLinked = [linkRequestToVehicle(Number(b.requestId), vid, req.user)]; } catch (e) { console.error('Enlace solicitud:', e.message); }
+  } else {
+    autoLinked = autoLinkVehicle(vid, req.user);
+  }
+  res.status(201).json({ ...withDetails(getVehicleFull(vid)), autoLinked });
+});
+
+// Enlazar a mano una llamada / solicitud con este vehículo
+router.post('/:id/link-request', (req, res) => {
+  const requestId = Number((req.body || {}).requestId);
+  if (!requestId) return res.status(400).json({ error: 'Escoge la solicitud' });
+  try {
+    const link = linkRequestToVehicle(requestId, Number(req.params.id), req.user);
+    res.json({ link, vehicle: withDetails(getVehicleFull(req.params.id)) });
+  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+});
+
+// Quitar el enlace (si se enlazó la llamada equivocada). No devuelve la solicitud al cliente anterior.
+router.post('/:id/unlink-request', (req, res) => {
+  const requestId = Number((req.body || {}).requestId);
+  run('UPDATE crm_requests SET vehicle_id = NULL, updated_at = datetime(\'now\') WHERE id = ? AND vehicle_id = ?', [requestId, req.params.id]);
+  res.json(withDetails(getVehicleFull(req.params.id)));
 });
 
 // Editar la recepción: se puede completar o corregir cualquier dato después (incluido el VIN,
@@ -177,7 +207,9 @@ router.put('/:id', upload.single('photo'), (req, res) => {
     [vin, val(b.make, existing.make), val(b.model, existing.model), year, val(b.chassisType, existing.chassis_type),
      val(b.plate, existing.plate), customerId, photoUrl, b.status || existing.status, val(b.notes, existing.notes), receivedAt, req.params.id]
   );
-  res.json(withDetails(getVehicleFull(req.params.id)));
+  // Si se completó el cliente, el VIN o el equipo, se vuelve a buscar la llamada que le corresponde
+  const autoLinked = autoLinkVehicle(Number(req.params.id), req.user);
+  res.json({ ...withDetails(getVehicleFull(req.params.id)), autoLinked });
 });
 
 router.delete('/:id', (req, res) => {
@@ -209,6 +241,7 @@ router.post('/:id/equipment', (req, res) => {
     [req.params.id, typeId, null, b.serialNumber || null,
      b.manufacturer || null, b.model || null, b.notes || null]
   );
+  autoLinkVehicle(vehicle.id, req.user);
   res.status(201).json(get(
     `SELECT ve.*, et.name as equipment_type_name FROM vehicle_equipment ve
      LEFT JOIN equipment_types et ON et.id = ve.equipment_type_id WHERE ve.id = ?`,

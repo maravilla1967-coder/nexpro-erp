@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
 import { useI18n } from '../i18n.jsx';
+import { useAuth } from '../auth.jsx';
 import RequestModal from '../crm/RequestModal.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
 import { channelIcon, contactTypeLabel, money, shortDate } from '../crm/constants.js';
@@ -27,6 +28,13 @@ export default function RequestsList() {
   const [status, setStatus] = useState('abiertas');
   const [q, setQ] = useState('');
   const ex = useListExport({ rows: list });
+  const { isAdmin } = useAuth();
+  const selectedRows = list.filter((r) => ex.selected && ex.selected.has(r.id));
+  // Solo el administrador borra solicitudes (las marcadas con la casilla)
+  async function deleteSelected() {
+    if (!window.confirm(`${t('¿Eliminar')} ${selectedRows.length} ${t('solicitud(es)?')}\n${selectedRows.map((r) => r.number).join(', ')}\n\n${t('Se borra con su historial de la llamada, archivos y la cotización si sigue en borrador. Una cotización enviada o facturada, el vehículo recibido y las órdenes de trabajo se conservan.')}`)) return;
+    try { await api.post('/crm/requests/bulk-delete', { ids: selectedRows.map((r) => r.id) }); ex.clearAll(); load(); } catch (e) { window.alert(e.message); }
+  }
   const openId = params.get('abrir');
 
   function load() { api.get('/crm/requests', { status, q }).then(setList).catch(console.error); }
@@ -48,6 +56,11 @@ export default function RequestsList() {
         <div className="card">
           {list.length === 0 ? <div className="empty-state">{t('No hay solicitudes con este filtro.')}</div> : (
             <>
+              {isAdmin && selectedRows.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                  <button type="button" className="btn btn-sm btn-danger" onClick={deleteSelected}>🗑 {t('Eliminar seleccionadas')} ({selectedRows.length})</button>
+                </div>
+              )}
               <ListExportBar ex={ex} title={t('Solicitudes')} filename="solicitudes" columns={COLUMNS} />
               <table>
                 <thead><tr><th><SelectAllBox ex={ex} /></th><th>{t('Número')}</th><th>{t('Fecha')}</th><th>{t('Cliente')}</th><th>{t('Persona')}</th><th>{t('Lo que pide')}</th><th>{t('Estado')}</th><th>{t('Cotización')}</th><th>{t('Acuse')}</th></tr></thead>

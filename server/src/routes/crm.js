@@ -3,6 +3,7 @@ const { all, get, run, nowIso } = require('../../db');
 const { nextDocNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 const { makeDocUploader } = require('../middleware/upload');
+const { linkRequestToVehicle, createWorkOrder } = require('../utils/requestLinks');
 
 const docUpload = makeDocUploader('crm-requests');
 
@@ -343,6 +344,10 @@ function getRequest(id) {
   r.customer = get('SELECT id, name, email, phone, preferred_language, address, city, state, zip FROM customers WHERE id = ?', [r.customer_id]);
   r.interactions = all(`SELECT a.*, u.name AS created_by_name FROM activities a LEFT JOIN users u ON u.id = a.created_by
                         WHERE a.request_id = ? ORDER BY COALESCE(a.occurred_at, a.created_at) DESC`, [id]);
+  // Equipo / vehículo recibido y órdenes de servicio de esta llamada
+  r.vehicle = r.vehicle_id ? get('SELECT id, vin, make, model, year, status FROM vehicles WHERE id = ?', [r.vehicle_id]) : null;
+  r.work_orders = all(`SELECT w.id, w.number, w.status, w.created_at, w.vehicle_id, v.vin FROM work_orders w JOIN vehicles v ON v.id = w.vehicle_id
+                       WHERE w.request_id = ? OR (? IS NOT NULL AND w.vehicle_id = ?) ORDER BY w.created_at DESC`, [id, r.vehicle_id, r.vehicle_id]);
   return r;
 }
 
@@ -448,10 +453,44 @@ router.put('/requests/:id', (req, res) => {
   res.json(getRequest(r.id));
 });
 
-router.delete('/requests/:id', (req, res) => {
-  run('UPDATE activities SET request_id = NULL WHERE request_id = ?', [req.params.id]);
-  run('DELETE FROM crm_requests WHERE id = ?', [req.params.id]);
+// Borrar una solicitud mal hecha: SOLO el administrador (Jorge). Se van con ella su historial de la
+// llamada, sus ítems y archivos, y la cotización si sigue en borrador sin factura. Lo que ya tiene
+// vida propia se conserva: cotización enviada o facturada, vehículo recibido y órdenes de trabajo
+// (quedan sin enlace a la solicitud).
+function deleteRequest(id) {
+  const r = get('SELECT * FROM crm_requests WHERE id = ?', [id]);
+  if (!r) return null;
+  run('DELETE FROM activities WHERE request_id = ?', [id]);
+  run('UPDATE work_orders SET request_id = NULL WHERE request_id = ?', [id]);
+  let quoteDeleted = false;
+  if (r.sales_order_id) {
+    const so = get(`SELECT so.id, so.status, (SELECT COUNT(*) FROM invoices i WHERE i.sales_order_id = so.id) AS inv FROM sales_orders so WHERE so.id = ?`, [r.sales_order_id]);
+    if (so && so.status === 'borrador' && !so.inv) {
+      run('UPDATE crm_requests SET sales_order_id = NULL WHERE id = ?', [id]);
+      run('DELETE FROM sales_order_items WHERE sales_order_id = ?', [so.id]);
+      run('DELETE FROM sales_orders WHERE id = ?', [so.id]);
+      quoteDeleted = true;
+    }
+  }
+  run('UPDATE sales_orders SET request_id = NULL WHERE request_id = ?', [id]);
+  run('DELETE FROM crm_requests WHERE id = ?', [id]);
+  return { number: r.number, quoteDeleted };
+}
+const adminOnly = (req, res, next) => (req.user && req.user.role === 'admin' ? next()
+  : res.status(403).json({ error: 'Solo el administrador puede borrar solicitudes. Pídeselo a Jorge.' }));
+
+router.delete('/requests/:id', adminOnly, (req, res) => {
+  const out = deleteRequest(Number(req.params.id));
+  if (!out) return res.status(404).json({ error: 'Solicitud no encontrada' });
   res.status(204).end();
+});
+
+// Borrar varias a la vez (las marcadas en la lista). Solo el administrador.
+router.post('/requests/bulk-delete', adminOnly, (req, res) => {
+  const ids = (Array.isArray((req.body || {}).ids) ? req.body.ids : []).map(Number).filter(Boolean);
+  if (!ids.length) return res.status(400).json({ error: 'No escogiste ninguna solicitud' });
+  const deleted = ids.map(deleteRequest).filter(Boolean);
+  res.json({ deleted: deleted.length });
 });
 
 // Crear / completar la orden de pedido (cotización) a partir de la solicitud
@@ -462,6 +501,67 @@ router.post('/requests/:id/quote', (req, res) => {
     const soId = quoteFromRequest(r.id);
     res.json({ salesOrderId: soId, request: getRequest(r.id) });
   } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+});
+
+// Recibir el equipo / vehículo de la llamada y abrir la orden de servicio en un solo paso, con los
+// datos que ya se tomaron en la llamada (sin volver a escribirlos en Recepción ni en Órdenes de
+// trabajo). Si el VIN / serial ya existe, se usa ese vehículo. Si en la llamada no se tenía el
+// nombre real del cliente, se puede escribir aquí: la solicitud pasa a ese cliente y el cliente
+// provisional de la llamada se fusiona en él.
+router.post('/requests/:id/service-order', (req, res) => {
+  const b = req.body || {};
+  const r = get('SELECT * FROM crm_requests WHERE id = ?', [req.params.id]);
+  if (!r) return res.status(404).json({ error: 'Solicitud no encontrada' });
+  const vin = String(b.vin || '').trim().toUpperCase();
+  let vehicle = b.vehicleId ? get('SELECT * FROM vehicles WHERE id = ?', [b.vehicleId]) : (vin ? get('SELECT * FROM vehicles WHERE upper(vin) = ?', [vin]) : null);
+  if (!vehicle && !vin) return res.status(400).json({ error: 'Escribe el VIN o el número de serie del equipo' });
+
+  // Cliente real (si se escribió) o el de la llamada
+  let customerId = r.customer_id;
+  const name = String(b.customerName || '').trim();
+  if (name) {
+    const found = get('SELECT id FROM customers WHERE lower(trim(name)) = lower(?)', [name]);
+    customerId = found ? found.id : run(`INSERT INTO customers (type, name, status, roles, source, phone) VALUES ('empresa', ?, 'cliente', 'cliente', 'Llamada / recepción', ?)`,
+      [name, /\d{7,}/.test(String(r.reply_to || '').replace(/\D/g, '')) ? r.reply_to : null]).lastInsertRowid;
+  }
+
+  if (!vehicle) {
+    const vid = run(`INSERT INTO vehicles (vin, make, model, year, plate, customer_id, status, notes) VALUES (?,?,?,?,?,?,?,?)`,
+      [vin, b.make || null, b.model || null, b.year ? parseInt(b.year, 10) || null : null, b.plate || null, customerId, 'recibido',
+        b.vehicleNotes || [r.subject, r.notes].filter(Boolean).join(' — ') || null]).lastInsertRowid;
+    vehicle = get('SELECT * FROM vehicles WHERE id = ?', [vid]);
+  } else if (!vehicle.customer_id || (name && vehicle.customer_id !== customerId)) {
+    run('UPDATE vehicles SET customer_id = ? WHERE id = ?', [customerId, vehicle.id]);
+  }
+
+  // Equipo montado (compresor, grúa…) con su serial, si se indicó
+  const eq = b.equipment || {};
+  const typeName = String(eq.typeName || '').trim();
+  if (typeName) {
+    const t = get('SELECT id FROM equipment_types WHERE lower(name) = lower(?)', [typeName]);
+    const typeId = t ? t.id : run('INSERT INTO equipment_types (name) VALUES (?)', [typeName]).lastInsertRowid;
+    const serial = String(eq.serialNumber || '').trim() || null;
+    const dup = serial && get('SELECT id FROM vehicle_equipment WHERE vehicle_id = ? AND lower(serial_number) = lower(?)', [vehicle.id, serial]);
+    if (!dup) {
+      run('INSERT INTO vehicle_equipment (vehicle_id, equipment_type_id, serial_number, manufacturer, model, notes) VALUES (?,?,?,?,?,?)',
+        [vehicle.id, typeId, serial, eq.manufacturer || null, eq.model || null, null]);
+    }
+  }
+
+  let link;
+  try { link = linkRequestToVehicle(r.id, vehicle.id, req.user); } catch (e) { return res.status(e.status || 500).json({ error: e.message }); }
+
+  let wo = null;
+  if (b.createWorkOrder !== false) {
+    wo = createWorkOrder(vehicle.id, {
+      mechanicId: b.mechanicId || null, supplierId: b.supplierId || null, services: b.services, requestId: r.id,
+      notes: b.notes || [r.subject, r.notes].filter(Boolean).join(' — ') || null, diagnosis: b.diagnosis || null,
+    });
+    const cid = get('SELECT customer_id FROM crm_requests WHERE id = ?', [r.id]).customer_id;
+    run(`INSERT INTO activities (customer_id, type, subject, done, request_id, created_by, occurred_at) VALUES (?, 'nota', ?, 1, ?, ?, ?)`,
+      [cid, `${r.number}: orden de servicio ${wo.number} (VIN / serial ${vehicle.vin})`, r.id, req.user ? req.user.id : null, nowIso()]);
+  }
+  res.status(201).json({ vehicleId: vehicle.id, workOrderId: wo && wo.id, workOrderNumber: wo && wo.number, link, request: getRequest(r.id) });
 });
 
 // Deja constancia de un mensaje enviado al cliente (acuse de recibo, cotización, seguimiento)
