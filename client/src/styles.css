@@ -279,18 +279,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 .signature-line { border-bottom: 1px solid var(--navy); height: 40px; margin-bottom: 6px; }
 
 @media print {
-  /* El margen de la página se maneja con padding propio (más abajo), no con el margen de
-     @page: distintos navegadores y controladores de impresión interpretan @page margin de
-     forma inconsistente entre la vista previa y la impresión/PDF final (es la causa más común
-     de que el margen se vea bien en pantalla pero el contenido se corra hacia arriba al
-     imprimir de verdad). Con @page margin: 0 el motor de impresión no tiene margen que
-     reinterpretar, y el espacio real lo controla siempre nuestro propio CSS.*/
-  @page { size: letter; margin: 0; }
+  /* El margen de cada hoja se controla con @page margin, no con padding en .content. Un
+     padding en .content solo se aplica UNA vez al inicio/fin de todo el documento (antes de
+     la primera línea y después de la última) porque es un solo contenedor que fluye de
+     principio a fin: en un documento de una sola página no se nota, pero en facturas/órdenes
+     que ocupan más de una hoja (como esta, con varias líneas largas) el margen superior
+     desaparece a partir de la página 2 — el contenido queda pegado contra el borde de la hoja.
+     @page margin, en cambio, es justo el mecanismo pensado para repetirse igual en cada hoja
+     impresa, así que así se ve cada página (la 1, la 2, la 3...) con el mismo margen arriba,
+     abajo y a los lados, centrada y profesional. */
+  @page { size: letter; margin: 0.6in 0.5in; }
   html, body, #root { height: auto !important; min-height: 0 !important; margin: 0 !important; }
   .app-shell { display: block !important; min-height: 0 !important; }
   .main { display: block !important; }
   .sidebar, .topbar.no-print, .modal-overlay, .no-print { display: none !important; }
-  .content { padding: 0.4in !important; margin: 0 !important; }
+  .content { padding: 0 !important; margin: 0 !important; }
   .card.invoice-sheet { border: none; box-shadow: none; margin: 0 !important; padding: 0; max-width: 100%; }
   body { background: #fff; font-size: 12px; }
   .invoice-header { padding-bottom: 10px; margin-bottom: 10px; }
