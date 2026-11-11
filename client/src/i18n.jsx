@@ -582,6 +582,8 @@ const DICT = {
   'Editar o borrar cuenta': 'Edit or delete account',
   '📘 Manual de usuario': '📘 User manual',
   'Manual de usuario': 'User manual',
+  'Procedimientos': 'Procedures',
+  'Ver procedimiento': 'See procedure',
   'Ayuda': 'Help',
   'Cómo funciona cada módulo del ERP, paso a paso, y qué hacer si algo no sale': 'How each ERP module works, step by step, and what to do if something does not work',
   'Abrir todo': 'Expand all',

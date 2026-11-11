@@ -31,6 +31,7 @@ import WarrantiesList from './pages/WarrantiesList.jsx';
 import ReceivablesPage from './pages/ReceivablesPage.jsx';
 import PayablesPage from './pages/PayablesPage.jsx';
 import HelpPage from './pages/HelpPage.jsx';
+import ProcessesPage from './pages/ProcessesPage.jsx';
 import FinancePage from './pages/FinancePage.jsx';
 import AccountRegister from './pages/AccountRegister.jsx';
 import LoansPage from './pages/LoansPage.jsx';
@@ -236,6 +237,9 @@ function MainShell() {
           <NavLink to="/ayuda" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <span>📘</span><span>{t('Manual de usuario')}</span>
           </NavLink>
+          <NavLink to="/procedimientos" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <span>🔀</span><span>{t('Procedimientos')}</span>
+          </NavLink>
         </div>
         <div style={{ marginTop: 'auto', padding: '10px 14px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <AccountMenu />
@@ -245,6 +249,7 @@ function MainShell() {
         <HelpButton />
         <Routes>
           <Route path="/ayuda" element={<HelpPage />} />
+          <Route path="/procedimientos" element={<ProcessesPage />} />
           <Route path="/finanzas" element={<FinancePage />} />
           <Route path="/finanzas/cuenta/:id" element={<AccountRegister />} />
           <Route path="/finanzas/prestamos" element={<LoansPage />} />

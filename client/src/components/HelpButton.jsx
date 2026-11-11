@@ -7,7 +7,7 @@ import { sectionForPath } from '../help/manual.js';
 export default function HelpButton() {
   const { t } = useI18n();
   const { pathname } = useLocation();
-  if (pathname.startsWith('/ayuda')) return null;
+  if (pathname.startsWith('/ayuda') || pathname.startsWith('/procedimientos')) return null;
   const s = sectionForPath(pathname);
   return (
     <Link to={`/ayuda${s ? `#${s.id}` : ''}`} className="help-fab no-print" title={t('Ver cómo funciona esta pantalla')}>

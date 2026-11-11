@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useI18n } from '../i18n.jsx';
 import { MANUAL } from '../help/manual.js';
+import { procesosForHelp } from '../help/procesos.js';
 
 // Manual de usuario: una sección por módulo (qué hace, pasos, consejos y problemas
 // frecuentes), con buscador e índice. /ayuda#compras abre directo la sección de compras.
@@ -74,7 +75,12 @@ export default function HelpPage() {
                 </button>
                 {isOpen(s.id) && (
                   <div className="help-body">
-                    {s.routes && s.routes[0] && <div className="no-print" style={{ marginBottom: 8 }}><Link className="btn btn-sm" to={s.routes[0]}>{t('Ir a')} {L(s.title)} →</Link></div>}
+                    {((s.routes && s.routes[0]) || procesosForHelp(s.id).length > 0) && (
+                      <div className="no-print" style={{ marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {s.routes && s.routes[0] && <Link className="btn btn-sm" to={s.routes[0]}>{t('Ir a')} {L(s.title)} →</Link>}
+                        {procesosForHelp(s.id).map((p) => <Link key={p.id} className="btn btn-sm" to={`/procedimientos#${p.id}`}>🔀 {t('Ver procedimiento')}: {L(p.title)}</Link>)}
+                      </div>
+                    )}
                     {(s.tasks || []).map((tk, i) => (
                       <div key={i} className="help-task">
                         <h4>{mark(L(tk.title))}</h4>
