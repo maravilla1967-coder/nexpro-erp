@@ -190,10 +190,11 @@ router.post('/:id/activities', (req, res) => {
   const b = req.body;
   if (!b.subject || !b.type) return res.status(400).json({ error: 'Tipo y asunto son obligatorios' });
   const result = run(
-    `INSERT INTO activities (customer_id, type, subject, notes, due_date, done, contact_id, request_id, direction, created_by, occurred_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO activities (customer_id, type, subject, notes, due_date, done, contact_id, request_id, direction, created_by, occurred_at, msg_to, msg_subject, msg_body)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [req.params.id, b.type, b.subject, b.notes || null, b.dueDate || null, b.done ? 1 : 0,
-     b.contactId || null, b.requestId || null, b.direction || null, req.user ? req.user.id : null, b.occurredAt || nowIso()]
+     b.contactId || null, b.requestId || null, b.direction || null, req.user ? req.user.id : null, b.occurredAt || nowIso(),
+     b.msgTo || null, b.msgSubject || null, b.msgBody || null]
   );
   res.status(201).json(get('SELECT * FROM activities WHERE id = ?', [result.lastInsertRowid]));
 });

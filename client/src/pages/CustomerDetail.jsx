@@ -7,6 +7,7 @@ import { useI18n } from '../i18n.jsx';
 import CustomerForm, { customerToForm, ContactFields, EMPTY_CONTACT } from '../crm/CustomerForm.jsx';
 import { RolePills, StatusPill } from '../crm/CustomerSnapshot.jsx';
 import RequestModal from '../crm/RequestModal.jsx';
+import ResendMessage, { canResend } from '../crm/ResendMessage.jsx';
 import {
   CONTACT_TYPES, INTERACTION_TYPES, contactTypeLabel, interactionIcon, interactionLabel, channelIcon, money, shortDate,
 } from '../crm/constants.js';
@@ -30,6 +31,7 @@ export default function CustomerDetail() {
   const [error, setError] = useState('');
   const [tlFilter, setTlFilter] = useState('');
   const [contactFilter, setContactFilter] = useState('');
+  const [resend, setResend] = useState(null);
   const openReq = params.get('solicitud');
 
   function load() { api.get(`/crm/customers/${id}/360`).then(setD).catch((e) => setError(e.message)); }
@@ -133,6 +135,7 @@ export default function CustomerDetail() {
                       <div>{e.link ? <Link to={e.link}>{e.title}</Link> : e.title}{e.who && <span className="muted"> — {e.who}</span>}</div>
                       {e.detail && <div className="muted tl-detail" title={t('Clic para ver todo')} onClick={(ev) => ev.currentTarget.classList.toggle('open')}>{e.detail}</div>}
                       {e.by && <div className="muted" style={{ fontSize: 11 }}>{t('registró')} {e.by}</div>}
+                      {canResend(e.activity) && <button type="button" className="btn btn-sm" style={{ marginTop: 6 }} onClick={() => setResend(e.activity)}>{t('↻ Reenviar')}</button>}
                     </div>
                   </div>
                 ))}
@@ -218,7 +221,12 @@ export default function CustomerDetail() {
                       <td>{a.contact_name || '—'}</td>
                       <td>{a.subject}{a.notes && <div className="muted" style={{ fontSize: 12.5, whiteSpace: 'pre-wrap' }}>{a.notes}</div>}</td>
                       <td className="muted">{a.created_by_name || '—'}</td>
-                      <td><button className="btn-row-action delete" onClick={() => delActivity(a)}>{t('Eliminar')}</button></td>
+                      <td>
+                        <div className="row-actions">
+                          {canResend(a) && <button className="btn-row-action" onClick={() => setResend(a)}>{t('↻ Reenviar')}</button>}
+                          <button className="btn-row-action delete" onClick={() => delActivity(a)}>{t('Eliminar')}</button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -413,6 +421,7 @@ export default function CustomerDetail() {
         </Modal>
       )}
 
+      {resend && <ResendMessage activity={resend} customerId={c.id} onClose={() => setResend(null)} onSent={load} />}
       {openReq && <RequestModal id={openReq} onClose={() => setParams({ tab: 'solicitudes' })} onChanged={load} />}
     </>
   );

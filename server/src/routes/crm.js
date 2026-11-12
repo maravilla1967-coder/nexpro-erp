@@ -289,7 +289,7 @@ router.get('/customers/:id/360', (req, res) => {
 
   // Línea de tiempo: todo lo que ha pasado con el cliente, en orden
   const tl = [];
-  for (const a of interactions) tl.push({ date: a.occurred_at || a.created_at, kind: 'interaccion', type: a.type, title: a.subject, detail: a.notes, who: a.contact_name, by: a.created_by_name, direction: a.direction, ref: a.request_number });
+  for (const a of interactions) tl.push({ date: a.occurred_at || a.created_at, kind: 'interaccion', type: a.type, title: a.subject, detail: a.notes, who: a.contact_name, by: a.created_by_name, direction: a.direction, ref: a.request_number, activity: a });
   for (const r of requests) tl.push({ date: r.created_at, kind: 'solicitud', title: `${r.number} · ${r.subject || ''}`, detail: r.items.map((i) => `${i.quantity !== 1 ? `${i.quantity} × ` : ''}${i.description}`).join(', '), who: r.contact_name, status: r.status, link: `/crm/solicitudes?abrir=${r.id}` });
   for (const s of salesOrders) tl.push({ date: s.created_at, kind: 'pedido', title: `${s.number} · $${round2(s.total).toLocaleString('en-US')}`, status: s.status, who: s.contact_name, link: `/pedidos/${s.id}/documento` });
   for (const i of invoices) tl.push({ date: i.issue_date, kind: 'factura', title: `${i.number} · $${round2(i.total).toLocaleString('en-US')}`, status: i.status, detail: i.balance > 0.004 ? `Saldo $${i.balance.toLocaleString('en-US')}` : null, link: `/facturas/${i.id}` });
@@ -572,10 +572,10 @@ router.post('/requests/:id/messages', (req, res) => {
   const kind = ['acuse', 'cotizacion', 'seguimiento'].includes(b.kind) ? b.kind : 'seguimiento';
   const type = ['email', 'texto', 'whatsapp', 'llamada'].includes(b.channel) ? b.channel : 'email';
   const label = { acuse: 'Acuse de recibo enviado', cotizacion: 'Cotización enviada', seguimiento: 'Seguimiento enviado' }[kind];
-  run(`INSERT INTO activities (customer_id, type, subject, notes, done, contact_id, request_id, direction, created_by, occurred_at)
-       VALUES (?,?,?,?,1,?,?,'saliente',?,?)`,
+  run(`INSERT INTO activities (customer_id, type, subject, notes, done, contact_id, request_id, direction, created_by, occurred_at, msg_to, msg_subject, msg_body)
+       VALUES (?,?,?,?,1,?,?,'saliente',?,?,?,?,?)`,
   [r.customer_id, type, `${r.number}: ${label}${b.to ? ` a ${b.to}` : ''}`, [b.subject, b.body].filter(Boolean).join('\n\n') || null,
-    r.contact_id, r.id, req.user ? req.user.id : null, nowIso()]);
+    r.contact_id, r.id, req.user ? req.user.id : null, nowIso(), b.to || null, b.subject || null, b.body || null]);
   if (kind === 'acuse') run('UPDATE crm_requests SET ack_sent_at = ?, updated_at = ? WHERE id = ?', [nowIso(), nowIso(), r.id]);
   if (kind === 'cotizacion') {
     run("UPDATE crm_requests SET quote_sent_at = ?, status = CASE WHEN status IN ('nueva','en_proceso') THEN 'cotizada' ELSE status END, updated_at = ? WHERE id = ?", [nowIso(), nowIso(), r.id]);

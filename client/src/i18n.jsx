@@ -54,6 +54,10 @@ const DICT = {
   'Tipo de equipo': 'Equipment type',
   'Técnico asignado': 'Assigned technician',
   // ===== CRM =====
+  'Mensaje reenviado': 'Message resent',
+  'Reenviar mensaje': 'Resend message',
+  'Enviado originalmente': 'Originally sent',
+  '↻ Reenviar': '↻ Resend',
   'Abre el correo en Outlook en el navegador (outlook.office.com)': 'Opens the email in Outlook on the web (outlook.office.com)',
   'Outlook web': 'Outlook web',
   'Abre el correo ya escrito en la app de Outlook del computador': 'Opens the ready email in the Outlook app on this computer',

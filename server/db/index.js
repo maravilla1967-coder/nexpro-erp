@@ -114,6 +114,10 @@ tryAlter('ALTER TABLE activities ADD COLUMN request_id INTEGER REFERENCES crm_re
 tryAlter('ALTER TABLE activities ADD COLUMN direction TEXT');
 tryAlter('ALTER TABLE activities ADD COLUMN created_by INTEGER REFERENCES users(id)');
 tryAlter('ALTER TABLE activities ADD COLUMN occurred_at TEXT');
+// Mensajes enviados al cliente: a quién, asunto y texto exactos (para poder reenviarlos).
+tryAlter('ALTER TABLE activities ADD COLUMN msg_to TEXT');
+tryAlter('ALTER TABLE activities ADD COLUMN msg_subject TEXT');
+tryAlter('ALTER TABLE activities ADD COLUMN msg_body TEXT');
 // Cada vehículo (y sus equipos) puede pertenecer a una persona concreta del cliente.
 tryAlter('ALTER TABLE vehicles ADD COLUMN contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL');
 // Orden de pedido nacida de una solicitud del CRM, a la atención de un contacto.
