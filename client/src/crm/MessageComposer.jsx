@@ -4,7 +4,7 @@ import Modal from '../components/Modal.jsx';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
-import { ackMessage, quoteMessage, mailtoHref, smsHref, whatsappHref } from './messages.js';
+import { ackMessage, quoteMessage, mailtoHref, outlookHref, smsHref, whatsappHref } from './messages.js';
 
 // Ventana con el mensaje ya preparado para el cliente (acuse de recibo o cotización). Se puede
 // editar, cambiar de idioma y enviar por el mismo medio por donde llegó la solicitud: correo,
@@ -50,6 +50,10 @@ export default function MessageComposer({ request, kind = 'acuse', onClose, onSe
       onSent && onSent(r);
     } catch (e) { setError(e.message); }
   }
+  function openOutlook() {
+    window.open(outlookHref(to, subject, body), '_blank', 'noopener');
+    log();
+  }
   function openApp() {
     const href = channel === 'email' ? mailtoHref(to, subject, body) : channel === 'whatsapp' ? whatsappHref(to, body) : smsHref(to, body);
     if (channel === 'whatsapp') window.open(href, '_blank'); else window.location.href = href;
@@ -85,6 +89,11 @@ export default function MessageComposer({ request, kind = 'acuse', onClose, onSe
         <div className="field"><label>{t('Asunto')}</label><input value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
       )}
       <div className="field"><label>{t('Mensaje')}</label><textarea rows={channel === 'email' ? 14 : 5} value={body} onChange={(e) => setBody(e.target.value)} /></div>
+      {channel === 'email' && (
+        <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+          {t('"Abrir en Outlook" abre el correo listo en tu Outlook de Nexpro (outlook.office.com) en otra pestaña: revisa y pulsa Enviar allá. Si te pide iniciar sesión, entra con je.ramirez@nexprotrucks.com.')}
+        </div>
+      )}
       {kind === 'cotizacion' && request.sales_order_id && (
         <div className="muted" style={{ fontSize: 12.5, marginBottom: 6 }}>
           {t('Adjunta el PDF de la cotización:')} <Link to={`/pedidos/${request.sales_order_id}/documento`} target="_blank">{t('abrir la orden de pedido')} {request.sales_order_number}</Link> → {t('Imprimir / Guardar PDF')}.
@@ -94,9 +103,14 @@ export default function MessageComposer({ request, kind = 'acuse', onClose, onSe
         <button type="button" className="btn" onClick={onClose}>{logged ? t('Cerrar') : t('Ahora no')}</button>
         <button type="button" className="btn" onClick={copy}>{t('📋 Copiar texto')}</button>
         {!logged && <button type="button" className="btn" onClick={log}>{t('Ya lo envié')}</button>}
-        <button type="button" className="btn btn-primary" onClick={openApp} disabled={!to}>
-          {channel === 'email' ? t('Abrir en mi correo') : channel === 'whatsapp' ? t('Abrir WhatsApp') : t('Abrir mensajes')}
-        </button>
+        {channel === 'email' && <button type="button" className="btn" onClick={openApp} disabled={!to} title={t('Usa la app de correo predeterminada de este computador')}>{t('Otra app de correo')}</button>}
+        {channel === 'email' ? (
+          <button type="button" className="btn btn-primary" onClick={openOutlook} disabled={!to}>{t('📧 Abrir en Outlook')}</button>
+        ) : (
+          <button type="button" className="btn btn-primary" onClick={openApp} disabled={!to}>
+            {channel === 'whatsapp' ? t('Abrir WhatsApp') : t('Abrir mensajes')}
+          </button>
+        )}
       </div>
     </Modal>
   );

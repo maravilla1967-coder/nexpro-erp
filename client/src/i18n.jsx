@@ -54,6 +54,10 @@ const DICT = {
   'Tipo de equipo': 'Equipment type',
   'Técnico asignado': 'Assigned technician',
   // ===== CRM =====
+  'Usa la app de correo predeterminada de este computador': 'Uses this computer\'s default email app',
+  'Otra app de correo': 'Other email app',
+  '📧 Abrir en Outlook': '📧 Open in Outlook',
+  '"Abrir en Outlook" abre el correo listo en tu Outlook de Nexpro (outlook.office.com) en otra pestaña: revisa y pulsa Enviar allá. Si te pide iniciar sesión, entra con je.ramirez@nexprotrucks.com.': '"Open in Outlook" opens the ready email in your Nexpro Outlook (outlook.office.com) in a new tab: review it and press Send there. If it asks you to sign in, use je.ramirez@nexprotrucks.com.',
   'Se guarda la información para cotizar. La cotización (orden de pedido) solo se crea cuando alguien pulsa "Crear cotización" o "Facturar" en la solicitud.': 'The quoting information is saved. The quote (sales order) is only created when someone clicks "Create quote" or "Invoice" on the request.',
   'Crear cotización o facturar desde la solicitud': 'Create a quote or invoice from the request',
   'Hay líneas sin precio en la cotización. Ponles el precio y luego pulsa "Facturar" en Órdenes de Pedido.': 'Some quote lines have no price. Price them, then click "Invoice" in Sales Orders.',
