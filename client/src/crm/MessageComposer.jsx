@@ -91,7 +91,7 @@ export default function MessageComposer({ request, kind = 'acuse', onClose, onSe
       <div className="field"><label>{t('Mensaje')}</label><textarea rows={channel === 'email' ? 14 : 5} value={body} onChange={(e) => setBody(e.target.value)} /></div>
       {channel === 'email' && (
         <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-          {t('"Abrir en Outlook" abre el correo listo en tu Outlook de Nexpro (outlook.office.com) en otra pestaña: revisa y pulsa Enviar allá. Si te pide iniciar sesión, entra con je.ramirez@nexprotrucks.com.')}
+          {t('"Abrir en Outlook" abre el correo ya escrito en la app de Outlook de tu computador, desde tu cuenta predeterminada (je.ramirez@nexprotrucks.com): revisa y pulsa Enviar. Si se abre otra app, deja Outlook como app de correo predeterminada (ver Ayuda).')}
         </div>
       )}
       {kind === 'cotizacion' && request.sales_order_id && (
@@ -103,9 +103,9 @@ export default function MessageComposer({ request, kind = 'acuse', onClose, onSe
         <button type="button" className="btn" onClick={onClose}>{logged ? t('Cerrar') : t('Ahora no')}</button>
         <button type="button" className="btn" onClick={copy}>{t('📋 Copiar texto')}</button>
         {!logged && <button type="button" className="btn" onClick={log}>{t('Ya lo envié')}</button>}
-        {channel === 'email' && <button type="button" className="btn" onClick={openApp} disabled={!to} title={t('Usa la app de correo predeterminada de este computador')}>{t('Otra app de correo')}</button>}
+        {channel === 'email' && <button type="button" className="btn" onClick={openOutlook} disabled={!to} title={t('Abre el correo en Outlook en el navegador (outlook.office.com)')}>{t('Outlook web')}</button>}
         {channel === 'email' ? (
-          <button type="button" className="btn btn-primary" onClick={openOutlook} disabled={!to}>{t('📧 Abrir en Outlook')}</button>
+          <button type="button" className="btn btn-primary" onClick={openApp} disabled={!to} title={t('Abre el correo ya escrito en la app de Outlook del computador')}>{t('📧 Abrir en Outlook')}</button>
         ) : (
           <button type="button" className="btn btn-primary" onClick={openApp} disabled={!to}>
             {channel === 'whatsapp' ? t('Abrir WhatsApp') : t('Abrir mensajes')}

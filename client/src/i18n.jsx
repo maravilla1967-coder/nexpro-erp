@@ -54,6 +54,10 @@ const DICT = {
   'Tipo de equipo': 'Equipment type',
   'Técnico asignado': 'Assigned technician',
   // ===== CRM =====
+  'Abre el correo en Outlook en el navegador (outlook.office.com)': 'Opens the email in Outlook on the web (outlook.office.com)',
+  'Outlook web': 'Outlook web',
+  'Abre el correo ya escrito en la app de Outlook del computador': 'Opens the ready email in the Outlook app on this computer',
+  '"Abrir en Outlook" abre el correo ya escrito en la app de Outlook de tu computador, desde tu cuenta predeterminada (je.ramirez@nexprotrucks.com): revisa y pulsa Enviar. Si se abre otra app, deja Outlook como app de correo predeterminada (ver Ayuda).': '"Open in Outlook" opens the ready email in the Outlook app on your computer, from your default account (je.ramirez@nexprotrucks.com): review it and press Send. If another app opens, make Outlook your default email app (see Help).',
   'Usa la app de correo predeterminada de este computador': 'Uses this computer\'s default email app',
   'Otra app de correo': 'Other email app',
   '📧 Abrir en Outlook': '📧 Open in Outlook',
