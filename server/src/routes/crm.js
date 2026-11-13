@@ -660,6 +660,27 @@ async function tryParse(buffer) {
   try { return await parseQuotePdf(buffer); } catch (e) { return { items: [], total: null, warnings: [`No se pudo leer el PDF: ${e.message}`] }; }
 }
 
+// Todas las oportunidades (de todos los clientes) con filtros y totales por etapa.
+// status: 'abiertas' (por defecto: todas menos ganado/perdido), una etapa concreta, o 'todas'.
+router.get('/opportunities', (req, res) => {
+  const { stage = 'abiertas', q } = req.query;
+  let where = '1=1'; const params = [];
+  if (stage === 'abiertas') where += " AND o.stage NOT IN ('ganado','perdido')";
+  else if (stage && stage !== 'todas') { where += ' AND o.stage = ?'; params.push(stage); }
+  if (q) { const like = `%${q}%`; where += ' AND (o.title LIKE ? OR o.notes LIKE ? OR c.name LIKE ?)'; params.push(like, like, like); }
+  const list = all(`SELECT o.*, c.name AS customer_name, so.number AS sales_order_number,
+                           (SELECT COUNT(*) FROM opportunity_files f WHERE f.opportunity_id = o.id) AS files_count
+                    FROM opportunities o JOIN customers c ON c.id = o.customer_id
+                    LEFT JOIN sales_orders so ON so.id = o.sales_order_id
+                    WHERE ${where} ORDER BY COALESCE(o.value,0) DESC, o.created_at DESC`, params);
+  const byStage = all(`SELECT stage, COUNT(*) AS count, COALESCE(SUM(value),0) AS total,
+                              COALESCE(SUM(value * COALESCE(probability, 0) / 100.0),0) AS weighted
+                       FROM opportunities GROUP BY stage`);
+  const total = round2(list.reduce((s, o) => s + (Number(o.value) || 0), 0));
+  const weighted = round2(list.reduce((s, o) => s + (Number(o.value) || 0) * (Number(o.probability) || 0) / 100, 0));
+  res.json({ list, total, weighted, byStage });
+});
+
 router.get('/opportunities/:id', (req, res) => {
   const o = getOpportunity(req.params.id);
   if (!o) return res.status(404).json({ error: 'Oportunidad no encontrada' });

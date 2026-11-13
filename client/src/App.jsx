@@ -11,6 +11,7 @@ import CustomerReport from './pages/CustomerReport.jsx';
 import CallConsole from './pages/CallConsole.jsx';
 import MailSettings from './pages/MailSettings.jsx';
 import RequestsList from './pages/RequestsList.jsx';
+import OpportunitiesList from './pages/OpportunitiesList.jsx';
 import ProductsList from './pages/ProductsList.jsx';
 import InventoryStockPage from './pages/InventoryStockPage.jsx';
 import SuppliersList from './pages/SuppliersList.jsx';
@@ -54,6 +55,7 @@ const NAV = [
     links: [
       { to: '/crm/llamada', text: 'Atender llamada', icon: '📞' },
       { to: '/crm/solicitudes', text: 'Solicitudes', icon: '📥' },
+      { to: '/crm/oportunidades', text: 'Oportunidades', icon: '🎯' },
       { to: '/clientes', text: 'Clientes y contactos', icon: '🤝' },
     ],
   },
@@ -266,6 +268,7 @@ function MainShell() {
           <Route path="/crm/llamada" element={<CallConsole />} />
           <Route path="/mi-correo" element={<MailSettings />} />
           <Route path="/crm/solicitudes" element={<RequestsList />} />
+          <Route path="/crm/oportunidades" element={<OpportunitiesList />} />
           <Route path="/inventario" element={<InventoryStockPage />} />
           <Route path="/productos" element={<ProductsList />} />
           <Route path="/proveedores" element={<SuppliersList />} />
