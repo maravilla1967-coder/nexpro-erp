@@ -4,6 +4,31 @@ const { nextPoNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 const { makeDocUploader } = require('../middleware/upload');
 const { receivePurchaseOrder, closeShort, reopenShort } = require('../utils/receiving');
+const { linkPoWarranty, unlinkPo, createClaimForPo } = require('../utils/warrantyLink');
+
+// "Por garantía" se elige en las condiciones de pago: la orden la cubre el fabricante/vendedor.
+const isWarrantyTerms = (b) => b.paymentTermsDays === 'garantia' || b.isWarranty === true || b.isWarranty === 1 || b.isWarranty === '1';
+// Aplica lo de garantía que venga en el formulario: marca, vehículo (VIN) y reclamo enlazado
+// (uno existente o 'nuevo' para crearlo con los datos de la orden).
+function applyWarranty(poId, b) {
+  const touches = b.paymentTermsDays !== undefined || b.isWarranty !== undefined || b.warrantyId !== undefined || b.vehicleId !== undefined;
+  if (!touches) return;
+  const po = get('SELECT * FROM purchase_orders WHERE id = ?', [poId]);
+  const flag = (b.paymentTermsDays !== undefined || b.isWarranty !== undefined) ? isWarrantyTerms(b) : !!po.is_warranty;
+  if (!flag) { if (po.is_warranty || po.warranty_id) unlinkPo(poId, { clearFlag: true }); return; }
+  const vid = b.vehicleId === undefined ? po.vehicle_id : (parseInt(b.vehicleId, 10) || null);
+  run('UPDATE purchase_orders SET is_warranty = 1, payment_terms_days = NULL, vehicle_id = ? WHERE id = ?', [vid, poId]);
+  if (b.warrantyId === undefined) { if (po.warranty_id) linkPoWarranty(poId, po.warranty_id); return; }
+  if (b.warrantyId === 'nuevo') { if (po.warranty_id) unlinkPo(poId); createClaimForPo(poId); return; }
+  const wid = parseInt(b.warrantyId, 10) || null;
+  if (po.warranty_id && po.warranty_id !== wid) unlinkPo(poId);
+  if (wid) {
+    if (!get("SELECT id FROM warranties WHERE id = ?", [wid])) { const e = new Error('Reclamo de garantía no encontrado'); e.status = 400; throw e; }
+    linkPoWarranty(poId, wid);
+  }
+}
+const WARRANTY_SELECT = `SELECT w.id, w.number, w.status, w.kind, w.vin, w.item_description, w.manufacturer_claim_number,
+    w.claim_amount, w.approved_amount, w.vehicle_id FROM warranties w WHERE w.id = ?`;
 
 const router = express.Router();
 const termsVal = (v) => { if (v === undefined) return undefined; if (v === null || String(v).trim() === '') return null; const n = parseInt(v, 10); return Number.isNaN(n) || n < 0 ? null : n; };
@@ -40,7 +65,11 @@ function withItems(po) {
   // Las órdenes históricas importadas no tienen recepciones, así que no generan este aviso.
   const costOf = new Map(po.items.map((i) => [i.id, Number(i.unit_cost) || 0]));
   const viaReceipts = po.receipts.reduce((s, r) => s + r.items.reduce((t, gi) => t + gi.quantity * (costOf.get(gi.purchase_order_item_id) || 0), 0), 0);
-  po.summary.unbilled = Math.max(0, Math.round((viaReceipts - po.summary.billed) * 100) / 100);
+  po.summary.unbilled = po.is_warranty ? 0 : Math.max(0, Math.round((viaReceipts - po.summary.billed) * 100) / 100);
+  // Garantía: reclamo enlazado y vehículo (VIN).
+  po.warranty = po.warranty_id ? get(WARRANTY_SELECT, [po.warranty_id]) || null : null;
+  po.vehicle = po.vehicle_id ? get(`SELECT v.id, v.vin, v.make, v.model, v.year, c.name AS customer_name FROM vehicles v
+                                    LEFT JOIN customers c ON c.id = v.customer_id WHERE v.id = ?`, [po.vehicle_id]) || null : null;
   return po;
 }
 
@@ -54,9 +83,13 @@ router.get('/', (req, res) => {
             (SELECT GROUP_CONCAT(COALESCE(p.name,'') || ' ' || COALESCE(p.sku,''), ' ') FROM purchase_order_items i JOIN products p ON p.id = i.product_id WHERE i.purchase_order_id = po.id) AS search_products,
             (SELECT GROUP_CONCAT(ps.serial, ' ') FROM product_serials ps WHERE ps.purchase_order_id = po.id) AS search_serials,
             (SELECT GROUP_CONCAT(COALESCE(b.bill_number,''), ' ') FROM supplier_bills b WHERE b.purchase_order_id = po.id) AS search_bills,
-            (SELECT GROUP_CONCAT(gr.number, ' ') FROM goods_receipts gr WHERE gr.purchase_order_id = po.id) AS search_receipts
+            (SELECT GROUP_CONCAT(gr.number, ' ') FROM goods_receipts gr WHERE gr.purchase_order_id = po.id) AS search_receipts,
+            w.number AS warranty_number, w.status AS warranty_status, w.manufacturer_claim_number AS warranty_claim_number,
+            COALESCE(v.vin, w.vin) AS vehicle_vin
      FROM purchase_orders po
-     LEFT JOIN suppliers s ON s.id = po.supplier_id ORDER BY po.created_at DESC`
+     LEFT JOIN suppliers s ON s.id = po.supplier_id
+     LEFT JOIN warranties w ON w.id = po.warranty_id
+     LEFT JOIN vehicles v ON v.id = po.vehicle_id ORDER BY po.created_at DESC`
   );
   res.json(list);
 });
@@ -99,6 +132,7 @@ router.post('/', (req, res) => {
       [poId, item.productId || null, item.description, item.quantity, item.unitCost]
     );
   }
+  try { applyWarranty(poId, b); } catch (err) { return res.status(err.status || 500).json({ error: err.message }); }
   res.status(201).json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [poId])));
 });
 
@@ -160,6 +194,7 @@ router.put('/:id', (req, res) => {
       );
     }
   }
+  try { applyWarranty(req.params.id, b); } catch (err) { return res.status(err.status || 500).json({ error: err.message }); }
   res.json(withItems(get('SELECT * FROM purchase_orders WHERE id = ?', [req.params.id])));
 });
 
@@ -179,6 +214,7 @@ router.delete('/:id', (req, res) => {
   const block = poBlocker(po.id, 'eliminar');
   if (block) return res.status(400).json({ error: block });
   run('UPDATE supplier_bills SET purchase_order_id = NULL WHERE purchase_order_id = ?', [po.id]);
+  unlinkPo(po.id);
   run('DELETE FROM purchase_orders WHERE id = ?', [po.id]);
   res.status(204).end();
 });

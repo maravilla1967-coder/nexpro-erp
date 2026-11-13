@@ -16,7 +16,8 @@ export default function ReceiveModal({ po, onDone, onClose }) {
   const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const terms = po.effective_terms_days !== undefined ? po.effective_terms_days : po.supplier_terms_days; // null = sin definir, 0 = contado
-  const [billMode, setBillMode] = useState(terms === 0 ? 'pagada' : 'credito');
+  // Orden por garantía: la cubre el fabricante, así que por omisión no se crea cuenta por pagar.
+  const [billMode, setBillMode] = useState(po.is_warranty ? 'ninguna' : terms === 0 ? 'pagada' : 'credito');
   const [billNumber, setBillNumber] = useState('');
   const [billAmount, setBillAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -123,7 +124,8 @@ export default function ReceiveModal({ po, onDone, onClose }) {
 
         {lines.length > 0 && (
           <div style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>{t('Cuenta por pagar al proveedor')} <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>· {terms == null ? t('condiciones sin definir en el proveedor (se usan 30 días)') : terms === 0 ? t('proveedor de contado') : `${t('crédito')} ${terms} ${t('días')}`}</span></div>
+            {po.is_warranty ? <div className="warranty-box" style={{ marginTop: 0 }}>🛡️ {t('Orden por garantía')}{po.warranty ? ` · ${po.warranty.number}` : ''}{po.vehicle ? ` · VIN ${po.vehicle.vin}` : ''} — {t('la cubre el fabricante / vendedor; no se crea cuenta por pagar salvo que lo elijas.')}</div> : null}
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>{t('Cuenta por pagar al proveedor')} <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>· {po.is_warranty ? t('por garantía') : terms == null ? t('condiciones sin definir en el proveedor (se usan 30 días)') : terms === 0 ? t('proveedor de contado') : `${t('crédito')} ${terms} ${t('días')}`}</span></div>
             <div className="seg" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {[['credito', t('A crédito: crear cuenta por pagar')], ['pagada', t('Ya está pagada (contado / prepago)')], ['ninguna', t('No crear ahora')]].map(([k, label]) => (
                 <button key={k} type="button" className={`btn btn-sm ${billMode === k ? 'btn-primary' : ''}`} onClick={() => setBillMode(k)}>{label}</button>

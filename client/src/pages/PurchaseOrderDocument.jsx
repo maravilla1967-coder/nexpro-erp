@@ -38,7 +38,10 @@ export default function PurchaseOrderDocument() {
               <div><strong>No.</strong> {po.number}</div>
               <div><strong>{t('Fecha:')}</strong> {po.order_date || po.created_at}</div>
               <div><strong>{t('Estado:')}</strong> <Pill value={po.status} /></div>
-              {po.effective_terms_days != null && <div><strong>{t('Condiciones de pago:')}</strong> {Number(po.effective_terms_days) === 0 ? t('Contado / prepago') : `${t('Crédito')} ${po.effective_terms_days} ${t('días')}`}</div>}
+              {po.is_warranty ? <div><strong>{t('Condiciones de pago:')}</strong> {t('Por garantía')}{po.warranty ? ` · ${po.warranty.number}` : ''}</div> : null}
+              {po.is_warranty && (po.vehicle || (po.warranty && po.warranty.vin)) ? <div><strong>VIN:</strong> <span className="mono">{po.vehicle ? po.vehicle.vin : po.warranty.vin}</span></div> : null}
+              {po.is_warranty && po.warranty && po.warranty.manufacturer_claim_number ? <div><strong>{t('Reclamo fabricante:')}</strong> {po.warranty.manufacturer_claim_number}</div> : null}
+              {!po.is_warranty && po.effective_terms_days != null && <div><strong>{t('Condiciones de pago:')}</strong> {Number(po.effective_terms_days) === 0 ? t('Contado / prepago') : `${t('Crédito')} ${po.effective_terms_days} ${t('días')}`}</div>}
             </div>
           </div>
 

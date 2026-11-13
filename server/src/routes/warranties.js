@@ -3,6 +3,7 @@ const { all, get, run, nowIso } = require('../../db');
 const { nextDocNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 const { makeDocUploader } = require('../middleware/upload');
+const { linkPoWarranty, unlinkPo } = require('../utils/warrantyLink');
 
 // Módulo de garantías. Dos tipos de registro en la misma tabla:
 //   - 'reclamo'  (NX-WC-AAAAMMDD-NN): reclamo de garantía al fabricante.
@@ -56,7 +57,20 @@ const SELECT = `
 function withAttachments(w) {
   if (!w) return w;
   w.attachments = all('SELECT * FROM warranty_attachments WHERE warranty_id = ? ORDER BY id', [w.id]);
+  // Órdenes de compra por garantía amarradas a este reclamo (puede haber varias).
+  w.purchase_orders = all(`SELECT po.id, po.number, po.status, po.order_date, s.name AS supplier_name,
+      (SELECT COALESCE(SUM(i.quantity * i.unit_cost), 0) FROM purchase_order_items i WHERE i.purchase_order_id = po.id) AS total
+    FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+    WHERE po.warranty_id = ? OR po.id = ? ORDER BY po.id`, [w.id, w.purchase_order_id || -1]);
   return w;
+}
+// Un reclamo con orden de compra deja esa orden marcada "por garantía" y amarrada al reclamo.
+function syncPo(w, oldPoId) {
+  if (oldPoId && oldPoId !== w.purchase_order_id) {
+    const old = get('SELECT warranty_id FROM purchase_orders WHERE id = ?', [oldPoId]);
+    if (old && old.warranty_id === w.id) unlinkPo(oldPoId);
+  }
+  if (w.kind === 'reclamo' && w.purchase_order_id) linkPoWarranty(w.purchase_order_id, w.id);
 }
 const getOne = (id) => withAttachments(get(`${SELECT} WHERE w.id = ?`, [id]));
 
@@ -97,6 +111,7 @@ router.post('/', (req, res) => {
     `INSERT INTO warranties (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`,
     vals
   );
+  syncPo(get('SELECT * FROM warranties WHERE id = ?', [result.lastInsertRowid]), null);
   res.status(201).json(getOne(result.lastInsertRowid));
 });
 
@@ -115,10 +130,12 @@ router.put('/:id', (req, res) => {
     sets.push('updated_at = ?'); vals.push(nowIso());
     run(`UPDATE warranties SET ${sets.join(', ')} WHERE id = ?`, [...vals, req.params.id]);
   }
+  syncPo(get('SELECT * FROM warranties WHERE id = ?', [req.params.id]), existing.purchase_order_id);
   res.json(getOne(req.params.id));
 });
 
 router.delete('/:id', (req, res) => {
+  run('UPDATE purchase_orders SET warranty_id = NULL WHERE warranty_id = ?', [req.params.id]);
   run('DELETE FROM warranties WHERE id = ?', [req.params.id]);
   res.status(204).end();
 });

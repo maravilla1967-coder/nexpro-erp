@@ -81,6 +81,11 @@ tryAlter('ALTER TABLE supplier_bills ADD COLUMN goods_receipt_id INTEGER REFEREN
 tryAlter('ALTER TABLE purchase_order_items ADD COLUMN short_qty REAL NOT NULL DEFAULT 0');
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN short_note TEXT');
 tryAlter('ALTER TABLE purchase_orders ADD COLUMN payment_terms_days INTEGER'); // vacío = las del proveedor
+// Orden de compra por garantía: la cubre el fabricante/vendedor y va amarrada a un reclamo de
+// garantía y al vehículo (VIN) del equipo.
+tryAlter('ALTER TABLE purchase_orders ADD COLUMN is_warranty INTEGER NOT NULL DEFAULT 0');
+tryAlter('ALTER TABLE purchase_orders ADD COLUMN warranty_id INTEGER REFERENCES warranties(id) ON DELETE SET NULL');
+tryAlter('ALTER TABLE purchase_orders ADD COLUMN vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE SET NULL');
 // Finanzas: cada cobro / pago puede quedar en una cuenta bancaria (y conciliado).
 // Cuenta especial sin banco: pagos que un socio hizo directamente por Nexpro (no pasan por ningún banco).
 tryAlter('ALTER TABLE bank_accounts ADD COLUMN is_direct INTEGER NOT NULL DEFAULT 0');
@@ -176,3 +181,24 @@ try {
     run("INSERT INTO app_settings (key, value) VALUES ('equipment_types_master_v1', ?)", [String(rows.length)]);
   }
 } catch (e) { console.error('Migración de tipos de equipo:', e.message); }
+
+// Enlace orden de compra ↔ reclamo de garantía (se corre en cada arranque, es idempotente):
+// todo reclamo que ya apunta a una orden de compra marca esa orden como "por garantía".
+try {
+  db.exec(`UPDATE purchase_orders SET is_warranty = 1,
+             warranty_id = (SELECT w.id FROM warranties w WHERE w.purchase_order_id = purchase_orders.id AND w.kind = 'reclamo' ORDER BY w.id LIMIT 1)
+           WHERE warranty_id IS NULL AND EXISTS (SELECT 1 FROM warranties w WHERE w.purchase_order_id = purchase_orders.id AND w.kind = 'reclamo')`);
+  db.exec(`UPDATE purchase_orders SET vehicle_id = (SELECT w.vehicle_id FROM warranties w WHERE w.id = purchase_orders.warranty_id)
+           WHERE vehicle_id IS NULL AND warranty_id IS NOT NULL`);
+} catch (e) { console.error('Enlace OC-garantía:', e.message); }
+// Migración única pedida por Jorge: la orden de compra 273 es la del reclamo NX-WC-20261113-01.
+try {
+  if (!get("SELECT value FROM app_settings WHERE key = 'po273_warranty_link_v1'")) {
+    const w = get("SELECT id FROM warranties WHERE number = 'NX-WC-20261113-01'");
+    const pos = all("SELECT id FROM purchase_orders WHERE number = '273' OR number LIKE '%-273' OR number LIKE '% 273'");
+    if (w && pos.length === 1) {
+      require('../src/utils/warrantyLink').linkPoWarranty(pos[0].id, w.id);
+      run("INSERT INTO app_settings (key, value) VALUES ('po273_warranty_link_v1', ?)", [String(pos[0].id)]);
+    }
+  }
+} catch (e) { console.error('Enlace OC 273:', e.message); }

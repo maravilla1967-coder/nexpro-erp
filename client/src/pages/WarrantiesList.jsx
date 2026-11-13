@@ -95,6 +95,9 @@ export default function WarrantiesList() {
 
   // Abrir el formulario ya lleno cuando se llega desde un vehículo o una orden de compra.
   useEffect(() => {
+    // Abrir un reclamo desde otro módulo (p. ej. la orden de compra por garantía): /garantias?ver=ID
+    const ver = params.get('ver');
+    if (ver) { openEdit({ id: ver }).catch(() => {}); setParams({}, { replace: true }); return; }
     const nuevo = params.get('nuevo');
     if (!nuevo) return;
     const kind = nuevo === 'registro' ? 'registro' : 'reclamo';
@@ -243,7 +246,7 @@ export default function WarrantiesList() {
                   {ex.visible.map((w) => (
                     <tr key={w.id}>
                       <td><RowBox ex={ex} row={w} /></td>
-                      <td className="mono clickable" onClick={() => openEdit(w)}>{w.number}</td>
+                      <td className="mono clickable" onClick={() => openEdit(w)}>{w.number}{w.purchase_order_number ? <div className="warranty-tag">{t('OC')} {w.purchase_order_number}</div> : null}</td>
                       <td>{w.kind === 'registro' ? t('Registro') : t('Reclamo')}</td>
                       <td className="mono muted">{w.vin || '—'}{w.serial_number ? <div>{t('S/N')} {w.serial_number}</div> : null}</td>
                       <td>{w.item_description || w.equipment_type_name || '—'}<div className="muted" style={{ fontSize: 12 }}>{[w.manufacturer, w.model, w.year].filter(Boolean).join(' · ')}</div></td>
@@ -348,6 +351,22 @@ export default function WarrantiesList() {
             )}
 
             <div className="field"><label>{t('Notas')}</label><textarea rows={2} value={form.notes} onChange={set('notes')} /></div>
+
+            {editing && (editing.purchase_orders || []).length > 0 && (
+              <div className="warranty-box">
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>🛒 {isClaim ? t('Órdenes de compra por garantía de este reclamo') : t('Orden de compra')}</div>
+                <table>
+                  <thead><tr><th>{t('Orden')}</th><th>{t('Proveedor')}</th><th>{t('Fecha')}</th><th>{t('Estado')}</th><th className="text-right">{t('Total')}</th></tr></thead>
+                  <tbody>{editing.purchase_orders.map((po) => (
+                    <tr key={po.id}>
+                      <td className="mono"><Link to={`/compras?ver=${po.id}`}>{po.number}</Link></td>
+                      <td>{po.supplier_name}</td><td className="muted">{po.order_date || '—'}</td><td><Pill value={po.status} /></td>
+                      <td className="text-right">${Number(po.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
 
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)', marginTop: 16, display: 'block' }}>
               {isClaim ? t('Archivos adjuntos (fotos de la falla, facturas, etc.)') : t('Constancia del registro de garantía')}

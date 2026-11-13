@@ -49,7 +49,9 @@ export default function WarrantyDocument() {
               <div style={{ fontWeight: 700, fontSize: 15 }}>{w.supplier_name || w.manufacturer || '—'}</div>
               {w.supplier_address && <div className="muted">{w.supplier_address} {w.supplier_city || ''} {w.supplier_zip || ''}</div>}
               {(w.supplier_email || w.supplier_phone) && <div className="muted">{w.supplier_email} {w.supplier_phone}</div>}
-              {w.purchase_order_number && <div className="muted">{t('Orden de compra:')} {w.purchase_order_number}</div>}
+              {(w.purchase_orders || []).length > 0
+                ? <div className="muted">{t('Orden de compra:')} {w.purchase_orders.map((po) => po.number).join(', ')}</div>
+                : w.purchase_order_number && <div className="muted">{t('Orden de compra:')} {w.purchase_order_number}</div>}
             </div>
             <div className="doc-box">
               <div className="doc-box-title">{t('Responsable Nexpro')}</div>
