@@ -106,6 +106,7 @@ app.use('/api/approvals', require('./routes/approvals'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/crm', require('./routes/crm'));
+app.use('/api/options', require('./routes/options'));
 app.use('/api/mail', require('./routes/mail'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/suppliers', require('./routes/suppliers'));

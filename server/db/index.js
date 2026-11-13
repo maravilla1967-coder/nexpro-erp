@@ -139,6 +139,9 @@ try {
   db.exec(`UPDATE sales_orders SET status = 'facturado'
            WHERE status != 'facturado' AND EXISTS (SELECT 1 FROM invoices i WHERE i.sales_order_id = sales_orders.id AND i.status NOT IN ('anulada','cancelado'))`);
 } catch (e) { console.error('Reparación de pedidos facturados:', e.message); }
+// Opciones que los usuarios agregan a listas abiertas (tipo y estado de contacto, etc.).
+try { db.exec(`CREATE TABLE IF NOT EXISTS custom_options (id INTEGER PRIMARY KEY AUTOINCREMENT, list TEXT NOT NULL, value TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(list, value))`); } catch (e) { console.error('custom_options:', e.message); }
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_activities_customer ON activities(customer_id)'); } catch (e) {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_requests_customer ON crm_requests(customer_id)'); } catch (e) {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_requests_vehicle ON crm_requests(vehicle_id)'); } catch (e) {}

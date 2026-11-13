@@ -349,7 +349,7 @@ export default function CustomerDetail() {
       </div>
 
       {modal === 'edit' && (
-        <Modal title={t('Editar cliente')} onClose={() => setModal(null)} wide>
+        <Modal title={t('Registro de Contacto')} onClose={() => setModal(null)} wide>
           <form onSubmit={saveCustomer}>
             {error && <div className="error-banner">{error}</div>}
             <CustomerForm form={form} setForm={setForm} excludeId={c.id} onUseExisting={(x) => { setModal(null); navigate(`/clientes/${x.id}`); }} />
