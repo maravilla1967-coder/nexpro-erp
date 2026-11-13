@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import Modal from '../components/Modal.jsx';
 import { api } from '../api.js';
 import { useI18n } from '../i18n.jsx';
+import DirectSend from './DirectSend.jsx';
+import { useMailStatus } from './mailStatus.js';
 import { mailtoHref, outlookHref, smsHref, whatsappHref } from './messages.js';
 
 const SENDABLE = ['email', 'texto', 'whatsapp'];
@@ -30,6 +32,7 @@ function original(a) {
 // destinatario o el texto; al abrirlo en Outlook (o copiarlo) queda registrado como reenviado.
 export default function ResendMessage({ activity, customerId, onClose, onSent }) {
   const { t } = useI18n();
+  const mail = useMailStatus();
   const o = original(activity);
   const [to, setTo] = useState(o.to);
   const [subject, setSubject] = useState(o.subject);
@@ -72,12 +75,13 @@ export default function ResendMessage({ activity, customerId, onClose, onSent })
       <div className="field"><label>{isEmail ? t('Para (correo)') : t('Para (teléfono)')}</label><input value={to} onChange={(e) => setTo(e.target.value)} /></div>
       {isEmail && <div className="field"><label>{t('Asunto')}</label><input value={subject} onChange={(e) => setSubject(e.target.value)} /></div>}
       <div className="field"><label>{t('Mensaje')}</label><textarea rows={isEmail ? 14 : 5} value={body} onChange={(e) => setBody(e.target.value)} /></div>
+      {isEmail && !logged && <DirectSend mail={mail} to={to} subject={subject} body={body} onSent={log} />}
       <div className="modal-footer" style={{ flexWrap: 'wrap' }}>
         <button type="button" className="btn" onClick={onClose}>{logged ? t('Cerrar') : t('Ahora no')}</button>
         <button type="button" className="btn" onClick={copy}>{t('📋 Copiar texto')}</button>
         {!logged && <button type="button" className="btn" onClick={log}>{t('Ya lo envié')}</button>}
         {isEmail && <button type="button" className="btn" onClick={openWeb} disabled={!to}>{t('Outlook web')}</button>}
-        <button type="button" className="btn btn-primary" onClick={openApp} disabled={!to}>
+        <button type="button" className={`btn ${isEmail && mail && mail.connected ? '' : 'btn-primary'}`} onClick={openApp} disabled={!to}>
           {isEmail ? t('📧 Abrir en Outlook') : activity.type === 'whatsapp' ? t('Abrir WhatsApp') : t('Abrir mensajes')}
         </button>
       </div>

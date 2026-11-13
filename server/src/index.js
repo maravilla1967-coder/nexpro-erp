@@ -84,6 +84,8 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Autenticación: login, aceptar invitación, etc. No requiere sesión previa.
 app.use('/api/auth', require('./routes/auth'));
+// Microsoft devuelve aquí al usuario después de autorizar su Outlook (sin sesión del ERP).
+app.use('/api/mail', require('./routes/mail').publicRouter);
 // Registro de lo que pasa en el navegador (p. ej. Safari al guardar un pago con archivo), para
 // poder ver en los logs de Railway dónde falla algo que no llega a enviarse al servidor.
 app.post('/api/client-log', (req, res) => {
@@ -104,6 +106,7 @@ app.use('/api/approvals', require('./routes/approvals'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/crm', require('./routes/crm'));
+app.use('/api/mail', require('./routes/mail'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/purchase-orders', require('./routes/purchaseOrders'));

@@ -9,6 +9,7 @@ import CustomersList from './pages/CustomersList.jsx';
 import CustomerDetail from './pages/CustomerDetail.jsx';
 import CustomerReport from './pages/CustomerReport.jsx';
 import CallConsole from './pages/CallConsole.jsx';
+import MailSettings from './pages/MailSettings.jsx';
 import RequestsList from './pages/RequestsList.jsx';
 import ProductsList from './pages/ProductsList.jsx';
 import InventoryStockPage from './pages/InventoryStockPage.jsx';
@@ -226,6 +227,9 @@ function MainShell() {
           <NavLink to={APPROVALS_LINK.to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <span>{APPROVALS_LINK.icon}</span><span>{t(APPROVALS_LINK.text)}</span>
           </NavLink>
+          <NavLink to="/mi-correo" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <span>📧</span><span>{t('Mi correo (Outlook)')}</span>
+          </NavLink>
           {isAdmin && (
             <NavLink to={ADMIN_LINK.to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span>{ADMIN_LINK.icon}</span><span>{t(ADMIN_LINK.text)}</span>
@@ -260,6 +264,7 @@ function MainShell() {
           <Route path="/clientes/:id" element={<CustomerDetail />} />
           <Route path="/clientes/:id/informe" element={<CustomerReport />} />
           <Route path="/crm/llamada" element={<CallConsole />} />
+          <Route path="/mi-correo" element={<MailSettings />} />
           <Route path="/crm/solicitudes" element={<RequestsList />} />
           <Route path="/inventario" element={<InventoryStockPage />} />
           <Route path="/productos" element={<ProductsList />} />

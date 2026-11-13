@@ -107,6 +107,17 @@ CREATE TABLE IF NOT EXISTS crm_request_files (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Cuenta de Outlook (Microsoft 365) conectada por cada usuario para enviar correos desde el ERP.
+CREATE TABLE IF NOT EXISTS mail_accounts (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT,
+  access_token TEXT,
+  refresh_token TEXT,
+  expires_at INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ===================== INVENTARIO =====================
 CREATE TABLE IF NOT EXISTS product_types (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

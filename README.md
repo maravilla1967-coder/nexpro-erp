@@ -348,3 +348,19 @@ En cuanto estén esos registros, Railway emite el certificado solo y la direcci�
   crea el tipo de equipo, el servicio (precio $0, tarifa "servicio completo") o el producto (costo/precio $0)
   o reutiliza el que ya exista con ese nombre.
 - Vehículo ↔ persona: `vehicles.contact_id` (`PUT /api/crm/vehicles/:id/contact`).
+
+## 17. Correo desde Outlook (Microsoft 365)
+
+El ERP envía los correos del CRM (acuse, cotización, reenvíos) directamente desde la cuenta de Outlook
+de cada usuario con Microsoft Graph (`server/src/routes/mail.js`, pantalla `/mi-correo`).
+
+- **Una vez (administrador):** registrar la app en Microsoft Entra (App registrations → New registration,
+  single tenant, Redirect URI tipo Web = `https://erp.nexprotrucks.com/api/mail/callback`), crear un client
+  secret, dar permisos delegados Microsoft Graph `Mail.Send` y `User.Read` con "Grant admin consent", y pegar
+  Tenant ID, Client ID y el secreto en `/mi-correo` (se guardan en `app_settings`: `ms_tenant_id`,
+  `ms_client_id`, `ms_client_secret`).
+- **Cada usuario:** "Conectar mi Outlook" (OAuth con `offline_access`); los tokens van en `mail_accounts`
+  y se renuevan solos.
+- `POST /api/mail/send` (multipart: to, cc, subject, body, files ≤ 3 MB en total) → `me/sendMail` con
+  `saveToSentItems`. El correo queda en Enviados del usuario; el ERP lo registra en el historial del cliente.
+- Si no hay Outlook conectado, siguen las opciones de abrir la app de Outlook / Outlook web / copiar texto.
