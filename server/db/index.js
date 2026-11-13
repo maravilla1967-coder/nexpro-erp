@@ -207,3 +207,20 @@ try {
     }
   }
 } catch (e) { console.error('Enlace OC 273:', e.message); }
+
+// Migración única pedida por Jorge: los tres "Rechtien" duplicados quedan en uno solo,
+// RECHTIEN INTERNATIONAL TRUCKS, INC., con todos sus vehículos, contactos y documentos.
+try {
+  if (!get("SELECT value FROM app_settings WHERE key = 'merge_rechtien_v1'")) {
+    const rows = all("SELECT id, name FROM customers WHERE lower(name) LIKE 'rechtien%'");
+    const norm = (n) => String(n).trim().toLowerCase();
+    const target = rows.find((r) => norm(r.name) === 'rechtien international llc')
+      || rows.find((r) => norm(r.name) === 'rechtien international trucks, inc.');
+    const sources = rows.filter((r) => target && r.id !== target.id && ['rechtien', 'rechtien international'].includes(norm(r.name)));
+    if (target) {
+      if (sources.length) require('../src/utils/mergeCustomers').mergeCustomers(target.id, sources.map((s) => s.id), 'RECHTIEN INTERNATIONAL TRUCKS, INC.');
+      else run('UPDATE customers SET name = ? WHERE id = ?', ['RECHTIEN INTERNATIONAL TRUCKS, INC.', target.id]);
+      run("INSERT INTO app_settings (key, value) VALUES ('merge_rechtien_v1', ?)", [String(target.id)]);
+    }
+  }
+} catch (e) { console.error('Fusión Rechtien:', e.message); }

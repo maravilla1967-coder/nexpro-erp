@@ -1,6 +1,7 @@
 const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
-const { requireModuleEdit } = require('../middleware/auth');
+const { requireModuleEdit, requireAdmin } = require('../middleware/auth');
+const { mergeCustomers } = require('../utils/mergeCustomers');
 
 const router = express.Router();
 router.use(requireModuleEdit('clientes'));
@@ -105,6 +106,15 @@ router.put('/:id', (req, res) => {
   );
   ensureSupplierLink(req.params.id);
   res.json(get('SELECT * FROM customers WHERE id = ?', [req.params.id]));
+});
+
+// Fusionar duplicados en este cliente (solo administrador): body { sourceIds: [..], name? }
+router.post('/:id/merge', requireAdmin, (req, res) => {
+  try {
+    res.json(mergeCustomers(req.params.id, req.body.sourceIds, req.body.name));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 router.delete('/:id', (req, res) => {

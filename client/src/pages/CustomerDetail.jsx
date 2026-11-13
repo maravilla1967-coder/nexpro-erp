@@ -8,6 +8,7 @@ import CustomerForm, { customerToForm, ContactFields, EMPTY_CONTACT } from '../c
 import { RolePills, StatusPill } from '../crm/CustomerSnapshot.jsx';
 import RequestModal from '../crm/RequestModal.jsx';
 import OpportunityModal from '../crm/OpportunityModal.jsx';
+import MergeCustomersModal from '../crm/MergeCustomersModal.jsx';
 import ResendMessage, { canResend } from '../crm/ResendMessage.jsx';
 import {
   CONTACT_TYPES, INTERACTION_TYPES, contactTypeLabel, interactionIcon, interactionLabel, channelIcon, money, shortDate,
@@ -28,6 +29,7 @@ export default function CustomerDetail() {
   const [d, setD] = useState(null);
   const [tab, setTab] = useState(params.get('tab') || 'resumen');
   const [modal, setModal] = useState(null);
+  const [merging, setMerging] = useState(false);
   const [form, setForm] = useState({});
   const [error, setError] = useState('');
   const [tlFilter, setTlFilter] = useState('');
@@ -96,8 +98,10 @@ export default function CustomerDetail() {
           <Link to={`/crm/llamada?cliente=${c.id}`} className="btn btn-primary">{t('📞 Nueva solicitud')}</Link>
           <Link to={`/clientes/${c.id}/informe`} className="btn">{t('🖨️ Informe del cliente')}</Link>
           <button className="btn" onClick={() => open('edit', customerToForm(c))}>{t('Editar')}</button>
+          <button className="btn admin-only" onClick={() => setMerging(true)}>{t('🔗 Fusionar duplicados')}</button>
           <button className="btn btn-danger" onClick={remove}>{t('Eliminar')}</button>
         </div>
+        {merging && <MergeCustomersModal customer={c} onClose={() => setMerging(false)} onDone={() => { setMerging(false); load(); }} />}
       </div>
       <div className="content">
         {error && !modal && <div className="error-banner">{error}</div>}
