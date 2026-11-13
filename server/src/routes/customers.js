@@ -163,7 +163,8 @@ router.post('/:id/opportunities', (req, res) => {
   const result = run(
     `INSERT INTO opportunities (customer_id, title, stage, value, probability, expected_close, notes)
      VALUES (?,?,?,?,?,?,?)`,
-    [req.params.id, b.title, b.stage || 'nuevo', b.value ?? null, b.probability ?? null, b.expectedClose || null, b.notes || null]
+    [req.params.id, b.title, b.stage || 'nuevo', b.value === '' || b.value == null ? null : Number(b.value),
+     b.probability === '' || b.probability == null ? null : Number(b.probability), b.expectedClose || null, b.notes || null]
   );
   res.status(201).json(get('SELECT * FROM opportunities WHERE id = ?', [result.lastInsertRowid]));
 });
@@ -174,8 +175,10 @@ router.put('/opportunities/:oppId', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Oportunidad no encontrada' });
   run(
     `UPDATE opportunities SET title=?, stage=?, value=?, probability=?, expected_close=?, notes=?, updated_at=? WHERE id=?`,
-    [b.title ?? existing.title, b.stage ?? existing.stage, b.value ?? existing.value, b.probability ?? existing.probability,
-     b.expectedClose ?? existing.expected_close, b.notes ?? existing.notes, nowIso(), req.params.oppId]
+    [b.title ?? existing.title, b.stage ?? existing.stage,
+     b.value === undefined ? existing.value : (b.value === '' || b.value === null ? null : Number(b.value)),
+     b.probability === undefined ? existing.probability : (b.probability === '' || b.probability === null ? null : Number(b.probability)),
+     b.expectedClose === undefined ? existing.expected_close : (b.expectedClose || null), b.notes ?? existing.notes, nowIso(), req.params.oppId]
   );
   res.json(get('SELECT * FROM opportunities WHERE id = ?', [req.params.oppId]));
 });

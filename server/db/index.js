@@ -119,6 +119,8 @@ tryAlter('ALTER TABLE activities ADD COLUMN request_id INTEGER REFERENCES crm_re
 tryAlter('ALTER TABLE activities ADD COLUMN direction TEXT');
 tryAlter('ALTER TABLE activities ADD COLUMN created_by INTEGER REFERENCES users(id)');
 tryAlter('ALTER TABLE activities ADD COLUMN occurred_at TEXT');
+// Oportunidad → cotización del ERP creada desde ella
+tryAlter('ALTER TABLE opportunities ADD COLUMN sales_order_id INTEGER REFERENCES sales_orders(id) ON DELETE SET NULL');
 // Mensajes enviados al cliente: a quién, asunto y texto exactos (para poder reenviarlos).
 tryAlter('ALTER TABLE activities ADD COLUMN msg_to TEXT');
 tryAlter('ALTER TABLE activities ADD COLUMN msg_subject TEXT');

@@ -118,6 +118,21 @@ CREATE TABLE IF NOT EXISTS mail_accounts (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Documentos de una oportunidad (cotizaciones preliminares en PDF, fichas técnicas…). Las
+-- cotizaciones con la plantilla de Nexpro se pueden leer y convertir en cotización del ERP.
+CREATE TABLE IF NOT EXISTS opportunity_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  opportunity_id INTEGER NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+  file_url TEXT NOT NULL,
+  original_name TEXT,
+  mime_type TEXT,
+  size INTEGER,
+  parsed_json TEXT,
+  sales_order_id INTEGER REFERENCES sales_orders(id) ON DELETE SET NULL,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ===================== INVENTARIO =====================
 CREATE TABLE IF NOT EXISTS product_types (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

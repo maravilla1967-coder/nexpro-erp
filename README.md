@@ -364,3 +364,14 @@ de cada usuario con Microsoft Graph (`server/src/routes/mail.js`, pantalla `/mi-
 - `POST /api/mail/send` (multipart: to, cc, subject, body, files ≤ 3 MB en total) → `me/sendMail` con
   `saveToSentItems`. El correo queda en Enviados del usuario; el ERP lo registra en el historial del cliente.
 - Si no hay Outlook conectado, siguen las opciones de abrir la app de Outlook / Outlook web / copiar texto.
+
+## 18. Oportunidades con cotización preliminar (PDF)
+
+- `opportunity_files` guarda los documentos de cada oportunidad (`/uploads/crm-opportunities`).
+- `server/src/utils/quotePdf.js` lee las cotizaciones hechas con la plantilla de Nexpro (Design): número
+  (`QUOTE NO.` / `COTIZACIÓN NO.`), referencia, equipo ofertado, cliente y la tabla `INVESTMENT SUMMARY` /
+  `RESUMEN DE INVERSIÓN` (ítem, cantidad, descripción, precio) hasta `TOTAL QUOTED PRICE` / `PRECIO TOTAL
+  COTIZADO`, usando pdfjs-dist y las posiciones del texto. Avisa si la suma no cuadra con el total.
+- `POST /api/crm/parse-quote` (llenar título/valor al crear), `POST /api/crm/opportunities/:id/files`,
+  `GET /api/crm/opportunity-files/:id/parse`, `POST /api/crm/opportunities/:id/quote` (crea la orden de
+  pedido en borrador con las líneas revisadas — producto + descripción, cantidad, precio — y la enlaza).

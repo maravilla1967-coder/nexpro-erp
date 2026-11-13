@@ -2,10 +2,16 @@ const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
 const { nextDocNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
-const { makeDocUploader } = require('../middleware/upload');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const { makeDocUploader, UPLOADS_ROOT } = require('../middleware/upload');
+const { parseQuotePdf } = require('../utils/quotePdf');
 const { linkRequestToVehicle, createWorkOrder } = require('../utils/requestLinks');
 
 const docUpload = makeDocUploader('crm-requests');
+const oppUpload = makeDocUploader('crm-opportunities');
+const memUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 // CRM: búsqueda instantánea cuando alguien llama, detección de clientes duplicados, ficha 360
 // del cliente (todo lo que se le ha hecho), solicitudes con productos/servicios escogidos de la
@@ -14,6 +20,7 @@ const router = express.Router();
 router.use(requireModuleEdit('clientes'));
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim();
 const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const digits = (s) => String(s || '').replace(/\D/g, '');
 // Palabras que no distinguen a una empresa de otra ("Inc", "LLC", "City of"…).
@@ -235,7 +242,10 @@ router.get('/customers/:id/360', (req, res) => {
                             FROM activities a LEFT JOIN contacts k ON k.id = a.contact_id
                             LEFT JOIN users u ON u.id = a.created_by LEFT JOIN crm_requests r ON r.id = a.request_id
                             WHERE a.customer_id = ? ORDER BY COALESCE(a.occurred_at, a.created_at) DESC, a.id DESC`, [id]);
-  const opportunities = all('SELECT * FROM opportunities WHERE customer_id = ? ORDER BY created_at DESC', [id]);
+  const opportunities = all(`SELECT o.*, so.number AS sales_order_number,
+                                    (SELECT COUNT(*) FROM opportunity_files f WHERE f.opportunity_id = o.id) AS files_count
+                             FROM opportunities o LEFT JOIN sales_orders so ON so.id = o.sales_order_id
+                             WHERE o.customer_id = ? ORDER BY o.created_at DESC`, [id]);
 
   // Vehículos con sus equipos (seriales) y todo el historial de servicio
   const vehicles = all(`SELECT v.*, k.name AS contact_name FROM vehicles v LEFT JOIN contacts k ON k.id = v.contact_id
@@ -630,6 +640,113 @@ router.post('/catalog-item', (req, res) => {
     return res.status(ex ? 200 : 201).json({ kind: 'producto', productId: id, description: ex ? ex.name : name, existed: !!ex });
   }
   res.status(400).json({ error: 'Tipo no válido' });
+});
+
+// ---------- Oportunidades: documentos y paso a cotización del ERP ----------
+const isPdf = (f) => /pdf/i.test(f.mimetype || f.mime_type || '') || /\.pdf$/i.test(f.originalname || f.original_name || '');
+
+function getOpportunity(id) {
+  const o = get(`SELECT o.*, so.number AS sales_order_number, so.status AS sales_order_status,
+                        (SELECT COALESCE(SUM(i.quantity * i.unit_price),0) FROM sales_order_items i WHERE i.sales_order_id = so.id) AS sales_order_total
+                 FROM opportunities o LEFT JOIN sales_orders so ON so.id = o.sales_order_id WHERE o.id = ?`, [id]);
+  if (!o) return null;
+  o.files = all(`SELECT f.*, u.name AS created_by_name, so.number AS sales_order_number FROM opportunity_files f
+                 LEFT JOIN users u ON u.id = f.created_by LEFT JOIN sales_orders so ON so.id = f.sales_order_id
+                 WHERE f.opportunity_id = ? ORDER BY f.id`, [id]).map((f) => ({ ...f, parsed: f.parsed_json ? JSON.parse(f.parsed_json) : null, parsed_json: undefined }));
+  return o;
+}
+
+async function tryParse(buffer) {
+  try { return await parseQuotePdf(buffer); } catch (e) { return { items: [], total: null, warnings: [`No se pudo leer el PDF: ${e.message}`] }; }
+}
+
+router.get('/opportunities/:id', (req, res) => {
+  const o = getOpportunity(req.params.id);
+  if (!o) return res.status(404).json({ error: 'Oportunidad no encontrada' });
+  res.json(o);
+});
+
+// Leer una cotización en PDF sin guardarla (para llenar la oportunidad nueva: título y valor)
+router.post('/parse-quote', memUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No llegó el archivo' });
+  if (!isPdf(req.file)) return res.json({ items: [], total: null, warnings: ['Solo se pueden leer cotizaciones en PDF.'] });
+  res.json(await tryParse(req.file.buffer));
+});
+
+router.post('/opportunities/:id/files', oppUpload.array('files', 20), async (req, res) => {
+  const o = get('SELECT * FROM opportunities WHERE id = ?', [req.params.id]);
+  if (!o) return res.status(404).json({ error: 'Oportunidad no encontrada' });
+  let firstTotal = null;
+  for (const f of req.files || []) {
+    let parsed = null;
+    if (isPdf(f)) {
+      parsed = await tryParse(fs.readFileSync(f.path));
+      if (firstTotal == null && parsed.items.length && parsed.total) firstTotal = parsed.total;
+    }
+    run(`INSERT INTO opportunity_files (opportunity_id, file_url, original_name, mime_type, size, parsed_json, created_by) VALUES (?,?,?,?,?,?,?)`,
+      [o.id, `/uploads/crm-opportunities/${f.filename}`, f.originalname, f.mimetype, f.size, parsed ? JSON.stringify(parsed) : null, req.user ? req.user.id : null]);
+  }
+  // Si la oportunidad no tenía valor, se toma el total de la cotización adjunta
+  if ((o.value == null || o.value === 0) && firstTotal) run('UPDATE opportunities SET value = ?, updated_at = ? WHERE id = ?', [firstTotal, nowIso(), o.id]);
+  if ((req.files || []).length) {
+    run(`INSERT INTO activities (customer_id, type, subject, notes, done, created_by, occurred_at) VALUES (?, 'nota', ?, ?, 1, ?, ?)`,
+      [o.customer_id, `Oportunidad "${o.title}": ${req.files.length === 1 ? 'documento adjunto' : `${req.files.length} documentos adjuntos`}`,
+        req.files.map((f) => f.originalname).join(', '), req.user ? req.user.id : null, nowIso()]);
+  }
+  res.status(201).json(getOpportunity(o.id));
+});
+
+router.delete('/opportunities/:id/files/:fileId', (req, res) => {
+  run('DELETE FROM opportunity_files WHERE id = ? AND opportunity_id = ?', [req.params.fileId, req.params.id]);
+  res.status(204).end();
+});
+
+// Volver a leer un PDF ya adjunto (por si se adjuntó antes de esta función o se quiere revisar)
+router.get('/opportunity-files/:fileId/parse', async (req, res) => {
+  const f = get('SELECT * FROM opportunity_files WHERE id = ?', [req.params.fileId]);
+  if (!f) return res.status(404).json({ error: 'Documento no encontrado' });
+  if (!isPdf(f)) return res.json({ items: [], total: null, warnings: ['Solo se pueden leer cotizaciones en PDF.'] });
+  const disk = path.join(UPLOADS_ROOT, f.file_url.replace(/^\/uploads\//, ''));
+  if (!fs.existsSync(disk)) return res.status(404).json({ error: 'El archivo ya no está en el servidor' });
+  const parsed = await tryParse(fs.readFileSync(disk));
+  run('UPDATE opportunity_files SET parsed_json = ? WHERE id = ?', [JSON.stringify(parsed), f.id]);
+  res.json(parsed);
+});
+
+// Crear la cotización del ERP (orden de pedido en borrador) con las líneas revisadas del PDF.
+router.post('/opportunities/:id/quote', (req, res) => {
+  const o = get('SELECT * FROM opportunities WHERE id = ?', [req.params.id]);
+  if (!o) return res.status(404).json({ error: 'Oportunidad no encontrada' });
+  const b = req.body || {};
+  const items = (Array.isArray(b.items) ? b.items : []).map((i) => ({
+    description: clean(i.description) + (clean(i.details) ? ` — ${clean(i.details)}` : ''),
+    quantity: Number(i.quantity) > 0 ? Number(i.quantity) : 1,
+    unitPrice: Number(i.unitPrice) || 0,
+    productId: i.productId || null,
+  })).filter((i) => i.description && i.description !== ' — ');
+  if (!items.length) return res.status(400).json({ error: 'La cotización necesita al menos una línea' });
+  const file = b.fileId ? get('SELECT * FROM opportunity_files WHERE id = ? AND opportunity_id = ?', [b.fileId, o.id]) : null;
+  const parsed = file && file.parsed_json ? JSON.parse(file.parsed_json) : null;
+  const number = nextDocNumber('sales_orders', 'QT');
+  const notes = [
+    `Oportunidad: ${o.title}`,
+    parsed && parsed.quoteNumber ? `Cotización preliminar ${parsed.quoteNumber}${file ? ` (${file.original_name})` : ''}` : (file ? `Documento: ${file.original_name}` : null),
+    b.notes || null,
+  ].filter(Boolean).join('\n');
+  const contact = b.contactId && get('SELECT id FROM contacts WHERE id = ? AND customer_id = ?', [b.contactId, o.customer_id]);
+  const soId = run(`INSERT INTO sales_orders (number, customer_id, status, notes, contact_id) VALUES (?,?,?,?,?)`,
+    [number, o.customer_id, 'borrador', notes, contact ? contact.id : null]).lastInsertRowid;
+  for (const i of items) {
+    run('INSERT INTO sales_order_items (sales_order_id, product_id, description, quantity, unit_price) VALUES (?,?,?,?,?)',
+      [soId, i.productId, i.description, i.quantity, Math.round(i.unitPrice * 100) / 100]);
+  }
+  run(`UPDATE opportunities SET sales_order_id = ?, stage = CASE WHEN stage IN ('nuevo','calificado') THEN 'propuesta' ELSE stage END,
+         value = COALESCE(NULLIF(value, 0), ?), updated_at = ? WHERE id = ?`,
+  [soId, Math.round(items.reduce((s, i) => s + i.quantity * i.unitPrice, 0) * 100) / 100, nowIso(), o.id]);
+  if (file) run('UPDATE opportunity_files SET sales_order_id = ? WHERE id = ?', [soId, file.id]);
+  run(`INSERT INTO activities (customer_id, type, subject, done, created_by, occurred_at) VALUES (?, 'nota', ?, 1, ?, ?)`,
+    [o.customer_id, `Oportunidad "${o.title}" → cotización ${number}`, req.user ? req.user.id : null, nowIso()]);
+  res.status(201).json({ salesOrderId: soId, number, opportunity: getOpportunity(o.id) });
 });
 
 // Asignar un vehículo (y sus equipos) a una persona concreta del cliente
