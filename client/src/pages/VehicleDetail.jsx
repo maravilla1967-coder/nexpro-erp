@@ -50,6 +50,7 @@ export default function VehicleDetail() {
   const [woParts, setWoParts] = useState([]);
   const [selectedWoIds, setSelectedWoIds] = useState([]);
   const [invoicing, setInvoicing] = useState(false);
+  const [warrantySupplierId, setWarrantySupplierId] = useState('');
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   const [installedSerials, setInstalledSerials] = useState([]);
@@ -266,6 +267,27 @@ export default function VehicleDetail() {
     }
   }
 
+  // Varias órdenes de trabajo del mismo vehículo (ej. la misma reparación bajo garantía) se
+  // combinan en una sola factura, pero dirigida al proveedor en lugar del cliente final — para
+  // reclamarle el costo como garantía. Si alguna de las órdenes ya tenía su propia factura al
+  // cliente, hay que anularla primero (botón "Anular factura" en esa factura) para que quede
+  // libre y se pueda incluir aquí.
+  async function invoiceSelectedToSupplier() {
+    if (selectedWoIds.length === 0) return;
+    if (!warrantySupplierId) { alert(t('Selecciona primero el proveedor al que se le va a facturar')); return; }
+    const numbers = vehicle.workOrders.filter((wo) => selectedWoIds.includes(wo.id)).map((wo) => wo.number).join(', ');
+    const supplierName = suppliers.find((s) => String(s.id) === String(warrantySupplierId))?.name || '';
+    if (!window.confirm(`${t('¿Generar una factura de garantía al proveedor')} ${supplierName} ${t('con estas órdenes de trabajo?')} ${numbers}`)) return;
+    setInvoicing(true);
+    try {
+      const invoice = await api.post('/invoices/from-work-orders', { workOrderIds: selectedWoIds, supplierId: warrantySupplierId });
+      navigate(`/facturas/${invoice.id}`);
+    } catch (err) {
+      alert(err.message);
+      setInvoicing(false);
+    }
+  }
+
   if (!vehicle) return <div className="content">{t('Cargando…')}</div>;
 
   const woTotalPreview = partsTotal(woParts) + woServices.reduce((sum, s) => {
@@ -398,9 +420,18 @@ export default function VehicleDetail() {
             {t('Órdenes de trabajo')}
             <div style={{ display: 'flex', gap: 8 }}>
               {selectedWoIds.length > 0 && (
-                <button type="button" className="btn btn-sm btn-primary" disabled={invoicing} onClick={invoiceSelected}>
-                  {invoicing ? t('Generando…') : `${t('Facturar seleccionadas')} (${selectedWoIds.length})`}
-                </button>
+                <>
+                  <button type="button" className="btn btn-sm btn-primary" disabled={invoicing} onClick={invoiceSelected}>
+                    {invoicing ? t('Generando…') : `${t('Facturar seleccionadas')} (${selectedWoIds.length})`}
+                  </button>
+                  <select value={warrantySupplierId} onChange={(e) => setWarrantySupplierId(e.target.value)} style={{ maxWidth: 180 }}>
+                    <option value="">{t('— Proveedor (garantía) —')}</option>
+                    {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  <button type="button" className="btn btn-sm" disabled={invoicing || !warrantySupplierId} onClick={invoiceSelectedToSupplier} title={t('Factura esta selección al proveedor como reclamo de garantía, en vez de al cliente')}>
+                    {invoicing ? t('Generando…') : t('Facturar al proveedor (garantía)')}
+                  </button>
+                </>
               )}
               <button className="btn btn-sm btn-primary" onClick={openWoModal}>{t('+ Nueva orden de trabajo')}</button>
             </div>
@@ -436,7 +467,7 @@ export default function VehicleDetail() {
               </tbody>
             </table>
           )}
-          <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>{t('Gestiona el detalle de horas/servicios de cada orden en')} <Link to="/ordenes-trabajo">{t('Órdenes de Trabajo')}</Link>. {t('Las órdenes marcadas como "completado" pueden facturarse: selecciónalas con la casilla y haz clic en "Facturar seleccionadas".')}</div>
+          <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>{t('Gestiona el detalle de horas/servicios de cada orden en')} <Link to="/ordenes-trabajo">{t('Órdenes de Trabajo')}</Link>. {t('Las órdenes marcadas como "completado" pueden facturarse: selecciónalas con la casilla y haz clic en "Facturar seleccionadas". Para combinar varias órdenes del mismo vehículo (por ejemplo una reparación en garantía) en una sola factura al proveedor, escoge el proveedor en el menú y haz clic en "Facturar al proveedor (garantía)"; si alguna orden ya tenía su propia factura al cliente, primero anúlala desde esa factura para que quede libre.')}</div>
         </div>
 
         <div className="card">

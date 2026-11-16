@@ -251,7 +251,7 @@ router.post('/from-work-orders', (req, res) => {
 
   const placeholders = workOrderIds.map(() => '?').join(',');
   const workOrders = all(
-    `SELECT wo.*, v.customer_id FROM work_orders wo
+    `SELECT wo.*, v.customer_id, v.vin FROM work_orders wo
      LEFT JOIN vehicles v ON v.id = wo.vehicle_id WHERE wo.id IN (${placeholders})`,
     workOrderIds
   );
@@ -266,13 +266,38 @@ router.post('/from-work-orders', (req, res) => {
   if (notCompleted) {
     return res.status(400).json({ error: `La orden ${notCompleted.number} no está completada todavía` });
   }
-  const customerId = workOrders[0].customer_id;
-  if (!customerId) {
+  const vehicleCustomerId = workOrders[0].customer_id;
+  if (!vehicleCustomerId) {
     return res.status(400).json({ error: 'El vehículo de la orden de trabajo no tiene cliente asignado' });
   }
-  const mixedCustomer = workOrders.find((wo) => wo.customer_id !== customerId);
+  const mixedCustomer = workOrders.find((wo) => wo.customer_id !== vehicleCustomerId);
   if (mixedCustomer) {
     return res.status(400).json({ error: 'No se pueden facturar juntas órdenes de trabajo de clientes distintos' });
+  }
+
+  // Reclamo de garantía: en vez de facturarle al cliente final del vehículo, esta factura se le
+  // hace al proveedor (ej. quien vendió/instaló la pieza que falló bajo garantía). Se reutiliza la
+  // misma ficha de "cliente" que ya se usa en el CRM para cada proveedor (ver POST
+  // /crm/from-supplier/:id) para que la factura, la cartera y las cuentas por cobrar sigan
+  // funcionando exactamente igual que con cualquier otro cliente.
+  let customerId = vehicleCustomerId;
+  let noteExtra = '';
+  if (req.body.supplierId) {
+    const supplier = get('SELECT * FROM suppliers WHERE id = ?', [req.body.supplierId]);
+    if (!supplier) return res.status(404).json({ error: 'Proveedor no encontrado' });
+    let mirror = get('SELECT id FROM customers WHERE supplier_id = ?', [supplier.id]);
+    if (!mirror) {
+      const mirrorId = run(
+        `INSERT INTO customers (type, name, tax_id, email, phone, address, city, zip, status, roles, supplier_id, source)
+         VALUES ('empresa',?,?,?,?,?,?,?,'cliente','proveedor',?,'Facturación de garantía')`,
+        [supplier.name, supplier.tax_id, supplier.email, supplier.phone, supplier.address, supplier.city, supplier.zip, supplier.id]
+      ).lastInsertRowid;
+      mirror = { id: mirrorId };
+    }
+    customerId = mirror.id;
+    const vehicleCustomer = get('SELECT name FROM customers WHERE id = ?', [vehicleCustomerId]);
+    const vin = workOrders.map((wo) => wo.vin).find(Boolean);
+    noteExtra = ` — Reclamo de garantía (cliente final: ${vehicleCustomer ? vehicleCustomer.name : '—'}${vin ? `, VIN ${vin}` : ''})`;
   }
 
   const items = [];
@@ -308,7 +333,7 @@ router.post('/from-work-orders', (req, res) => {
     `INSERT INTO invoices (number, customer_id, status, due_date, subtotal, tax_rate, tax_amount, total, notes)
      VALUES (?,?,?,?,?,?,?,?,?)`,
     [number, customerId, 'pendiente', req.body.dueDate || null, subtotal, taxRate, taxAmount, total,
-     `Generada desde ${workOrders.map((wo) => wo.number).join(', ')}`]
+     `Generada desde ${workOrders.map((wo) => wo.number).join(', ')}${noteExtra}`]
   );
   const invId = result.lastInsertRowid;
   for (const item of items) {
