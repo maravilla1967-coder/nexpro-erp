@@ -56,3 +56,21 @@ export const PRIORITIES = ['baja', 'normal', 'alta', 'urgente'];
 export const money = (n) => `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const shortDate = (s) => (s ? String(s).slice(0, 10) : '—');
 export const digits = (s) => String(s || '').replace(/\D/g, '');
+
+// Tipo de contacto (empresa, municipio, persona…). Lista abierta: los usuarios agregan más.
+export const CUSTOMER_TYPES = [
+  { key: 'empresa', label: 'Empresa' },
+  { key: 'municipio', label: 'Municipio / Gobierno' },
+  { key: 'persona', label: 'Persona' },
+];
+// Estado del contacto. Lista abierta: los usuarios agregan más.
+export const CUSTOMER_STATUSES = [
+  { key: 'lead', label: 'Lead' },
+  { key: 'prospecto', label: 'Prospecto' },
+  { key: 'cliente', label: 'Cliente' },
+  { key: 'activo', label: 'Activo' },
+  { key: 'proveedor', label: 'Proveedor' },
+  { key: 'asesor', label: 'Asesor' },
+  { key: 'mecanico', label: 'Mecánico' },
+  { key: 'inactivo', label: 'Inactivo' },
+];

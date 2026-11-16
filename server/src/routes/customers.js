@@ -1,6 +1,7 @@
 const express = require('express');
 const { all, get, run, nowIso } = require('../../db');
-const { requireModuleEdit } = require('../middleware/auth');
+const { requireModuleEdit, requireAdmin } = require('../middleware/auth');
+const { mergeCustomers } = require('../utils/mergeCustomers');
 
 const router = express.Router();
 router.use(requireModuleEdit('clientes'));
@@ -107,6 +108,15 @@ router.put('/:id', (req, res) => {
   res.json(get('SELECT * FROM customers WHERE id = ?', [req.params.id]));
 });
 
+// Fusionar duplicados en este cliente (solo administrador): body { sourceIds: [..], name? }
+router.post('/:id/merge', requireAdmin, (req, res) => {
+  try {
+    res.json(mergeCustomers(req.params.id, req.body.sourceIds, req.body.name));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 router.delete('/:id', (req, res) => {
   run('DELETE FROM customers WHERE id = ?', [req.params.id]);
   res.status(204).end();
@@ -163,7 +173,8 @@ router.post('/:id/opportunities', (req, res) => {
   const result = run(
     `INSERT INTO opportunities (customer_id, title, stage, value, probability, expected_close, notes)
      VALUES (?,?,?,?,?,?,?)`,
-    [req.params.id, b.title, b.stage || 'nuevo', b.value ?? null, b.probability ?? null, b.expectedClose || null, b.notes || null]
+    [req.params.id, b.title, b.stage || 'nuevo', b.value === '' || b.value == null ? null : Number(b.value),
+     b.probability === '' || b.probability == null ? null : Number(b.probability), b.expectedClose || null, b.notes || null]
   );
   res.status(201).json(get('SELECT * FROM opportunities WHERE id = ?', [result.lastInsertRowid]));
 });
@@ -174,8 +185,10 @@ router.put('/opportunities/:oppId', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Oportunidad no encontrada' });
   run(
     `UPDATE opportunities SET title=?, stage=?, value=?, probability=?, expected_close=?, notes=?, updated_at=? WHERE id=?`,
-    [b.title ?? existing.title, b.stage ?? existing.stage, b.value ?? existing.value, b.probability ?? existing.probability,
-     b.expectedClose ?? existing.expected_close, b.notes ?? existing.notes, nowIso(), req.params.oppId]
+    [b.title ?? existing.title, b.stage ?? existing.stage,
+     b.value === undefined ? existing.value : (b.value === '' || b.value === null ? null : Number(b.value)),
+     b.probability === undefined ? existing.probability : (b.probability === '' || b.probability === null ? null : Number(b.probability)),
+     b.expectedClose === undefined ? existing.expected_close : (b.expectedClose || null), b.notes ?? existing.notes, nowIso(), req.params.oppId]
   );
   res.json(get('SELECT * FROM opportunities WHERE id = ?', [req.params.oppId]));
 });
@@ -190,10 +203,11 @@ router.post('/:id/activities', (req, res) => {
   const b = req.body;
   if (!b.subject || !b.type) return res.status(400).json({ error: 'Tipo y asunto son obligatorios' });
   const result = run(
-    `INSERT INTO activities (customer_id, type, subject, notes, due_date, done, contact_id, request_id, direction, created_by, occurred_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO activities (customer_id, type, subject, notes, due_date, done, contact_id, request_id, direction, created_by, occurred_at, msg_to, msg_subject, msg_body)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [req.params.id, b.type, b.subject, b.notes || null, b.dueDate || null, b.done ? 1 : 0,
-     b.contactId || null, b.requestId || null, b.direction || null, req.user ? req.user.id : null, b.occurredAt || nowIso()]
+     b.contactId || null, b.requestId || null, b.direction || null, req.user ? req.user.id : null, b.occurredAt || nowIso(),
+     b.msgTo || null, b.msgSubject || null, b.msgBody || null]
   );
   res.status(201).json(get('SELECT * FROM activities WHERE id = ?', [result.lastInsertRowid]));
 });

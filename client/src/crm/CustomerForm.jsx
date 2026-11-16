@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import Pill from '../components/Pill.jsx';
 import { useI18n } from '../i18n.jsx';
-import { ROLES, CONTACT_TYPES, splitRoles } from './constants.js';
+import { ROLES, CONTACT_TYPES, CUSTOMER_TYPES, CUSTOMER_STATUSES, splitRoles } from './constants.js';
+import OpenSelect from './OpenSelect.jsx';
 
 export const EMPTY_CUSTOMER = {
   type: 'empresa', name: '', aliases: '', roles: ['potencial'], taxId: '', email: '', phone: '', phone2: '', website: '',
@@ -94,19 +95,11 @@ export default function CustomerForm({ form, setForm, excludeId, onUseExisting, 
         </div>
         <div className="field">
           <label>{t('Tipo')}</label>
-          <select value={form.type} onChange={f('type')}>
-            <option value="empresa">{t('Empresa / Municipio')}</option>
-            <option value="persona">{t('Persona')}</option>
-          </select>
+          <OpenSelect list="customer_type" builtins={CUSTOMER_TYPES} value={form.type} onChange={(v) => setForm({ ...form, type: v })} />
         </div>
         <div className="field">
           <label>{t('Estado')}</label>
-          <select value={form.status} onChange={f('status')}>
-            <option value="lead">{t('Lead')}</option>
-            <option value="prospecto">{t('Prospecto')}</option>
-            <option value="cliente">{t('Cliente')}</option>
-            <option value="inactivo">{t('Inactivo')}</option>
-          </select>
+          <OpenSelect list="customer_status" builtins={CUSTOMER_STATUSES} value={form.status} onChange={(v) => setForm({ ...form, status: v })} />
         </div>
         <div className="field"><label>{t('Teléfono principal')}</label><input value={form.phone} onChange={f('phone')} /></div>
         <div className="field"><label>{t('Otro teléfono')}</label><input value={form.phone2} onChange={f('phone2')} /></div>

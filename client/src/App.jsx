@@ -9,7 +9,9 @@ import CustomersList from './pages/CustomersList.jsx';
 import CustomerDetail from './pages/CustomerDetail.jsx';
 import CustomerReport from './pages/CustomerReport.jsx';
 import CallConsole from './pages/CallConsole.jsx';
+import MailSettings from './pages/MailSettings.jsx';
 import RequestsList from './pages/RequestsList.jsx';
+import OpportunitiesList from './pages/OpportunitiesList.jsx';
 import ProductsList from './pages/ProductsList.jsx';
 import InventoryStockPage from './pages/InventoryStockPage.jsx';
 import SuppliersList from './pages/SuppliersList.jsx';
@@ -31,6 +33,7 @@ import WarrantiesList from './pages/WarrantiesList.jsx';
 import ReceivablesPage from './pages/ReceivablesPage.jsx';
 import PayablesPage from './pages/PayablesPage.jsx';
 import HelpPage from './pages/HelpPage.jsx';
+import ProcessesPage from './pages/ProcessesPage.jsx';
 import FinancePage from './pages/FinancePage.jsx';
 import AccountRegister from './pages/AccountRegister.jsx';
 import LoansPage from './pages/LoansPage.jsx';
@@ -52,6 +55,7 @@ const NAV = [
     links: [
       { to: '/crm/llamada', text: 'Atender llamada', icon: '📞' },
       { to: '/crm/solicitudes', text: 'Solicitudes', icon: '📥' },
+      { to: '/crm/oportunidades', text: 'Oportunidades', icon: '🎯' },
       { to: '/clientes', text: 'Clientes y contactos', icon: '🤝' },
     ],
   },
@@ -225,6 +229,9 @@ function MainShell() {
           <NavLink to={APPROVALS_LINK.to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <span>{APPROVALS_LINK.icon}</span><span>{t(APPROVALS_LINK.text)}</span>
           </NavLink>
+          <NavLink to="/mi-correo" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <span>📧</span><span>{t('Mi correo (Outlook)')}</span>
+          </NavLink>
           {isAdmin && (
             <NavLink to={ADMIN_LINK.to} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span>{ADMIN_LINK.icon}</span><span>{t(ADMIN_LINK.text)}</span>
@@ -236,6 +243,9 @@ function MainShell() {
           <NavLink to="/ayuda" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <span>📘</span><span>{t('Manual de usuario')}</span>
           </NavLink>
+          <NavLink to="/procedimientos" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <span>🔀</span><span>{t('Procedimientos')}</span>
+          </NavLink>
         </div>
         <div style={{ marginTop: 'auto', padding: '10px 14px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <AccountMenu />
@@ -245,6 +255,7 @@ function MainShell() {
         <HelpButton />
         <Routes>
           <Route path="/ayuda" element={<HelpPage />} />
+          <Route path="/procedimientos" element={<ProcessesPage />} />
           <Route path="/finanzas" element={<FinancePage />} />
           <Route path="/finanzas/cuenta/:id" element={<AccountRegister />} />
           <Route path="/finanzas/prestamos" element={<LoansPage />} />
@@ -255,7 +266,9 @@ function MainShell() {
           <Route path="/clientes/:id" element={<CustomerDetail />} />
           <Route path="/clientes/:id/informe" element={<CustomerReport />} />
           <Route path="/crm/llamada" element={<CallConsole />} />
+          <Route path="/mi-correo" element={<MailSettings />} />
           <Route path="/crm/solicitudes" element={<RequestsList />} />
+          <Route path="/crm/oportunidades" element={<OpportunitiesList />} />
           <Route path="/inventario" element={<InventoryStockPage />} />
           <Route path="/productos" element={<ProductsList />} />
           <Route path="/proveedores" element={<SuppliersList />} />

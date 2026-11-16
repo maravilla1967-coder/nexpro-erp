@@ -9,7 +9,7 @@ const { get, run } = require('../../db');
 // Pedidos (sales-orders) y facturas (invoices) ya tienen su propia lógica de aprobación, por eso
 // este middleware no los toca.
 
-const SKIP = [/^\/(sales-orders|invoices|approvals|users|auth)(\/|$)/];
+const SKIP = [/^\/(sales-orders|invoices|approvals|users|auth|mail)(\/|$)/];
 
 // Ediciones (PUT/PATCH) que necesitan autorización: el documento en sí, no los datos maestros
 // de contacto (clientes, proveedores, mecánicos, servicios), que los usuarios pueden actualizar.

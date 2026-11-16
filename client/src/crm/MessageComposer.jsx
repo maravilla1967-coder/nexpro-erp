@@ -4,7 +4,9 @@ import Modal from '../components/Modal.jsx';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { useI18n } from '../i18n.jsx';
-import { ackMessage, quoteMessage, mailtoHref, smsHref, whatsappHref } from './messages.js';
+import DirectSend from './DirectSend.jsx';
+import { useMailStatus } from './mailStatus.js';
+import { ackMessage, quoteMessage, mailtoHref, outlookHref, smsHref, whatsappHref } from './messages.js';
 
 // Ventana con el mensaje ya preparado para el cliente (acuse de recibo o cotización). Se puede
 // editar, cambiar de idioma y enviar por el mismo medio por donde llegó la solicitud: correo,
@@ -12,6 +14,7 @@ import { ackMessage, quoteMessage, mailtoHref, smsHref, whatsappHref } from './m
 export default function MessageComposer({ request, kind = 'acuse', onClose, onSent }) {
   const { t } = useI18n();
   const { user } = useAuth();
+  const mail = useMailStatus();
   const customer = request.customer || { name: request.customer_name };
   const contact = { name: request.contact_name, email: request.contact_email, phone: request.contact_phone, mobile: request.contact_mobile };
   const [lang, setLang] = useState((request.customer && request.customer.preferred_language) || 'en');
@@ -49,6 +52,10 @@ export default function MessageComposer({ request, kind = 'acuse', onClose, onSe
       setLogged(true);
       onSent && onSent(r);
     } catch (e) { setError(e.message); }
+  }
+  function openOutlook() {
+    window.open(outlookHref(to, subject, body), '_blank', 'noopener');
+    log();
   }
   function openApp() {
     const href = channel === 'email' ? mailtoHref(to, subject, body) : channel === 'whatsapp' ? whatsappHref(to, body) : smsHref(to, body);
@@ -90,13 +97,19 @@ export default function MessageComposer({ request, kind = 'acuse', onClose, onSe
           {t('Adjunta el PDF de la cotización:')} <Link to={`/pedidos/${request.sales_order_id}/documento`} target="_blank">{t('abrir la orden de pedido')} {request.sales_order_number}</Link> → {t('Imprimir / Guardar PDF')}.
         </div>
       )}
+      {channel === 'email' && !logged && <DirectSend mail={mail} to={to} subject={subject} body={body} onSent={log} />}
       <div className="modal-footer" style={{ flexWrap: 'wrap' }}>
         <button type="button" className="btn" onClick={onClose}>{logged ? t('Cerrar') : t('Ahora no')}</button>
         <button type="button" className="btn" onClick={copy}>{t('📋 Copiar texto')}</button>
         {!logged && <button type="button" className="btn" onClick={log}>{t('Ya lo envié')}</button>}
-        <button type="button" className="btn btn-primary" onClick={openApp} disabled={!to}>
-          {channel === 'email' ? t('Abrir en mi correo') : channel === 'whatsapp' ? t('Abrir WhatsApp') : t('Abrir mensajes')}
-        </button>
+        {channel === 'email' && <button type="button" className="btn" onClick={openOutlook} disabled={!to} title={t('Abre el correo en Outlook en el navegador (outlook.office.com)')}>{t('Outlook web')}</button>}
+        {channel === 'email' ? (
+          <button type="button" className={`btn ${mail && mail.connected ? '' : 'btn-primary'}`} onClick={openApp} disabled={!to} title={t('Abre el correo ya escrito en la app de Outlook del computador')}>{t('📧 Abrir en Outlook')}</button>
+        ) : (
+          <button type="button" className="btn btn-primary" onClick={openApp} disabled={!to}>
+            {channel === 'whatsapp' ? t('Abrir WhatsApp') : t('Abrir mensajes')}
+          </button>
+        )}
       </div>
     </Modal>
   );

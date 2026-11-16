@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
@@ -31,11 +31,11 @@ export default function PurchaseOrdersList() {
   const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const words = norm(q).split(/\s+/).filter(Boolean);
   const filtered = list.filter((po) => {
-    if (statusF && po.status !== statusF) return false;
+    if (statusF === '__garantia') { if (!po.is_warranty) return false; } else if (statusF && po.status !== statusF) return false;
     if (supplierF && String(po.supplier_id) !== supplierF) return false;
     if (!words.length) return true;
     const hay = norm([po.number, po.supplier_name, po.items_summary, po.search_products, po.search_serials, po.search_bills, po.search_receipts,
-      po.notes, po.short_note, po.status, po.order_date, po.created_at, po.total, Number(po.total || 0).toFixed(2)].join(' '));
+      po.notes, po.short_note, po.status, po.warranty_number, po.warranty_claim_number, po.vehicle_vin, po.is_warranty ? 'garantia warranty' : '', po.order_date, po.created_at, po.total, Number(po.total || 0).toFixed(2)].join(' '));
     return words.every((w) => hay.includes(w.replace(/[$,]/g, '')));
   });
   const ex = useListExport({ rows: filtered, getDate: poDate, getNumber: poNumber });
@@ -49,6 +49,12 @@ export default function PurchaseOrdersList() {
   const [items, setItems] = useState([{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
   const [notes, setNotes] = useState('');
   const [poTerms, setPoTerms] = useState('');
+  // Orden por garantía: reclamo enlazado ('' ninguno, 'nuevo' crear, o id) y vehículo (VIN).
+  const [warrantyId, setWarrantyId] = useState('');
+  const [poVehicleId, setPoVehicleId] = useState('');
+  const [claims, setClaims] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [params, setParams] = useSearchParams();
   const [error, setError] = useState('');
   const [uploadingDocs, setUploadingDocs] = useState(false);
 
@@ -57,11 +63,18 @@ export default function PurchaseOrdersList() {
     load();
     api.get('/suppliers').then(setSuppliers);
     api.get('/products').then(setProducts);
+    api.get('/warranties?kind=reclamo').then(setClaims).catch(() => {});
+    api.get('/vehicles').then(setVehicles).catch(() => {});
   }, []);
+  // Abrir una orden desde otro módulo (p. ej. desde el reclamo de garantía): /compras?ver=ID
+  useEffect(() => {
+    const ver = params.get('ver');
+    if (ver) { openView(ver).catch(() => {}); setParams({}, { replace: true }); }
+  }, [params]);
 
   function openNew() {
     setEditingPo(null);
-    setSupplierId(''); setOrderDate(todayStr()); setNotes(''); setPoTerms('');
+    setSupplierId(''); setOrderDate(todayStr()); setNotes(''); setPoTerms(''); setWarrantyId(''); setPoVehicleId('');
     setItems([{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
     setError(''); setModalOpen(true);
   }
@@ -72,7 +85,9 @@ export default function PurchaseOrdersList() {
     setSupplierId(full.supplier_id);
     setOrderDate(full.order_date || todayStr());
     setNotes(full.notes || '');
-    setPoTerms(full.payment_terms_days == null ? '' : String(full.payment_terms_days));
+    setPoTerms(full.is_warranty ? 'garantia' : full.payment_terms_days == null ? '' : String(full.payment_terms_days));
+    setWarrantyId(full.warranty_id ? String(full.warranty_id) : '');
+    setPoVehicleId(full.vehicle_id ? String(full.vehicle_id) : '');
     setItems(
       full.items.length > 0
         ? full.items.map((it) => ({ productId: it.product_id || '', description: it.description, quantity: it.quantity, unitPrice: it.unit_cost }))
@@ -108,6 +123,7 @@ export default function PurchaseOrdersList() {
     e.preventDefault();
     const payload = {
       supplierId, orderDate, notes, paymentTermsDays: poTerms,
+      ...(poTerms === 'garantia' ? { warrantyId, vehicleId: poVehicleId } : {}),
       items: linesLocked ? undefined : items.filter((i) => i.description).map((i) => ({ productId: i.productId || null, description: i.description, quantity: parseFloat(i.quantity) || 0, unitCost: parseFloat(i.unitPrice) || 0 })),
     };
     try {
@@ -117,6 +133,7 @@ export default function PurchaseOrdersList() {
         await api.post('/purchase-orders', payload);
       }
       setModalOpen(false); setEditingPo(null); load();
+      if (poTerms === 'garantia') api.get('/warranties?kind=reclamo').then(setClaims).catch(() => {});
     } catch (err) { setError(err.message); }
   }
 
@@ -172,6 +189,7 @@ export default function PurchaseOrdersList() {
           <select style={{ width: 170 }} value={statusF} onChange={(e) => setStatusF(e.target.value)}>
             <option value="">{t('Todos los estados')}</option>
             {['borrador', 'enviada', 'parcial', 'recibida', 'cerrada', 'cancelado'].map((s) => <option key={s} value={s}>{t(s)}</option>)}
+            <option value="__garantia">🛡️ {t('Por garantía')}</option>
           </select>
           {(q || statusF || supplierF) && <button className="btn btn-sm" onClick={() => { setQ(''); setStatusF(''); setSupplierF(''); }}>{t('Limpiar')}</button>}
           {(q || statusF || supplierF) && <span className="muted" style={{ fontSize: 13 }}>{filtered.length} {t('de')} {list.length}</span>}
@@ -185,7 +203,9 @@ export default function PurchaseOrdersList() {
                 {ex.visible.map((po) => (
                   <tr key={po.id}>
                     <td><RowBox ex={ex} row={po} /></td>
-                    <td className="mono clickable" onClick={() => openView(po.id)}>{po.number}</td>
+                    <td className="mono clickable" onClick={() => openView(po.id)}>{po.number}
+                      {po.is_warranty ? <div className="warranty-tag" title={po.vehicle_vin ? `VIN ${po.vehicle_vin}` : ''}>🛡️ {po.warranty_number || t('Garantía')}</div> : null}
+                    </td>
                     <td>{po.supplier_name}</td>
                     <td><Pill value={po.status} /></td>
                     <td className="muted">{po.order_date || po.created_at}</td>
@@ -232,12 +252,47 @@ export default function PurchaseOrdersList() {
                       <option value="">{t('Las del proveedor')}: {lbl(st)}</option>
                       <option value="0">{t('Contado / prepago')}</option>
                       {[15, 30, 45, 60, 90].map((d) => <option key={d} value={String(d)}>{t('Crédito')} {d} {t('días')}</option>)}
+                      <option value="garantia">🛡️ {t('Por garantía (la cubre el fabricante / vendedor)')}</option>
                     </select>
                   );
                 })()}
-                <div className="hint">{t('Se usan al recibir la mercancía para crear la cuenta por pagar. Cámbialas en el proveedor para todas sus órdenes.')}</div>
+                <div className="hint">{poTerms === 'garantia' ? t('Orden por garantía: no genera cuenta por pagar al recibir y queda amarrada al reclamo de garantía y al VIN del equipo.') : t('Se usan al recibir la mercancía para crear la cuenta por pagar. Cámbialas en el proveedor para todas sus órdenes.')}</div>
               </div>
             </div>
+            {poTerms === 'garantia' && (() => {
+              const vin = (id) => { const v = vehicles.find((x) => String(x.id) === String(id)); return v ? v.vin : ''; };
+              const selVin = vin(poVehicleId);
+              const sorted = [...claims].sort((a, b) => (selVin && (b.vin === selVin || String(b.vehicle_id) === String(poVehicleId)) ? 1 : 0) - (selVin && (a.vin === selVin || String(a.vehicle_id) === String(poVehicleId)) ? 1 : 0));
+              const chosen = claims.find((c) => String(c.id) === String(warrantyId));
+              return (
+                <div className="warranty-box">
+                  <div style={{ fontWeight: 600, marginBottom: 8 }}>🛡️ {t('Garantía')}</div>
+                  <div className="grid grid-2">
+                    <div className="field"><label>{t('Vehículo / equipo (VIN)')}</label>
+                      <select value={poVehicleId} onChange={(e) => setPoVehicleId(e.target.value)}>
+                        <option value="">{t('— Seleccionar VIN —')}</option>
+                        {vehicles.map((v) => <option key={v.id} value={v.id}>{v.vin} · {[v.make, v.model, v.year].filter(Boolean).join(' ')}{v.customer_name ? ` · ${v.customer_name}` : ''}</option>)}
+                      </select>
+                    </div>
+                    <div className="field"><label>{t('Reclamo de garantía')}</label>
+                      <select value={warrantyId} onChange={(e) => {
+                        const id = e.target.value; setWarrantyId(id);
+                        const c = claims.find((x) => String(x.id) === id);
+                        if (c && c.vehicle_id && !poVehicleId) setPoVehicleId(String(c.vehicle_id));
+                      }}>
+                        <option value="">{t('— Enlazar después —')}</option>
+                        <option value="nuevo">➕ {t('Crear reclamo nuevo con los datos de esta orden')}</option>
+                        {sorted.map((c) => <option key={c.id} value={c.id}>{c.number} · {c.vin || c.vehicle_vin || t('sin VIN')}{c.item_description ? ` · ${c.item_description.slice(0, 40)}` : ''} · {t(c.status)}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  {chosen && poVehicleId && chosen.vehicle_id && String(chosen.vehicle_id) !== String(poVehicleId) && (
+                    <div className="error-banner" style={{ background: '#fff7ed', color: '#9a3412', marginTop: 4 }}>{t('Ojo: el reclamo es de otro VIN')} ({chosen.vin || chosen.vehicle_vin}).</div>
+                  )}
+                  {warrantyId === 'nuevo' && <div className="muted" style={{ fontSize: 12 }}>{t('Al guardar se crea el reclamo (NX-WC) con el proveedor, el VIN, los items y los comentarios de esta orden. Luego completas la falla y el número de reclamo del fabricante en Garantías.')}</div>}
+                </div>
+              );
+            })()}
             {linesLocked ? (
               <>
                 <table>
@@ -313,6 +368,18 @@ export default function PurchaseOrdersList() {
           <p><strong>{t('Proveedor:')}</strong> {viewing.supplier_id && suppliers.find((s) => s.id === viewing.supplier_id)?.name}</p>
           <p><strong>{t('Estado:')}</strong> <Pill value={viewing.status} /></p>
           <p><strong>{t('Fecha de la orden:')}</strong> {viewing.order_date || '—'}</p>
+          {viewing.is_warranty ? (
+            <div className="warranty-box">
+              <div style={{ fontWeight: 600 }}>🛡️ {t('Orden por garantía')} <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>· {t('la cubre el fabricante / vendedor; no genera cuenta por pagar')}</span></div>
+              <div style={{ marginTop: 6, display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 14 }}>
+                <div>{t('Reclamo:')} {viewing.warranty
+                  ? <><Link to={`/garantias?ver=${viewing.warranty.id}`}><strong>{viewing.warranty.number}</strong></Link> <Pill value={viewing.warranty.status} />{viewing.warranty.manufacturer_claim_number ? <span className="muted"> · {t('No. del fabricante')} {viewing.warranty.manufacturer_claim_number}</span> : null}</>
+                  : <span className="muted">{t('sin enlazar')} — <button className="link-btn" onClick={() => { const po = viewing; setViewing(null); openEdit(po); }}>{t('enlazar')}</button></span>}</div>
+                <div>VIN: {viewing.vehicle ? <Link className="mono" to={`/vehiculos/${viewing.vehicle.id}`}>{viewing.vehicle.vin}</Link> : (viewing.warranty && viewing.warranty.vin) ? <span className="mono">{viewing.warranty.vin}</span> : <span className="muted">—</span>}
+                  {viewing.vehicle ? <span className="muted"> · {[viewing.vehicle.make, viewing.vehicle.model, viewing.vehicle.year].filter(Boolean).join(' ')}{viewing.vehicle.customer_name ? ` · ${viewing.vehicle.customer_name}` : ''}</span> : null}</div>
+              </div>
+            </div>
+          ) : null}
           {viewing.summary && (
             <div className="chain-summary">
               {[['Pedido', viewing.summary.ordered], ['Recibido', viewing.summary.received], ['Pendiente', viewing.summary.pending], ['Faltante cerrado', viewing.summary.short], ['Facturado (por pagar)', viewing.summary.billed], ['Pagado', viewing.summary.paid]].map(([k, v]) => (

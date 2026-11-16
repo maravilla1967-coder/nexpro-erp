@@ -348,3 +348,30 @@ En cuanto estén esos registros, Railway emite el certificado solo y la direcci�
   crea el tipo de equipo, el servicio (precio $0, tarifa "servicio completo") o el producto (costo/precio $0)
   o reutiliza el que ya exista con ese nombre.
 - Vehículo ↔ persona: `vehicles.contact_id` (`PUT /api/crm/vehicles/:id/contact`).
+
+## 17. Correo desde Outlook (Microsoft 365)
+
+El ERP envía los correos del CRM (acuse, cotización, reenvíos) directamente desde la cuenta de Outlook
+de cada usuario con Microsoft Graph (`server/src/routes/mail.js`, pantalla `/mi-correo`).
+
+- **Una vez (administrador):** registrar la app en Microsoft Entra (App registrations → New registration,
+  single tenant, Redirect URI tipo Web = `https://erp.nexprotrucks.com/api/mail/callback`), crear un client
+  secret, dar permisos delegados Microsoft Graph `Mail.Send` y `User.Read` con "Grant admin consent", y pegar
+  Tenant ID, Client ID y el secreto en `/mi-correo` (se guardan en `app_settings`: `ms_tenant_id`,
+  `ms_client_id`, `ms_client_secret`).
+- **Cada usuario:** "Conectar mi Outlook" (OAuth con `offline_access`); los tokens van en `mail_accounts`
+  y se renuevan solos.
+- `POST /api/mail/send` (multipart: to, cc, subject, body, files ≤ 3 MB en total) → `me/sendMail` con
+  `saveToSentItems`. El correo queda en Enviados del usuario; el ERP lo registra en el historial del cliente.
+- Si no hay Outlook conectado, siguen las opciones de abrir la app de Outlook / Outlook web / copiar texto.
+
+## 18. Oportunidades con cotización preliminar (PDF)
+
+- `opportunity_files` guarda los documentos de cada oportunidad (`/uploads/crm-opportunities`).
+- `server/src/utils/quotePdf.js` lee las cotizaciones hechas con la plantilla de Nexpro (Design): número
+  (`QUOTE NO.` / `COTIZACIÓN NO.`), referencia, equipo ofertado, cliente y la tabla `INVESTMENT SUMMARY` /
+  `RESUMEN DE INVERSIÓN` (ítem, cantidad, descripción, precio) hasta `TOTAL QUOTED PRICE` / `PRECIO TOTAL
+  COTIZADO`, usando pdfjs-dist y las posiciones del texto. Avisa si la suma no cuadra con el total.
+- `POST /api/crm/parse-quote` (llenar título/valor al crear), `POST /api/crm/opportunities/:id/files`,
+  `GET /api/crm/opportunity-files/:id/parse`, `POST /api/crm/opportunities/:id/quote` (crea la orden de
+  pedido en borrador con las líneas revisadas — producto + descripción, cantidad, precio — y la enlaza).

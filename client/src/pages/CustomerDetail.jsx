@@ -7,6 +7,9 @@ import { useI18n } from '../i18n.jsx';
 import CustomerForm, { customerToForm, ContactFields, EMPTY_CONTACT } from '../crm/CustomerForm.jsx';
 import { RolePills, StatusPill } from '../crm/CustomerSnapshot.jsx';
 import RequestModal from '../crm/RequestModal.jsx';
+import OpportunityModal from '../crm/OpportunityModal.jsx';
+import MergeCustomersModal from '../crm/MergeCustomersModal.jsx';
+import ResendMessage, { canResend } from '../crm/ResendMessage.jsx';
 import {
   CONTACT_TYPES, INTERACTION_TYPES, contactTypeLabel, interactionIcon, interactionLabel, channelIcon, money, shortDate,
 } from '../crm/constants.js';
@@ -26,10 +29,13 @@ export default function CustomerDetail() {
   const [d, setD] = useState(null);
   const [tab, setTab] = useState(params.get('tab') || 'resumen');
   const [modal, setModal] = useState(null);
+  const [merging, setMerging] = useState(false);
   const [form, setForm] = useState({});
   const [error, setError] = useState('');
   const [tlFilter, setTlFilter] = useState('');
   const [contactFilter, setContactFilter] = useState('');
+  const [resend, setResend] = useState(null);
+  const [opp, setOpp] = useState(null); // 'nueva' o id
   const openReq = params.get('solicitud');
 
   function load() { api.get(`/crm/customers/${id}/360`).then(setD).catch((e) => setError(e.message)); }
@@ -92,8 +98,10 @@ export default function CustomerDetail() {
           <Link to={`/crm/llamada?cliente=${c.id}`} className="btn btn-primary">{t('📞 Nueva solicitud')}</Link>
           <Link to={`/clientes/${c.id}/informe`} className="btn">{t('🖨️ Informe del cliente')}</Link>
           <button className="btn" onClick={() => open('edit', customerToForm(c))}>{t('Editar')}</button>
+          <button className="btn admin-only" onClick={() => setMerging(true)}>{t('🔗 Fusionar duplicados')}</button>
           <button className="btn btn-danger" onClick={remove}>{t('Eliminar')}</button>
         </div>
+        {merging && <MergeCustomersModal customer={c} onClose={() => setMerging(false)} onDone={() => { setMerging(false); load(); }} />}
       </div>
       <div className="content">
         {error && !modal && <div className="error-banner">{error}</div>}
@@ -133,6 +141,7 @@ export default function CustomerDetail() {
                       <div>{e.link ? <Link to={e.link}>{e.title}</Link> : e.title}{e.who && <span className="muted"> — {e.who}</span>}</div>
                       {e.detail && <div className="muted tl-detail" title={t('Clic para ver todo')} onClick={(ev) => ev.currentTarget.classList.toggle('open')}>{e.detail}</div>}
                       {e.by && <div className="muted" style={{ fontSize: 11 }}>{t('registró')} {e.by}</div>}
+                      {canResend(e.activity) && <button type="button" className="btn btn-sm" style={{ marginTop: 6 }} onClick={() => setResend(e.activity)}>{t('↻ Reenviar')}</button>}
                     </div>
                   </div>
                 ))}
@@ -218,7 +227,12 @@ export default function CustomerDetail() {
                       <td>{a.contact_name || '—'}</td>
                       <td>{a.subject}{a.notes && <div className="muted" style={{ fontSize: 12.5, whiteSpace: 'pre-wrap' }}>{a.notes}</div>}</td>
                       <td className="muted">{a.created_by_name || '—'}</td>
-                      <td><button className="btn-row-action delete" onClick={() => delActivity(a)}>{t('Eliminar')}</button></td>
+                      <td>
+                        <div className="row-actions">
+                          {canResend(a) && <button className="btn-row-action" onClick={() => setResend(a)}>{t('↻ Reenviar')}</button>}
+                          <button className="btn-row-action delete" onClick={() => delActivity(a)}>{t('Eliminar')}</button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -310,14 +324,16 @@ export default function CustomerDetail() {
 
         {tab === 'oportunidades' && (
           <div className="card">
-            <div className="card-title">{t('Oportunidades')} <button className="btn btn-sm btn-primary" onClick={() => open('opportunity', { stage: 'nuevo' })}>{t('+ Agregar')}</button></div>
+            <div className="card-title">{t('Oportunidades')} <button className="btn btn-sm btn-primary" onClick={() => setOpp('nueva')}>{t('+ Agregar')}</button></div>
             {d.opportunities.length === 0 ? <div className="empty-state">{t('Sin oportunidades.')}</div> : (
               <table>
-                <thead><tr><th>{t('Título')}</th><th>{t('Valor')}</th><th>{t('Prob.')}</th><th>{t('Cierre esperado')}</th><th>{t('Etapa')}</th><th></th></tr></thead>
+                <thead><tr><th>{t('Título')}</th><th>{t('Valor')}</th><th>{t('Prob.')}</th><th>{t('Cierre esperado')}</th><th>{t('Etapa')}</th><th>{t('Documentos')}</th><th>{t('Cotización ERP')}</th><th></th></tr></thead>
                 <tbody>{d.opportunities.map((o) => (
-                  <tr key={o.id}><td>{o.title}</td><td>{o.value ? money(o.value) : '—'}</td><td>{o.probability != null ? `${o.probability}%` : '—'}</td><td>{o.expected_close || '—'}</td>
-                    <td><select value={o.stage} onChange={(e) => updateStage(o, e.target.value)} style={{ width: 150 }}>{STAGES.map((x) => <option key={x} value={x}>{t(x)}</option>)}</select></td>
-                    <td><button className="btn-row-action delete" onClick={() => delOpp(o)}>{t('Eliminar')}</button></td></tr>
+                  <tr key={o.id} className="clickable" onClick={() => setOpp(o.id)}><td><strong>{o.title}</strong></td><td>{o.value ? money(o.value) : '—'}</td><td>{o.probability != null ? `${o.probability}%` : '—'}</td><td>{o.expected_close || '—'}</td>
+                    <td onClick={(e) => e.stopPropagation()}><select value={o.stage} onChange={(e) => updateStage(o, e.target.value)} style={{ width: 150 }}>{STAGES.map((x) => <option key={x} value={x}>{t(x)}</option>)}</select></td>
+                    <td>{o.files_count ? `📎 ${o.files_count}` : <span className="muted">—</span>}</td>
+                    <td onClick={(e) => e.stopPropagation()}>{o.sales_order_id ? <Link to={`/pedidos?abrir=${o.sales_order_id}`} className="mono">{o.sales_order_number}</Link> : <span className="muted">—</span>}</td>
+                    <td onClick={(e) => e.stopPropagation()}><div className="row-actions"><button className="btn-row-action" onClick={() => setOpp(o.id)}>{t('Abrir')}</button><button className="btn-row-action delete" onClick={() => delOpp(o)}>{t('Eliminar')}</button></div></td></tr>
                 ))}</tbody>
               </table>
             )}
@@ -341,7 +357,7 @@ export default function CustomerDetail() {
       </div>
 
       {modal === 'edit' && (
-        <Modal title={t('Editar cliente')} onClose={() => setModal(null)} wide>
+        <Modal title={t('Registro de Contacto')} onClose={() => setModal(null)} wide>
           <form onSubmit={saveCustomer}>
             {error && <div className="error-banner">{error}</div>}
             <CustomerForm form={form} setForm={setForm} excludeId={c.id} onUseExisting={(x) => { setModal(null); navigate(`/clientes/${x.id}`); }} />
@@ -413,6 +429,8 @@ export default function CustomerDetail() {
         </Modal>
       )}
 
+      {opp && <OpportunityModal customerId={c.id} opportunityId={opp === 'nueva' ? null : opp} onClose={() => setOpp(null)} onChanged={load} />}
+      {resend && <ResendMessage activity={resend} customerId={c.id} onClose={() => setResend(null)} onSent={load} />}
       {openReq && <RequestModal id={openReq} onClose={() => setParams({ tab: 'solicitudes' })} onChanged={load} />}
     </>
   );

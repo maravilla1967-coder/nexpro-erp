@@ -7,7 +7,8 @@ import { useI18n } from '../i18n.jsx';
 import ListExportBar, { useListExport, SelectAllBox, RowBox } from '../components/ListExport.jsx';
 import CustomerForm, { EMPTY_CUSTOMER, EMPTY_CONTACT } from '../crm/CustomerForm.jsx';
 import { RolePills, StatusPill } from '../crm/CustomerSnapshot.jsx';
-import { ROLES, shortDate } from '../crm/constants.js';
+import { ROLES, CUSTOMER_STATUSES, shortDate } from '../crm/constants.js';
+import { useOpenOptions } from '../crm/OpenSelect.jsx';
 const CUSTOMER_COLUMNS = [
   { label: 'Nombre', value: (r) => r.name },
   { label: 'Tipo', value: (r) => r.type },
@@ -30,6 +31,7 @@ export default function CustomersList() {
   const ex = useListExport({ rows: list });
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [statusOptions] = useOpenOptions('customer_status', CUSTOMER_STATUSES);
   const [role, setRole] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_CUSTOMER);
@@ -61,7 +63,7 @@ export default function CustomersList() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/crm/llamada" className="btn">{t('📞 Atender llamada')}</Link>
-          <button className="btn btn-primary" onClick={openNew}>{t('+ Nuevo cliente')}</button>
+          <button className="btn btn-primary" onClick={openNew}>{t('+ Nuevo contacto')}</button>
         </div>
       </div>
       <div className="content">
@@ -73,10 +75,7 @@ export default function CustomersList() {
           </div>
           <select style={{ width: 180 }} value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">{t('Todos los estados')}</option>
-            <option value="lead">{t('Lead')}</option>
-            <option value="prospecto">{t('Prospecto')}</option>
-            <option value="cliente">{t('Cliente')}</option>
-            <option value="inactivo">{t('Inactivo')}</option>
+            {statusOptions.map((o) => <option key={o.key} value={o.key}>{t(o.label)}</option>)}
           </select>
         </div>
         <div className="card">
@@ -108,7 +107,7 @@ export default function CustomersList() {
       </div>
 
       {modalOpen && (
-        <Modal title={t('Nuevo cliente')} onClose={() => setModalOpen(false)} wide>
+        <Modal title={t('Registro Nuevo Contacto')} onClose={() => setModalOpen(false)} wide>
           <form onSubmit={save}>
             {error && <div className="error-banner">{error}</div>}
             <CustomerForm form={form} setForm={setForm} withContact contact={contact} setContact={setContact}

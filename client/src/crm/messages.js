@@ -48,6 +48,9 @@ export function quoteMessage({ lang = 'en', customer, contact, request, userName
   };
 }
 
+// Outlook web (Microsoft 365) — abre el mensaje ya escrito en la cuenta de Outlook con la que se
+// esté conectado en el navegador (je.ramirez@nexprotrucks.com), en una pestaña nueva.
+export const outlookHref = (to, subject, body) => `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(to || '')}&subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
 export const mailtoHref = (to, subject, body) => `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
 export const smsHref = (phone, body) => `sms:${String(phone || '').replace(/[^\d+]/g, '')}${/iPhone|iPad|Mac/i.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body || '')}`;
 export const whatsappHref = (phone, body) => {

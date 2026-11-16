@@ -8,6 +8,7 @@ import { useAuth } from '../auth.jsx';
 import CatalogQuickPick from './CatalogQuickPick.jsx';
 import MessageComposer from './MessageComposer.jsx';
 import RequestFiles from './RequestFiles.jsx';
+import ResendMessage, { canResend } from './ResendMessage.jsx';
 import ServiceOrderModal from './ServiceOrderModal.jsx';
 import { REQUEST_STATUSES, PRIORITIES, CHANNELS, channelIcon, interactionIcon, contactTypeLabel, money, shortDate } from './constants.js';
 
@@ -25,6 +26,7 @@ export default function RequestModal({ id, onClose, onChanged }) {
   const [composer, setComposer] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [resend, setResend] = useState(null);
   const [serviceOpen, setServiceOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -191,8 +193,10 @@ export default function RequestModal({ id, onClose, onChanged }) {
         <div key={a.id} className="snap-line">
           {interactionIcon(a.type)} <span className="muted">{String(a.occurred_at || a.created_at).slice(0, 16)}</span> {a.subject}
           {a.created_by_name && <span className="muted"> — {a.created_by_name}</span>}
+          {canResend(a) && <button type="button" className="link-btn" style={{ marginLeft: 8 }} onClick={() => setResend(a)}>{t('↻ Reenviar')}</button>}
         </div>
       ))}
+      {resend && <ResendMessage activity={resend} customerId={r.customer_id} onClose={() => setResend(null)} onSent={load} />}
 
       <div className="modal-footer" style={{ flexWrap: 'wrap' }}>
         {isAdmin ? <button type="button" className="btn btn-danger" onClick={remove} style={{ marginRight: 'auto' }}>{t('Eliminar')}</button> : <span style={{ marginRight: 'auto' }} />}

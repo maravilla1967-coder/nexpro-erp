@@ -7,15 +7,17 @@ const COLORS = {
   cancelado: 'red', pagada: 'green', vencida: 'red', borrador: 'gray', enviada: 'blue',
   recibido: 'blue', en_servicio: 'orange', completado: 'green', entregado: 'gray',
   nuevo: 'gray', calificado: 'blue', propuesta: 'orange', negociacion: 'amber',
-  ganado: 'green', perdido: 'red', activo: 'green',
+  ganado: 'green', perdido: 'red', activo: 'green', proveedor: 'orange', asesor: 'blue', mecanico: 'amber',
   admin: 'blue', usuario: 'gray', invitado: 'amber', desactivado: 'red', rechazado: 'red',
   abierta: 'amber', parcial: 'orange', corriente: 'green', disponible: 'green', vendido: 'blue', instalado: 'orange', dado_de_baja: 'red', anulada: 'red', aprobada: 'green', rechazada: 'red', cerrada: 'gray', registrada: 'green', vigente: 'amber', pagado: 'green',
 };
+
+const LABELS = { mecanico: 'Mecánico', municipio: 'Municipio / Gobierno' };
 
 export default function Pill({ value }) {
   const { t } = useI18n();
   if (!value) return null;
   const color = COLORS[value] || 'gray';
-  const label = t(value.replace(/_/g, ' '));
+  const label = t(LABELS[value] || value.replace(/_/g, ' '));
   return <span className={`pill ${color}`}>{label}</span>;
 }
