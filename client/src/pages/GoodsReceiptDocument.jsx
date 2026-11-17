@@ -90,15 +90,15 @@ export default function GoodsReceiptDocument() {
             {(po.supplier_email || po.supplier_phone) && <div className="muted">{po.supplier_email} {po.supplier_phone}</div>}
           </div>
 
-          <table style={{ marginTop: 20, fontSize: 13 }}>
+          <table className="doc-table" style={{ marginTop: 20, fontSize: 12.5 }}>
             <thead>
               <tr>
-                <th style={{ minWidth: 260 }}>{t('Artículo')}</th>
-                <th className="text-right">{t('Ordenado')}</th>
-                {gr && <th className="text-right">{t('Recibido antes')}</th>}
-                <th className="text-right">{gr ? t('Recibido aquí') : t('Recibido')}</th>
-                <th className="text-right">{t('Faltante')}</th>
-                <th className="text-right">{t('Pendiente')}</th>
+                <th>{t('Artículo')}</th>
+                <th className="text-right">{t('Ord.')}</th>
+                {gr && <th className="text-right">{t('Antes')}</th>}
+                <th className="text-right">{gr ? t('Aquí') : t('Rec.')}</th>
+                <th className="text-right">{t('Falt.')}</th>
+                <th className="text-right">{t('Pend.')}</th>
                 <th className="text-right">{t('Costo unit.')}</th>
                 <th className="text-right">{t('Valor recibido')}</th>
                 <th>{t('Estado')}</th>
@@ -125,6 +125,10 @@ export default function GoodsReceiptDocument() {
             </tbody>
           </table>
 
+          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+            {gr ? t('Ord. = ordenado · Antes = recibido en recepciones anteriores · Aquí = recibido en esta recepción · Falt. = faltante (no llegará) · Pend. = pendiente por recibir')
+                : t('Ord. = ordenado · Rec. = recibido · Falt. = faltante (no llegará) · Pend. = pendiente por recibir')}
+          </div>
           <div className="invoice-totals">
             <div><span>{t('Valor ordenado')}</span><span>{fmt$(gr ? tot((r) => r.ordered * r.it.unit_cost) : po.summary.ordered)}</span></div>
             <div><span>{gr ? t('Valor recibido en esta recepción') : t('Valor recibido')}</span><span>{fmt$(tot((r) => r.thisDoc * r.it.unit_cost))}</span></div>

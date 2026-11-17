@@ -257,7 +257,15 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--o
 .btn-row-action.delete:hover { background: #fee2e2; border-color: var(--red); }
 
 /* ---- Factura imprimible ---- */
-.invoice-sheet { max-width: 760px; margin: 0 auto; }
+.invoice-sheet { max-width: 760px; margin: 0 auto; overflow-wrap: break-word; }
+/* Documentos imprimibles: las tablas nunca se salen de la hoja. Encabezados que pueden partirse,
+   celdas compactas y texto largo (descripciones, seriales) que se ajusta a la columna. */
+.invoice-sheet table { width: 100%; max-width: 100%; }
+.invoice-sheet thead th { padding: 6px 6px; letter-spacing: 0; white-space: normal; line-height: 1.2; vertical-align: bottom; }
+.invoice-sheet tbody td { padding: 8px 6px; overflow-wrap: anywhere; }
+.invoice-sheet td.text-right { overflow-wrap: normal; white-space: nowrap; }
+.invoice-sheet .invoice-totals > div { gap: 12px; }
+.invoice-sheet .invoice-totals > div > span:last-child { white-space: nowrap; }
 .invoice-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--navy); padding-bottom: 16px; margin-bottom: 16px; }
 .invoice-logo { max-height: 70px; max-width: 220px; object-fit: contain; }
 .invoice-brand-fallback strong { color: var(--navy); font-size: 18px; letter-spacing: .02em; }
@@ -663,3 +671,6 @@ table.register tr.cleared td { background: #f8fafc; }
 .opp-sum > div { display: flex; flex-direction: column; }
 .opp-sum span { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
 .opp-sum strong { font-size: 20px; color: var(--navy); }
+
+/* Pantallas angostas (celular/tablet): la tabla del documento se desplaza dentro de la hoja en vez de salirse. */
+@media screen and (max-width: 900px) { .invoice-sheet { overflow-x: auto; } }
