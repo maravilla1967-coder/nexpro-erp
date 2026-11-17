@@ -17,6 +17,7 @@ import InventoryStockPage from './pages/InventoryStockPage.jsx';
 import SuppliersList from './pages/SuppliersList.jsx';
 import PurchaseOrdersList from './pages/PurchaseOrdersList.jsx';
 import PurchaseOrderDocument from './pages/PurchaseOrderDocument.jsx';
+import GoodsReceiptDocument from './pages/GoodsReceiptDocument.jsx';
 import SalesOrdersList from './pages/SalesOrdersList.jsx';
 import DeliveryTicketDocument from './pages/DeliveryTicketDocument.jsx';
 import SalesOrderDocument from './pages/SalesOrderDocument.jsx';
@@ -274,6 +275,7 @@ function MainShell() {
           <Route path="/proveedores" element={<SuppliersList />} />
           <Route path="/compras" element={<PurchaseOrdersList />} />
           <Route path="/compras/:id/documento" element={<PurchaseOrderDocument />} />
+          <Route path="/compras/:id/recepcion" element={<GoodsReceiptDocument />} />
           <Route path="/pedidos" element={<SalesOrdersList />} />
           <Route path="/pedidos/:id/documento" element={<SalesOrderDocument />} />
           <Route path="/facturas" element={<InvoicesList />} />
