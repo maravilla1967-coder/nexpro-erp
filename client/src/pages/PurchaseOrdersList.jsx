@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/Modal.jsx';
 import Pill from '../components/Pill.jsx';
@@ -44,6 +44,16 @@ export default function PurchaseOrdersList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPo, setEditingPo] = useState(null); // null = nueva orden; si no, se está editando esta orden existente
   const [viewing, setViewing] = useState(null);
+  const navigate = useNavigate();
+  // Acta de recepción para lo recibido sin documento (órdenes de antes del ERP).
+  const [histForm, setHistForm] = useState(null); // { receiptDate, addStock }
+  async function doHistorical() {
+    try {
+      const r = await api.post(`/purchase-orders/${viewing.id}/historical-receipt`, histForm);
+      setHistForm(null); load();
+      navigate(`/compras/${viewing.id}/recepcion?gr=${r.receipt.id}`);
+    } catch (e) { setViewErr(e.message); }
+  }
   const [supplierId, setSupplierId] = useState('');
   const [orderDate, setOrderDate] = useState(todayStr());
   const [items, setItems] = useState([{ productId: '', description: '', quantity: 1, unitPrice: 0 }]);
@@ -212,6 +222,7 @@ export default function PurchaseOrdersList() {
                     <td style={{ textAlign: 'right' }}>${Number(po.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td style={{ display: 'flex', gap: 10 }}>
                       <Link className="link-btn" to={`/compras/${po.id}/documento`}>{t('Imprimir')}</Link>
+                      {['parcial', 'recibida', 'cerrada'].includes(po.status) && <Link className="link-btn" to={`/compras/${po.id}/recepcion`}>{t('Recepción')}</Link>}
                       <Link className="link-btn" to={`/garantias?nuevo=registro&oc=${po.id}`}>{t('Garantía')}</Link>
                       {po.status !== 'cancelado' && <button className="link-btn" onClick={() => openEdit(po)}>{t('Editar')}</button>}
                       {po.status === 'borrador' && <button className="link-btn" onClick={() => markStatus(po, 'enviada')}>{t('Marcar enviada')}</button>}
@@ -355,12 +366,18 @@ export default function PurchaseOrdersList() {
         </Modal>
       )}
 
-      {receiving && <ReceiveModal po={receiving} onClose={() => setReceiving(null)} onDone={() => { setReceiving(null); load(); }} />}
+      {receiving && <ReceiveModal po={receiving} onClose={() => setReceiving(null)} onDone={(updated) => {
+        const poId = receiving.id; setReceiving(null); load();
+        // Al recibir se abre el acta de recepción de lo que acaba de llegar (ordenado vs. recibido).
+        const last = updated && updated.receipts && updated.receipts[updated.receipts.length - 1];
+        if (last) navigate(`/compras/${poId}/recepcion?gr=${last.id}`);
+      }} />}
 
       {viewing && (
         <Modal title={`${t('Orden de compra')} ${viewing.number}`} onClose={() => setViewing(null)} wide>
           <div style={{ marginBottom: 10 }}>
             <Link className="btn btn-sm" to={`/compras/${viewing.id}/documento`}>{t('🖨️ Imprimir / Guardar PDF')}</Link>{' '}
+            {((viewing.receipts || []).length > 0 || ['parcial', 'recibida', 'cerrada'].includes(viewing.status)) && <><Link className="btn btn-sm" to={`/compras/${viewing.id}/recepcion`}>{t('📋 Acta de recepción (ordenado vs. recibido)')}</Link>{' '}</>}
             <Link className="btn btn-sm" to={`/garantias?nuevo=registro&oc=${viewing.id}`}>{t('🛡️ Registrar garantía')}</Link>{' '}
             <Link className="btn btn-sm" to={`/cuentas-por-pagar?nuevo=1&oc=${viewing.id}`}>{t('🧾 Registrar factura del proveedor')}</Link>{' '}
             {!['recibida', 'cancelado', 'cerrada'].includes(viewing.status) && <button className="btn btn-sm btn-primary" onClick={() => { setReceiving(viewing); setViewing(null); }}>{t('📦 Recibir mercancía')}</button>}
@@ -422,6 +439,20 @@ export default function PurchaseOrdersList() {
           {viewing.status === 'cerrada' && <button className="btn btn-sm" style={{ marginTop: 8 }} onClick={doReopenShort}>{t('Reabrir faltante (sí va a llegar)')}</button>}
           {viewErr && <div className="error-banner" style={{ marginTop: 8 }}>{viewErr}</div>}
 
+          {viewing.summary && viewing.summary.undocumented_qty > 0 && (
+            <div className="warranty-box" style={{ background: '#fff7ed', borderColor: '#fed7aa' }}>
+              <div style={{ fontWeight: 600 }}>📋 {t('Esta orden figura recibida pero no tiene documento de recepción')}</div>
+              <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{t('Genera el acta para dejar el registro de lo recibido, con sus seriales. Las órdenes de antes del ERP ya tienen su inventario cargado, por eso por omisión no se vuelve a sumar.')}</div>
+              {histForm === null
+                ? <button className="btn btn-sm btn-primary" style={{ marginTop: 8 }} onClick={() => setHistForm({ receiptDate: viewing.order_date || '', addStock: false })}>{t('Generar acta de recepción')}</button>
+                : <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                    <label style={{ fontSize: 13 }}>{t('Fecha de recepción')} <input type="date" value={histForm.receiptDate} onChange={(e) => setHistForm({ ...histForm, receiptDate: e.target.value })} /></label>
+                    <label style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={histForm.addStock} onChange={(e) => setHistForm({ ...histForm, addStock: e.target.checked })} /> {t('Sumar estas cantidades al inventario (solo si NO están cargadas)')}</label>
+                    <button className="btn btn-sm btn-primary" onClick={doHistorical}>{t('Generar')}</button>
+                    <button className="btn btn-sm" onClick={() => setHistForm(null)}>{t('Cancelar')}</button>
+                  </div>}
+            </div>
+          )}
           {viewing.receipts && viewing.receipts.length > 0 && (
             <>
               <p style={{ marginTop: 14, marginBottom: 4 }}><strong>{t('Recepciones (entradas a inventario):')}</strong></p>
@@ -430,9 +461,9 @@ export default function PurchaseOrdersList() {
                 <tbody>
                   {viewing.receipts.map((r) => (
                     <tr key={r.id}>
-                      <td className="mono">{r.number}</td>
+                      <td className="mono"><Link to={`/compras/${viewing.id}/recepcion?gr=${r.id}`}>{r.number}</Link></td>
                       <td className="muted">{r.receipt_date}{r.created_by_name ? ` · ${r.created_by_name}` : ''}</td>
-                      <td style={{ fontSize: 13 }}>{r.items.map((i) => `${i.quantity} × ${i.description}`).join('; ')}{r.notes ? <div className="muted">{r.notes}</div> : null}</td>
+                      <td style={{ fontSize: 13 }}>{r.items.map((i) => `${i.quantity} × ${i.description}${(i.serials || []).length ? ` [S/N ${i.serials.map((s) => s.serial).join(', ')}]` : ''}`).join('; ')}{r.notes ? <div className="muted">{r.notes}</div> : null}</td>
                       <td style={{ fontSize: 13 }}>{r.bill ? <><Link to={`/cuentas-por-pagar?ver=${r.bill.id}`}>{r.bill.bill_number || `#${r.bill.id}`}</Link> · {fmt$(r.bill.amount)} <Pill value={r.bill.status} /></> : <span className="muted">{t('sin factura')}</span>}</td>
                     </tr>
                   ))}

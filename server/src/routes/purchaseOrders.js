@@ -3,7 +3,7 @@ const { all, get, run } = require('../../db');
 const { nextPoNumber } = require('../utils/numbering');
 const { requireModuleEdit } = require('../middleware/auth');
 const { makeDocUploader } = require('../middleware/upload');
-const { receivePurchaseOrder, closeShort, reopenShort } = require('../utils/receiving');
+const { receivePurchaseOrder, closeShort, reopenShort, recordHistoricalReceipt } = require('../utils/receiving');
 const { linkPoWarranty, unlinkPo, createClaimForPo } = require('../utils/warrantyLink');
 
 // "Por garantía" se elige en las condiciones de pago: la orden la cubre el fabricante/vendedor.
@@ -37,7 +37,9 @@ const docUpload = makeDocUploader('purchase-order-docs');
 
 function withItems(po) {
   if (!po) return po;
-  po.items = all(`SELECT i.*, p.track_serials, p.name AS product_name FROM purchase_order_items i
+  po.items = all(`SELECT i.*, p.track_serials, p.name AS product_name, p.stock_qty, p.sku AS product_sku,
+                  (SELECT COALESCE(SUM(g.quantity),0) FROM goods_receipt_items g WHERE g.purchase_order_item_id = i.id) AS gr_qty
+                  FROM purchase_order_items i
                   LEFT JOIN products p ON p.id = i.product_id WHERE i.purchase_order_id = ? ORDER BY i.id`, [po.id]);
   po.attachments = all('SELECT * FROM purchase_order_attachments WHERE purchase_order_id = ? ORDER BY id', [po.id]);
   po.receipts = all(
@@ -49,6 +51,9 @@ function withItems(po) {
   for (const b of po.bills) b.balance = Math.round((b.amount - b.paid) * 100) / 100;
   for (const r of po.receipts) {
     r.items = all('SELECT * FROM goods_receipt_items WHERE goods_receipt_id = ?', [r.id]);
+    for (const gi of r.items) {
+      gi.serials = gi.product_id ? all('SELECT serial, status FROM product_serials WHERE goods_receipt_id = ? AND product_id = ? ORDER BY id', [r.id, gi.product_id]) : [];
+    }
     r.bill = po.bills.find((b) => b.goods_receipt_id === r.id) || null;
   }
   // Resumen de la cadena: pedido, recibido, faltante, facturado y pagado.
@@ -65,6 +70,8 @@ function withItems(po) {
   // Las órdenes históricas importadas no tienen recepciones, así que no generan este aviso.
   const costOf = new Map(po.items.map((i) => [i.id, Number(i.unit_cost) || 0]));
   const viaReceipts = po.receipts.reduce((s, r) => s + r.items.reduce((t, gi) => t + gi.quantity * (costOf.get(gi.purchase_order_item_id) || 0), 0), 0);
+  // Lo que figura recibido pero no tiene documento de recepción (órdenes de antes del ERP).
+  po.summary.undocumented_qty = Math.round(po.items.reduce((t, i) => t + Math.max(0, (i.received_qty || 0) - (i.gr_qty || 0)), 0) * 1000) / 1000;
   po.summary.unbilled = po.is_warranty ? 0 : Math.max(0, Math.round((viaReceipts - po.summary.billed) * 100) / 100);
   // Garantía: reclamo enlazado y vehículo (VIN).
   po.warranty = po.warranty_id ? get(WARRANTY_SELECT, [po.warranty_id]) || null : null;
@@ -228,6 +235,15 @@ router.post('/:id/receipts', (req, res) => {
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
+});
+
+// Acta de recepción para lo que figura recibido sin documento (órdenes de antes del ERP).
+router.post('/:id/historical-receipt', (req, res) => {
+  try {
+    const b = req.body || {};
+    const r = recordHistoricalReceipt(req.params.id, { receiptDate: b.receiptDate, notes: b.notes, addStock: !!b.addStock, userId: req.user && req.user.id });
+    res.status(201).json({ ...r, po: withItems(get(`SELECT po.*, s.name as supplier_name FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id WHERE po.id = ?`, [req.params.id])) });
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
 
 // Corregir la fecha / notas de una recepción ya hecha (no cambia cantidades ni inventario).

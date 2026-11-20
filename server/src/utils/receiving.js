@@ -154,6 +154,51 @@ function backfillReceivedQty() {
   run("INSERT INTO app_settings (key, value) VALUES ('po_received_qty_backfill_v1', ?)", [String(r.changes)]);
 }
 
+// Acta de recepción para órdenes que se recibieron antes del ERP (o sin documento): crea la
+// recepción (GR) por lo que figura recibido pero no tiene documento, sin mover inventario
+// (ya se había cargado) salvo que se pida addStock. Registra los seriales que vengan escritos
+// en la descripción de la línea (S/N …, Serial# …) si todavía no existen.
+const SERIAL_RE = /(?:S\/N|SERIAL\s*#|SERIAL\s*NO\.?|SERIAL)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{4,})/gi;
+function serialsInText(text) {
+  const out = []; let m; SERIAL_RE.lastIndex = 0;
+  while ((m = SERIAL_RE.exec(String(text || '')))) out.push(m[1].toUpperCase());
+  return [...new Set(out)];
+}
+function recordHistoricalReceipt(poId, { receiptDate, notes, addStock, userId } = {}) {
+  const po = get('SELECT * FROM purchase_orders WHERE id = ?', [poId]);
+  if (!po) throw httpError(404, 'Orden de compra no encontrada');
+  const items = all(`SELECT i.*, p.track_serials, (SELECT COALESCE(SUM(g.quantity),0) FROM goods_receipt_items g WHERE g.purchase_order_item_id = i.id) AS gr_qty
+                     FROM purchase_order_items i LEFT JOIN products p ON p.id = i.product_id WHERE i.purchase_order_id = ? ORDER BY i.id`, [poId]);
+  const missing = items.map((i) => ({ item: i, qty: round2(Number(i.received_qty || 0) - Number(i.gr_qty || 0)) })).filter((x) => x.qty > 0.0001);
+  if (!missing.length) throw httpError(400, 'Todo lo recibido de esta orden ya tiene su documento de recepción.');
+  const date = receiptDate || po.order_date || new Date().toISOString().slice(0, 10);
+  db.exec('BEGIN');
+  try {
+    const number = nextDocNumber('goods_receipts', 'GR');
+    const rid = run('INSERT INTO goods_receipts (number, purchase_order_id, receipt_date, notes, created_by) VALUES (?,?,?,?,?)',
+      [number, poId, date, notes || (addStock ? 'Acta de recepción (mercancía recibida antes del ERP; se sumó al inventario).'
+        : 'Acta de recepción histórica: la mercancía ya estaba recibida e ingresada al inventario antes del ERP.'), userId || null]).lastInsertRowid;
+    let serialsAdded = 0;
+    for (const { item, qty } of missing) {
+      run('INSERT INTO goods_receipt_items (goods_receipt_id, purchase_order_item_id, product_id, description, quantity) VALUES (?,?,?,?,?)',
+        [rid, item.id, item.product_id || null, item.description, qty]);
+      if (addStock && item.product_id) run('UPDATE products SET stock_qty = stock_qty + ? WHERE id = ?', [qty, item.product_id]);
+      if (item.product_id) {
+        for (const sn of serialsInText(item.description).slice(0, Math.ceil(qty))) {
+          if (get('SELECT id FROM product_serials WHERE product_id = ? AND serial = ?', [item.product_id, sn])) continue;
+          const sid = run(`INSERT INTO product_serials (product_id, serial, status, purchase_order_id, goods_receipt_id, supplier_id, received_date, unit_cost, status_date)
+                           VALUES (?,?,?,?,?,?,?,?,?)`, [item.product_id, sn, 'disponible', poId, rid, po.supplier_id, date, item.unit_cost, date]).lastInsertRowid;
+          run('INSERT INTO serial_events (serial_id, event, reference, created_by) VALUES (?,?,?,?)', [sid, 'recibido', `${number} · OC ${po.number}`, userId || null]);
+          run('UPDATE products SET track_serials = 1 WHERE id = ?', [item.product_id]);
+          serialsAdded++;
+        }
+      }
+    }
+    db.exec('COMMIT');
+    return { receipt: get('SELECT * FROM goods_receipts WHERE id = ?', [rid]), serialsAdded };
+  } catch (err) { db.exec('ROLLBACK'); throw err; }
+}
+
 function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 function addDays(dateStr, days) {
   const d = new Date(`${String(dateStr).slice(0, 10)}T12:00:00Z`);
@@ -164,4 +209,4 @@ function addDays(dateStr, days) {
 
 function httpError(status, message) { const e = new Error(message); e.status = status; return e; }
 
-module.exports = { receivePurchaseOrder, refreshPoStatus, backfillReceivedQty, closeShort, reopenShort };
+module.exports = { receivePurchaseOrder, refreshPoStatus, backfillReceivedQty, closeShort, reopenShort, recordHistoricalReceipt };
