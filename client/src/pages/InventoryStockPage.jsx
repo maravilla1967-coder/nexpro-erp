@@ -18,7 +18,7 @@ const COLUMNS = [
   { label: 'Tipo', value: (r) => r.product_type_name },
   { label: 'Proveedor', value: (r) => r.supplier_name },
   { label: 'Existencia', value: (r) => r.stock_qty, type: 'number' },
-  { label: 'Seriales disponibles', value: (r) => (r.track_serials ? r.serials_available : ''), type: 'number' },
+  { label: 'Seriales disponibles', value: (r) => (r.track_serials ? r.serials_list : ''), mono: true },
   { label: 'Costo unit.', value: (r) => unitCost(r), type: 'money', noTotal: true },
   { label: 'Valor al costo', value: (r) => unitCost(r) * (Number(r.stock_qty) || 0), type: 'money' },
   { label: 'Precio venta', value: (r) => r.selling_price, type: 'money', noTotal: true },
@@ -35,6 +35,7 @@ export default function InventoryStockPage() {
 
   const [expandedId, setExpandedId] = useState(null);
   const [serialsByProduct, setSerialsByProduct] = useState({});
+  const [serialsAll, setSerialsAll] = useState({});
 
   function toggleSerials(p) {
     if (expandedId === p.id) { setExpandedId(null); return; }
@@ -51,7 +52,25 @@ export default function InventoryStockPage() {
     api.get('/products/types').then(setTypes).catch(() => {});
   }, []);
 
-  const inStock = useMemo(() => (all || []).filter((p) => Math.abs(Number(p.stock_qty) || 0) > 0.0001), [all]);
+  useEffect(() => {
+    if (!all || !all.length) return;
+    const ids = all.filter((p) => p.track_serials).map((p) => p.id);
+    if (!ids.length) { setSerialsAll({}); return; }
+    api.get('/serials', { status: 'disponible', productIds: ids.join(',') })
+      .then((list) => {
+        const map = {};
+        (list || []).forEach((s) => { (map[s.product_id] = map[s.product_id] || []).push(s.serial); });
+        setSerialsAll(map);
+      })
+      .catch(() => {});
+  }, [all]);
+
+  const inStock = useMemo(
+    () => (all || [])
+      .filter((p) => Math.abs(Number(p.stock_qty) || 0) > 0.0001)
+      .map((p) => ({ ...p, serials_list: (serialsAll[p.id] || []).join(', ') })),
+    [all, serialsAll]
+  );
 
   const rows = useMemo(() => {
     let r = inStock;
