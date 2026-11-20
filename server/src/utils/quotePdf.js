@@ -62,7 +62,12 @@ async function parseQuotePdf(buffer) {
   };
 
   const quoteLine = find(/^(QUOTE NO|COTIZACION NO|QUOTATION NO)/) || find(/(QUOTE NO|COTIZACION NO)\./);
-  const quoteNumber = quoteLine ? (quoteLine.text.match(/NX-[\w-]+/) || [after(quoteLine, /(QUOTE|COTIZACION|NO\.?)/)])[0] : null;
+  let quoteNumber = quoteLine ? (quoteLine.text.match(/NX-[\w-]+/) || [after(quoteLine, /(QUOTE|COTIZACION|NO\.?)/)])[0] : null;
+  if (!quoteNumber) {
+    // Cotizadores web (quoters/<Marca>/...): el número de cotización va como "Quote #: NX-XX-20261023-1021"
+    // o, si no, aparece solo en el encabezado técnico de la página (mismo texto que el nombre del archivo).
+    for (const l of all) { const m = l.text.match(/NX-[A-Z]{1,4}-\d{6,8}-\d+/); if (m) { quoteNumber = m[0]; break; } }
+  }
   const refLine = find(/^(REFERENCE|REFERENCIA)\b/);
   const reference = refLine ? after(refLine, /^(REFERENCE|REFERENCIA)$/) : null;
   const language = all.some((l) => /RESUMEN DE INVERSION|COTIZACION NO/.test(norm(l.text))) ? 'es' : 'en';
@@ -72,18 +77,32 @@ async function parseQuotePdf(buffer) {
   const eqIdx = all.findIndex((l) => /^(EQUIPMENT OFFERED|EQUIPO OFERTADO)$/.test(norm(l.text)));
   if (eqIdx >= 0 && all[eqIdx + 1]) equipment = all[eqIdx + 1].text;
 
-  // Cliente: primer renglón bajo "PREPARED FOR / PREPARADA PARA" (columna izquierda)
+  // Cliente: en la plantilla vieja, el nombre va en el renglón que sigue a "PREPARED FOR" (que es su
+  // propio título); en los cotizadores web (quoters/<Marca>/...), "Prepared for: <nombre>" y el número
+  // de cotización comparten el mismo renglón (dos columnas), así que primero se intenta sacar el
+  // nombre del mismo renglón, y si no hay nada ahí, se cae al renglón siguiente.
   let customerName = null; let attention = null;
   const pfIdx = all.findIndex((l) => /(PREPARED FOR|PREPARADA PARA)/.test(norm(l.text)));
   if (pfIdx >= 0) {
     const pf = all[pfIdx].parts.find((p) => /(PREPARED FOR|PREPARADA PARA)/.test(norm(p.str)));
     const leftCol = (l) => clean(l.parts.filter((p) => !pf || p.x < pf.x + 200).map((p) => p.str).join(' '));
-    customerName = all[pfIdx + 1] ? leftCol(all[pfIdx + 1]) : null;
-    const second = all[pfIdx + 2] ? leftCol(all[pfIdx + 2]) : '';
-    if (second && !/\d{3,}/.test(second)) attention = second.replace(/^(Attn:|Atención:|At\.?:)\s*/i, '');
+    const sameLine = pf ? clean(all[pfIdx].parts.filter((p) => p.x > pf.x && p.x < pf.x + 350).map((p) => p.str).join(' ')) : '';
+    if (sameLine) {
+      customerName = sameLine;
+    } else {
+      customerName = all[pfIdx + 1] ? leftCol(all[pfIdx + 1]) : null;
+      const second = all[pfIdx + 2] ? leftCol(all[pfIdx + 2]) : '';
+      if (second && !/\d{3,}/.test(second)) attention = second.replace(/^(Attn:|Atención:|At\.?:)\s*/i, '');
+    }
   }
 
-  // Tabla de líneas
+  // Tabla de líneas — dos formatos posibles:
+  //  1) Plantilla vieja (Claude Design/Canva): tabla "INVESTMENT SUMMARY"/"RESUMEN DE INVERSIÓN",
+  //     columnas ITEM | QTY | DESCRIPTION | PRICE, termina en "TOTAL QUOTED PRICE".
+  //  2) Cotizadores web (nexprotrucks.com/quoters/<Marca>/...): tabla directa con encabezado
+  //     "# DESCRIPTION UNIT PRICE QTY LINE TOTAL"; cada renglón principal (con número en la columna #)
+  //     puede traer renglones "+ ..." debajo — partes/accesorios que varían según el chasis (bómper,
+  //     arnés, kit de montaje, etc.) y que también deben entrar como líneas propias de la cotización.
   const items = [];
   let total = null;
   for (const lines of pages) {
@@ -134,13 +153,60 @@ async function parseQuotePdf(buffer) {
     break;
   }
 
+  if (!items.length) {
+    for (const lines of pages) {
+      const headerIdx = lines.findIndex((l) => /^#\s/.test(l.text) && /(DESCRIPTION|DESCRIPCION)/.test(norm(l.text)) && /(LINE TOTAL|TOTAL LINEA|TOTAL RENGLON)/.test(norm(l.text)));
+      if (headerIdx < 0) continue;
+      const header = lines[headerIdx];
+      const col = (re) => { const p = header.parts.find((x) => re.test(norm(x.str))); return p ? p.x : null; };
+      const xHash = col(/^#$/) ?? 44;
+      const xDesc = col(/^(DESCRIPTION|DESCRIPCION)/) ?? 63;
+      const xUnit = col(/^(UNIT PRICE|PRECIO UNIT)/) ?? 413;
+      const xQty = col(/^(QTY|CANT)/) ?? 481;
+      const xLineTotal = col(/(LINE TOTAL|TOTAL LINEA|TOTAL RENGLON)/) ?? 513;
+      // El pie "TOTAL" sale como su propio renglón (la plantilla web apila la etiqueta y el monto);
+      // el monto puede venir en ese mismo renglón o en el siguiente.
+      const endIdx = lines.findIndex((l, i) => i > headerIdx && /^TOTAL$/.test(norm(l.text)));
+      const body = lines.slice(headerIdx + 1, endIdx < 0 ? undefined : endIdx);
+      if (endIdx >= 0) {
+        let m = lines[endIdx].text.match(MONEY);
+        if (!m && lines[endIdx + 1]) m = lines[endIdx + 1].text.match(MONEY);
+        if (m) total = toNumber(m[1]);
+      }
+      for (const l of body) {
+        const hashPart = l.parts.find((p) => Math.abs(p.x - xHash) < 15 && /^\d+$/.test(p.str.trim()));
+        const firstStr = l.parts[0] ? l.parts[0].str.trim() : '';
+        const isSubItem = !hashPart && /^\+/.test(firstStr);
+        if (!hashPart && !isSubItem) continue; // renglón que no es ni principal ni "+" (p.ej. nota al pie)
+        const descParts = l.parts.filter((p) => p.x >= xDesc - 15 && p.x < xUnit - 20);
+        const description = clean(descParts.map((p) => p.str).join(' ')).replace(/^\+\s*/, '');
+        if (!description) continue;
+        const unitPricePart = l.parts.find((p) => p.x >= xUnit - 20 && p.x < xQty - 15 && MONEY.test(p.str));
+        const qtyPart = l.parts.find((p) => p.x >= xQty - 25 && p.x < xLineTotal - 10 && /^\d+(\.\d+)?$/.test(p.str.trim()));
+        const lineTotalPart = l.parts.find((p) => p.x >= xLineTotal - 15 && MONEY.test(p.str));
+        const qty = qtyPart ? Number(qtyPart.str.trim()) : 1;
+        const lineTotal = lineTotalPart ? toNumber(lineTotalPart.str.match(MONEY)[1]) : null;
+        const unitPrice = unitPricePart ? toNumber(unitPricePart.str.match(MONEY)[1]) : (lineTotal != null && qty > 0 ? Math.round((lineTotal / qty) * 100) / 100 : null);
+        items.push({
+          item: hashPart ? hashPart.str.trim() : '+',
+          quantity: qty > 0 ? qty : 1,
+          description,
+          details: '',
+          lineTotal,
+          unitPrice,
+        });
+      }
+      break;
+    }
+  }
+
   for (const it of items) {
     if (!it.description) {
       it.description = equipment || reference || 'Equipo según cotización';
       warnings.push(`La línea ${it.item} no trae descripción en la tabla; se usó "${it.description}".`);
     }
   }
-  if (!items.length) warnings.push('No se encontró la tabla de precios ("Investment summary" / "Resumen de inversión"). Agrega las líneas a mano.');
+  if (!items.length) warnings.push('No se encontró la tabla de precios ("Investment summary"/"Resumen de inversión", o el formato de los cotizadores web). Agrega las líneas a mano.');
   const sum = Math.round(items.reduce((s, i) => s + (i.lineTotal || 0), 0) * 100) / 100;
   if (total != null && items.length && Math.abs(sum - total) > 0.01) warnings.push(`La suma de las líneas (${sum}) no coincide con el total del PDF (${total}). Revisa los precios.`);
 
