@@ -80,6 +80,60 @@ router.get('/pricelists/:file', (req, res) => {
   res.type('text/csv').send(fs.readFileSync(full, 'utf8'));
 });
 
+// ---- Reporte de inventario vendido, agrupable por tipo (grupo) o producto (modelo) ----
+// GET /api/products/sold-report?productTypeId=&productId=&from=&to=&q=
+// Lee de invoice_items (lo que realmente se facturó), excluyendo facturas anuladas/canceladas.
+router.get('/sold-report', (req, res) => {
+  const { productTypeId, productId, from, to, q } = req.query;
+  let where = "i.status NOT IN ('anulada','cancelado')";
+  const params = [];
+  if (productTypeId) { where += ' AND p.product_type_id = ?'; params.push(productTypeId); }
+  if (productId) { where += ' AND ii.product_id = ?'; params.push(productId); }
+  if (from) { where += ' AND date(i.issue_date) >= date(?)'; params.push(from); }
+  if (to) { where += ' AND date(i.issue_date) <= date(?)'; params.push(to); }
+  if (q) {
+    where += ' AND (p.name LIKE ? OR p.sku LIKE ? OR ii.description LIKE ? OR c.name LIKE ?)';
+    const like = `%${q}%`; params.push(like, like, like, like);
+  }
+  const rows = all(
+    `SELECT ii.id, i.id AS invoice_id, i.number AS invoice_number, i.issue_date, i.status AS invoice_status,
+            c.id AS customer_id, c.name AS customer_name,
+            ii.product_id, COALESCE(p.name, ii.description) AS product_name, p.sku,
+            p.product_type_id, pt.name AS product_type_name,
+            ii.description, ii.quantity, ii.unit_price, (ii.quantity * ii.unit_price) AS total
+     FROM invoice_items ii
+     JOIN invoices i ON i.id = ii.invoice_id
+     JOIN customers c ON c.id = i.customer_id
+     LEFT JOIN products p ON p.id = ii.product_id
+     LEFT JOIN product_types pt ON pt.id = p.product_type_id
+     WHERE ${where}
+     ORDER BY i.issue_date DESC, i.id DESC`,
+    params
+  );
+  // Resumen por producto (modelo) y por tipo (grupo), para la vista agrupada.
+  const byProduct = {};
+  const byType = {};
+  for (const r of rows) {
+    const pKey = r.product_id || `desc:${r.description}`;
+    if (!byProduct[pKey]) byProduct[pKey] = { product_id: r.product_id, product_name: r.product_name, sku: r.sku, product_type_name: r.product_type_name, quantity: 0, total: 0, sales: 0 };
+    byProduct[pKey].quantity += Number(r.quantity) || 0;
+    byProduct[pKey].total += Number(r.total) || 0;
+    byProduct[pKey].sales += 1;
+
+    const tKey = r.product_type_id || 'sin-tipo';
+    if (!byType[tKey]) byType[tKey] = { product_type_id: r.product_type_id, product_type_name: r.product_type_name || 'Sin tipo', quantity: 0, total: 0, sales: 0 };
+    byType[tKey].quantity += Number(r.quantity) || 0;
+    byType[tKey].total += Number(r.total) || 0;
+    byType[tKey].sales += 1;
+  }
+  res.json({
+    rows,
+    byProduct: Object.values(byProduct).sort((a, b) => b.total - a.total),
+    byType: Object.values(byType).sort((a, b) => b.total - a.total),
+    totals: { quantity: rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0), total: rows.reduce((s, r) => s + (Number(r.total) || 0), 0), sales: rows.length },
+  });
+});
+
 // ---- Importar lista de precios (CSV/JSON ya convertido a filas en el navegador) ----
 // POST /api/products/import  { rows: [...], supplierName, productTypeName, marginPercent, dryRun }
 // Cada fila: sku, name, vendorItemNumber, description, chassisCa, gvwr, bodyWeight, purchaseCost,

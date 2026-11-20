@@ -33,6 +33,19 @@ export default function InventoryStockPage() {
   const [typeId, setTypeId] = useState('');
   const [sort, setSort] = useState('name');
 
+  const [expandedId, setExpandedId] = useState(null);
+  const [serialsByProduct, setSerialsByProduct] = useState({});
+
+  function toggleSerials(p) {
+    if (expandedId === p.id) { setExpandedId(null); return; }
+    setExpandedId(p.id);
+    if (!serialsByProduct[p.id]) {
+      api.get('/serials', { productId: p.id, status: 'disponible' })
+        .then((list) => setSerialsByProduct((c) => ({ ...c, [p.id]: list })))
+        .catch(() => setSerialsByProduct((c) => ({ ...c, [p.id]: [] })));
+    }
+  }
+
   useEffect(() => {
     api.get('/products').then(setAll).catch(() => setAll([]));
     api.get('/products/types').then(setTypes).catch(() => {});
@@ -85,6 +98,7 @@ export default function InventoryStockPage() {
           <div className="sub">{t('Lo que hay disponible en bodega — solo artículos con existencia')}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <Link to="/inventario/vendido" className="btn">📤 {t('Inventario vendido')}</Link>
           <Link to="/productos" className="btn">🏷️ {t('Catálogo de productos')}</Link>
           <Link to="/compras" className="btn">🛒 {t('Órdenes de Compra')}</Link>
         </div>
@@ -142,7 +156,8 @@ export default function InventoryStockPage() {
                 </thead>
                 <tbody>
                   {ex.visible.map((p) => (
-                    <tr key={p.id} style={Number(p.stock_qty) < 0 ? { background: '#fef2f2' } : null}>
+                    <React.Fragment key={p.id}>
+                    <tr style={Number(p.stock_qty) < 0 ? { background: '#fef2f2' } : null}>
                       <td><RowBox ex={ex} row={p} /></td>
                       <td>
                         <Link to={`/productos?q=${encodeURIComponent(p.sku || p.name)}`}><strong>{p.name}</strong></Link>
@@ -152,12 +167,44 @@ export default function InventoryStockPage() {
                       <td className="muted">{p.product_type_name || '—'}</td>
                       <td className="text-right" style={{ whiteSpace: 'nowrap' }}>
                         <strong style={{ fontSize: 15, color: Number(p.stock_qty) < 0 ? '#b91c1c' : undefined }}>{Number(p.stock_qty).toLocaleString()}</strong> <span className="muted">{p.unit && p.unit !== 'unidad' ? p.unit : ''}</span>
-                        {p.track_serials ? <div><Link className="muted" style={{ fontSize: 12 }} to={`/seriales?producto=${p.id}`}>🔢 {p.serials_available} {t('seriales disp.')}</Link></div> : null}
+                        {p.track_serials ? (
+                          <div>
+                            <button type="button" className="link-btn" style={{ fontSize: 12 }} onClick={() => toggleSerials(p)}>
+                              🔢 {p.serials_available} {t('seriales disp.')} {expandedId === p.id ? '▲' : '▼'}
+                            </button>
+                          </div>
+                        ) : null}
                       </td>
                       <td className="text-right">{money(unitCost(p))}</td>
                       <td className="text-right"><strong>{money(unitCost(p) * Number(p.stock_qty))}</strong></td>
                       <td className="text-right">{money(p.selling_price)}</td>
                     </tr>
+                    {expandedId === p.id && (
+                      <tr>
+                        <td colSpan={8} style={{ background: '#f8fafc', padding: '10px 14px' }}>
+                          {!serialsByProduct[p.id] ? (
+                            <span className="muted">{t('Cargando seriales…')}</span>
+                          ) : serialsByProduct[p.id].length === 0 ? (
+                            <span className="muted">{t('No hay seriales disponibles registrados para este producto.')}</span>
+                          ) : (
+                            <>
+                              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+                                {t('Seriales disponibles para contar')} ({serialsByProduct[p.id].length}){Number(p.stock_qty) !== serialsByProduct[p.id].length ? (
+                                  <strong style={{ color: '#b91c1c', marginLeft: 8 }}>⚠️ {t('no coincide con la existencia')} ({Number(p.stock_qty)})</strong>
+                                ) : null}
+                                {' · '}<Link to={`/seriales?producto=${p.id}`}>{t('ver historial completo')}</Link>
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {serialsByProduct[p.id].map((s) => (
+                                  <span key={s.id} className="mono" style={{ background: '#fff', border: '1px solid var(--border, #e2e8f0)', borderRadius: 4, padding: '2px 8px', fontSize: 13 }}>{s.serial}</span>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

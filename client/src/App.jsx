@@ -14,6 +14,7 @@ import RequestsList from './pages/RequestsList.jsx';
 import OpportunitiesList from './pages/OpportunitiesList.jsx';
 import ProductsList from './pages/ProductsList.jsx';
 import InventoryStockPage from './pages/InventoryStockPage.jsx';
+import SoldProductsReport from './pages/SoldProductsReport.jsx';
 import SuppliersList from './pages/SuppliersList.jsx';
 import PurchaseOrdersList from './pages/PurchaseOrdersList.jsx';
 import PurchaseOrderDocument from './pages/PurchaseOrderDocument.jsx';
@@ -81,6 +82,7 @@ const NAV = [
     label: 'Inventario y Compras',
     links: [
       { to: '/inventario', text: 'Inventario', icon: '📦' },
+      { to: '/inventario/vendido', text: 'Inventario vendido', icon: '📤' },
       { to: '/productos', text: 'Catálogo de productos', icon: '🏷️' },
       { to: '/proveedores', text: 'Proveedores', icon: '🏭' },
       { to: '/compras', text: 'Órdenes de Compra', icon: '🛒' },
@@ -270,6 +272,7 @@ function MainShell() {
           <Route path="/crm/solicitudes" element={<RequestsList />} />
           <Route path="/crm/oportunidades" element={<OpportunitiesList />} />
           <Route path="/inventario" element={<InventoryStockPage />} />
+          <Route path="/inventario/vendido" element={<SoldProductsReport />} />
           <Route path="/productos" element={<ProductsList />} />
           <Route path="/proveedores" element={<SuppliersList />} />
           <Route path="/compras" element={<PurchaseOrdersList />} />
